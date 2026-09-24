@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/API/">
+    <Project Path="src/Vaulta.Web.Api/Vaulta.Web.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/API/Modules/">
+    <Project Path="src/Modules/Identity/Vaulta.Identity.Application/Vaulta.Identity.Application.csproj" />
+    <Project Path="src/Modules/Identity/Vaulta.Identity.Contracts/Vaulta.Identity.Contracts.csproj" />
+    <Project Path="src/Modules/Identity/Vaulta.Identity.Domain/Vaulta.Identity.Domain.csproj" />
+    <Project Path="src/Modules/Identity/Vaulta.Identity.Infrastructure/Vaulta.Identity.Infrastructure.csproj" />
+    <Project Path="src/Vaulta.SharedKernel/Vaulta.SharedKernel.csproj" />
+  </Folder>
+  <Folder Name="/src/API/Modules/Identity/" />
+  <Folder Name="/tests/">
+    <Project Path="tests/Vaulta.ArchitectureTests/Vaulta.ArchitectureTests.csproj" />
+    <Project Path="tests/Vaulta.Identity.IntegrationTests/Vaulta.Identity.IntegrationTests.csproj" />
+    <Project Path="tests/Vaulta.Identity.UnitTests/Vaulta.Identity.UnitTests.csproj" />
+  </Folder>
+</Solution>
