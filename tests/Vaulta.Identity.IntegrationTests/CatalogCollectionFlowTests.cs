@@ -155,6 +155,23 @@ public sealed class CatalogCollectionFlowTests(ApiFixture fixture)
         Assert.Equal("completed", (await nextScope.ServiceProvider.GetRequiredService<CatalogDbContext>().SyncRuns.SingleAsync(x => x.Id == next)).Status);
     }
 
+    [Fact]
+    public async Task FailedSetRollsBackAndDoesNotFlushPendingEntitiesWhenRecordingFailure()
+    {
+        var provider = new FixtureProvider { DuplicatePrinting = true };
+        await using var scope = fixture.Factory.Services.CreateAsyncScope();
+        await Assert.ThrowsAsync<DbUpdateException>(() => Sync(scope.ServiceProvider, provider).Synchronize("fake", provider.SetId, default));
+        var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+        Assert.False(await db.Sets.AnyAsync(x => x.Name == provider.SetName));
+        Assert.False(await db.Cards.AnyAsync(x => x.Name == provider.CardName));
+        var run = await db.SyncRuns.SingleAsync(x => x.Scope == provider.SetId);
+        Assert.Equal("failed", run.Status);
+        Assert.Equal(0, run.RecordsCreated);
+        Assert.Equal(0, run.RecordsUpdated);
+        Assert.Equal(0, run.RecordsUnresolved);
+        Assert.NotNull(run.CompletedAt);
+    }
+
     [Theory]
     [InlineData("page=0")]
     [InlineData("pageSize=0")]
@@ -186,13 +203,16 @@ public sealed class CatalogCollectionFlowTests(ApiFixture fixture)
         public string Artwork { get; set; } = "https://example.com/pikachu.png";
         public string Rarity { get; set; } = "Rare";
         public IReadOnlyList<ProviderVariant> Variants { get; set; } = [new("normal", "Normal", "normal"), new("reverse", "Reverse", "reverse")];
+        public bool DuplicatePrinting { get; set; }
         public Func<CancellationToken, Task>? BeforeDetails { get; set; }
         private ProviderSet Set => new(SetId, SetName, null, new DateOnly(2026, 1, 1));
         public Task<IReadOnlyList<ProviderSet>> GetSets(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ProviderSet>>([Set]);
         public async Task<ProviderSetDetails> GetSetDetails(string setId, CancellationToken cancellationToken)
         {
             if (BeforeDetails is not null) await BeforeDetails(cancellationToken);
-            return new(Set, [new("card-" + _key, CardName, "007 / 100", "en", Rarity, Artwork, Variants)]);
+            var printing = new ProviderPrinting("card-" + _key, CardName, "007 / 100", "en", Rarity, Artwork, Variants);
+            // Different external identities claim the same canonical set/number/language. The DB must reject the entire batch.
+            return new(Set, DuplicatePrinting ? [printing, printing with { ExternalId = "other-" + _key }] : [printing]);
         }
     }
 

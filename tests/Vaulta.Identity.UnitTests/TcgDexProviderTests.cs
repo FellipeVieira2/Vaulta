@@ -102,6 +102,20 @@ public sealed class TcgDexProviderTests
         Assert.False(error.IsTransient); Assert.Equal(category, error.ErrorCategory);
     }
 
+    [Theory]
+    [InlineData("[]", "invalid_json")]
+    [InlineData("null", "invalid_contract")]
+    [InlineData("{\"normal\":\"yes\"}", "invalid_json")]
+    public async Task IncompatibleVariantsArePermanentContractFailures(string variants, string category)
+    {
+        using var handler = new Handler((request, _) => Task.FromResult(Json(request.RequestUri!.AbsolutePath.Contains("/sets/", StringComparison.Ordinal)
+            ? Fixture("set") : "{\"id\":\"base1-58\",\"name\":\"Pikachu\",\"localId\":\"58\",\"set\":{\"id\":\"base1\",\"name\":\"Base Set\"},\"variants\":" + variants + "}")));
+        using var client = Client(handler);
+        var provider = new TcgDexProvider(client, Options.Create(new TcgDexOptions()));
+        var error = await Assert.ThrowsAsync<CatalogProviderException>(() => provider.GetSetDetails("base1", default));
+        Assert.False(error.IsTransient); Assert.Equal(category, error.ErrorCategory);
+    }
+
     [Fact]
     public async Task TimeoutIsTransientButCallerCancellationPropagates()
     {

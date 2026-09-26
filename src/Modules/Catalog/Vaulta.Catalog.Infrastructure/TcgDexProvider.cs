@@ -33,7 +33,11 @@ internal sealed partial class TcgDexProvider(HttpClient httpClient, IOptions<Tcg
     public async Task<IReadOnlyList<ProviderSet>> GetSets(CancellationToken cancellationToken)
     {
         var sets = await Get<TcgDexSetDto[]>("sets", cancellationToken);
-        foreach (var set in sets) ValidateIdentity(set.Id, set.Name);
+        foreach (var set in sets)
+        {
+            if (set is null) throw ContractError("TCGdex set entry is null.");
+            ValidateIdentity(set.Id, set.Name);
+        }
         // TCGdex IDs are integration keys, not authoritative canonical set codes.
         return sets.Select(x => new ProviderSet(x.Id, x.Name, null, null)).ToArray();
     }
@@ -44,6 +48,11 @@ internal sealed partial class TcgDexProvider(HttpClient httpClient, IOptions<Tcg
         ValidateIdentity(set.Id, set.Name);
         if (set.Id != setId || set.Cards is null)
             throw ContractError("TCGdex set identity or cards collection is invalid.");
+        foreach (var brief in set.Cards)
+        {
+            if (brief is null) throw ContractError("TCGdex card brief is null.");
+            ValidateIdentity(brief.Id, brief.Name);
+        }
         if (set.Cards.Select(x => x.Id).Distinct(StringComparer.Ordinal).Count() != set.Cards.Length)
             throw ContractError("TCGdex set contains duplicate card identities.");
         DateOnly? releaseDate = null;
@@ -61,12 +70,12 @@ internal sealed partial class TcgDexProvider(HttpClient httpClient, IOptions<Tcg
         }, async (index, ct) =>
         {
             var brief = set.Cards[index];
-            ValidateIdentity(brief.Id, brief.Name);
             // Briefs omit rarity and treatments. Refresh details on every sync so metadata changes are observed.
             var card = await Get<TcgDexCardDetailsDto>($"cards/{Uri.EscapeDataString(brief.Id)}", ct);
             ValidateIdentity(card.Id, card.Name);
-            if (card.Id != brief.Id || card.Set?.Id != setId || card.Variants is null)
+            if (card.Id != brief.Id || card.Set?.Id != setId)
                 throw ContractError("TCGdex card does not match the requested card/set.");
+            if (card.Variants is null) throw ContractError("TCGdex variants object is missing.");
             var number = CollectorNumber(card.LocalId);
             var variants = card.Variants.Where(x => x.Value)
                 .Select(x => new ProviderVariant(VariantCode(x.Key), VariantName(x.Key), x.Key))
