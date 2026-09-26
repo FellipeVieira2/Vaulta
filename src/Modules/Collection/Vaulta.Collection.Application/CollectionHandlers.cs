@@ -16,6 +16,7 @@ public sealed class CollectionCommandHandlers(ICollectionStore store, ICollectio
         await new AddCollectibleItemsValidator().ValidateAndThrowAsync(command.Request, cancellationToken);
         var request = command.Request;
         var printing = await catalog.GetPrinting(request.PrintingId, cancellationToken) ?? throw new NotFoundException("Printing not found.");
+        if (!printing.IsActive) throw new ConflictException("Printing is no longer available in the catalog and cannot be added to a collection.");
         if (request.VariantId is { } variantId)
         {
             var variant = await catalog.GetVariant(variantId, cancellationToken) ?? throw new NotFoundException("Variant not found.");

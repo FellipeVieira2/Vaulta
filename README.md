@@ -253,6 +253,28 @@ Somente variants ativas aparecem para seleção. Códigos mantêm o padrão can�
 sem enum fechado, preservando `RawValue`. Variants removidas da fonte ficam inativas e conservam seus GUIDs;
 se reaparecerem, o mesmo ID é reativado. Collection continua resolvendo referências históricas, inclusive inativas.
 
+### Printing lifecycle (IsActive)
+
+`Printing` também possui `IsActive` (default `true`), com o mesmo comportamento de `Variant`: nunca é deletada
+fisicamente. Ao final de um sync de set concluído com sucesso, o serviço compara as Printings retornadas pelo
+provider com as já conhecidas para aquele Set:
+
+- Presente no resultado atual → `IsActive = true` (ativa ou reativada, preservando o mesmo `PrintingId`).
+- Conhecida anteriormente para o Set mas ausente do resultado atual → `IsActive = false`.
+
+Essa comparação só acontece depois que todo o lote do set foi persistido com sucesso (mesma transação do sync).
+Timeout, HTTP 429/500, JSON inválido, cancelamento ou falha de persistência interrompem o processo antes disso;
+nenhuma Printing é desativada em um sync que falhou parcial ou totalmente.
+
+Catálogo público × leitura histórica:
+
+- `GET /api/v1/catalog/search` e `GET /api/v1/catalog/printings/{id}` só retornam/expõem Printings com
+  `IsActive == true`. Uma Printing inativa responde `404` no detalhe público e não aparece na busca.
+- O reader interno usado por Collection (`ICatalogCollectionReader`) continua resolvendo Printings ativas e
+  inativas, preservando a leitura de itens de coleção antigos mesmo que a Printing tenha saído do catálogo público.
+- `POST /api/v1/me/collection/items` rejeita com `409 Conflict` a adição de **novos** itens referenciando uma
+  Printing inativa; a leitura de entradas/itens já existentes não é afetada por essa regra.
+
 O app usa diretamente os GUIDs retornados:
 
 ```http

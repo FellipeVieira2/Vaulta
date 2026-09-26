@@ -62,6 +62,7 @@ public sealed class Printing
     public string? RawRarity { get; set; }
     public string? ExternalArtworkUrl { get; set; }
     public string? ArtworkProvider { get; set; }
+    public bool IsActive { get; set; } = true;
     public Card Card { get; set; } = null!;
     public Set Set { get; set; } = null!;
     public ICollection<Variant> Variants { get; set; } = new List<Variant>();

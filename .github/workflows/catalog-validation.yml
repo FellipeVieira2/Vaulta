@@ -1,8 +1,9 @@
 name: Catalog validation
 on:
   push:
-    branches: [fix/catalog-tcgdex-maui]
+    branches: [master]
   pull_request:
+    branches: [master]
     paths:
       - 'src/Modules/Catalog/**'
       - 'src/Modules/Collection/**'
@@ -10,6 +11,7 @@ on:
       - 'tests/**'
       - '.github/workflows/catalog-validation.yml'
       - 'scripts/smoke-catalog.py'
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -40,8 +42,8 @@ jobs:
           name: catalog-test-results
           path: TestResults
   smoke:
-    # One controlled real-provider smoke on this implementation branch, never on forks/ordinary PRs.
-    if: github.event_name == 'push'
+    # Real-provider smoke runs only on master pushes or manual dispatch, never on ordinary PRs.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

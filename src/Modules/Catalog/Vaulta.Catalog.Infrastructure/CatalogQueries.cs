@@ -10,7 +10,7 @@ internal sealed class CatalogQueries(CatalogDbContext db) : ICatalogSearch, ICat
     {
         var normalized = Catalog.Domain.CatalogNormalizer.NormalizeName(query);
         if (normalized.Length == 0) return new([], page, pageSize, 0);
-        var results = db.Printings.AsNoTracking().Where(x => x.Card.NormalizedName.Contains(normalized));
+        var results = db.Printings.AsNoTracking().Where(x => x.IsActive && x.Card.NormalizedName.Contains(normalized));
         if (!string.IsNullOrWhiteSpace(gameCode)) results = results.Where(x => x.Card.Game.Code == gameCode.ToLowerInvariant());
         var total = await results.CountAsync(cancellationToken);
         var items = await results.OrderByDescending(x => x.Card.NormalizedName == normalized)
@@ -22,19 +22,19 @@ internal sealed class CatalogQueries(CatalogDbContext db) : ICatalogSearch, ICat
     }
 
     public Task<CatalogPrintingDetails?> GetPrinting(Guid id, CancellationToken cancellationToken) => db.Printings.AsNoTracking()
-        .Where(x => x.Id == id)
+        .Where(x => x.Id == id && x.IsActive)
         .Select(x => new CatalogPrintingDetails(x.Id, x.CardId, x.SetId, x.Card.Game.Code, x.Set.Name, x.Card.Name, x.CollectorNumber, x.Language, x.Rarity, x.ExternalArtworkUrl,
             x.Variants.Where(v => v.IsActive).OrderBy(v => v.Code).Select(v => new CatalogVariantDto(v.Id, v.Code, v.Name)).ToArray()))
         .SingleOrDefaultAsync(cancellationToken);
 
     Task<CollectionPrintingDetails?> ICatalogCollectionReader.GetPrinting(Guid printingId, CancellationToken cancellationToken) => db.Printings.AsNoTracking()
         .Where(x => x.Id == printingId)
-        .Select(x => new CollectionPrintingDetails(x.Id, x.CardId, x.SetId, x.Card.Game.Code, x.Set.Name, x.Card.Name, x.CollectorNumber, x.Language, x.Rarity, x.ExternalArtworkUrl))
+        .Select(x => new CollectionPrintingDetails(x.Id, x.CardId, x.SetId, x.Card.Game.Code, x.Set.Name, x.Card.Name, x.CollectorNumber, x.Language, x.Rarity, x.ExternalArtworkUrl, x.IsActive))
         .SingleOrDefaultAsync(cancellationToken);
 
     async Task<IReadOnlyList<CollectionPrintingDetails>> ICatalogCollectionReader.GetPrintings(IReadOnlyCollection<Guid> printingIds, CancellationToken cancellationToken) =>
         await db.Printings.AsNoTracking().Where(x => printingIds.Contains(x.Id))
-            .Select(x => new CollectionPrintingDetails(x.Id, x.CardId, x.SetId, x.Card.Game.Code, x.Set.Name, x.Card.Name, x.CollectorNumber, x.Language, x.Rarity, x.ExternalArtworkUrl))
+            .Select(x => new CollectionPrintingDetails(x.Id, x.CardId, x.SetId, x.Card.Game.Code, x.Set.Name, x.Card.Name, x.CollectorNumber, x.Language, x.Rarity, x.ExternalArtworkUrl, x.IsActive))
             .ToArrayAsync(cancellationToken);
 
     async Task<IReadOnlyList<CollectionVariantDetails>> ICatalogCollectionReader.GetVariants(IReadOnlyCollection<Guid> variantIds, CancellationToken cancellationToken) =>

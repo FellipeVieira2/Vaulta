@@ -70,8 +70,10 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
                 {
                     await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
                     var set = await UpsertSet(source.Code, game, details.Set, run, cancellationToken);
+                    var seenPrintingIds = new List<Guid>(details.Printings.Count);
                     foreach (var printing in details.Printings)
-                        await UpsertPrinting(source.Code, game, set, printing, run, cancellationToken);
+                        seenPrintingIds.Add(await UpsertPrinting(source.Code, game, set, printing, run, cancellationToken));
+                    await DeactivateMissingPrintings(set, seenPrintingIds, run, cancellationToken);
                     await db.SaveChangesAsync(cancellationToken);
                     await transaction.CommitAsync(cancellationToken);
                     logger.LogInformation("Catalog set persisted with {PrintingCount} printings", details.Printings.Count);
@@ -156,7 +158,7 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
         return set;
     }
 
-    private async Task UpsertPrinting(string providerCode, Game game, Set set, ProviderPrinting input, CatalogSyncRun run, CancellationToken ct)
+    private async Task<Guid> UpsertPrinting(string providerCode, Game game, Set set, ProviderPrinting input, CatalogSyncRun run, CancellationToken ct)
     {
         var cardExternal = await db.ExternalIds.SingleOrDefaultAsync(x => x.Provider == providerCode && x.EntityType == EntityCard && x.ExternalId == input.ExternalId, ct);
         Card card;
@@ -187,7 +189,7 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
             printing = new Printing { Id = Guid.NewGuid(), CardId = card.Id, SetId = set.Id, CollectorNumber = input.CollectorNumber,
                 NormalizedCollectorNumber = CatalogNormalizer.NormalizeCollectorNumber(input.CollectorNumber), Language = CatalogNormalizer.NormalizeLanguage(input.Language),
                 Rarity = CatalogNormalizer.NormalizeCode(input.Rarity), RawRarity = input.Rarity,
-                ExternalArtworkUrl = input.ImageUrl, ArtworkProvider = input.ImageUrl is null ? null : providerCode };
+                ExternalArtworkUrl = input.ImageUrl, ArtworkProvider = input.ImageUrl is null ? null : providerCode, IsActive = true };
             db.Printings.Add(printing);
             db.ExternalIds.Add(NewExternal(providerCode, EntityPrinting, printing.Id, input.ExternalId, input));
             run.RecordsCreated++;
@@ -197,7 +199,7 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
             printing = await db.Printings.Include(x => x.Variants).SingleAsync(x => x.Id == printingExternal.EntityId, ct);
             printing.CardId = card.Id; printing.SetId = set.Id;
             var changed = printing.CollectorNumber != input.CollectorNumber || printing.Language != CatalogNormalizer.NormalizeLanguage(input.Language) || printing.Rarity != CatalogNormalizer.NormalizeCode(input.Rarity) || printing.RawRarity != input.Rarity ||
-                printing.ExternalArtworkUrl != input.ImageUrl || printing.ArtworkProvider != (input.ImageUrl is null ? null : providerCode);
+                printing.ExternalArtworkUrl != input.ImageUrl || printing.ArtworkProvider != (input.ImageUrl is null ? null : providerCode) || !printing.IsActive;
             if (changed)
             {
                 printing.CollectorNumber = input.CollectorNumber;
@@ -205,6 +207,7 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
                 printing.Language = CatalogNormalizer.NormalizeLanguage(input.Language);
                 printing.Rarity = CatalogNormalizer.NormalizeCode(input.Rarity); printing.RawRarity = input.Rarity;
                 printing.ExternalArtworkUrl = input.ImageUrl; printing.ArtworkProvider = input.ImageUrl is null ? null : providerCode;
+                printing.IsActive = true;
                 run.RecordsUpdated++;
             }
             var ext = await db.ExternalIds.SingleAsync(x => x.Id == printingExternal.Id, ct);
@@ -226,6 +229,19 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
         {
             printing.Variants.Add(new Variant { Id = Guid.NewGuid(), Code = variant.Code, Name = variant.Name, RawValue = variant.RawValue });
             run.RecordsCreated++;
+        }
+        return printing.Id;
+    }
+
+    private async Task DeactivateMissingPrintings(Set set, IReadOnlyCollection<Guid> seenPrintingIds, CatalogSyncRun run, CancellationToken ct)
+    {
+        // Only reached after every printing in this provider batch has been upserted successfully; a Printing
+        // previously known for this Set that the provider no longer returns becomes unavailable, not deleted.
+        var toDeactivate = await db.Printings.Where(x => x.SetId == set.Id && x.IsActive && !seenPrintingIds.Contains(x.Id)).ToArrayAsync(ct);
+        foreach (var printing in toDeactivate)
+        {
+            printing.IsActive = false;
+            run.RecordsUpdated++;
         }
     }
 

@@ -80,3 +80,30 @@
   ExternalId/provider/type/id e SyncRun/provider/started atendem joins/identidade/filtros atuais. Nenhum B-tree adicional
   foi criado prometendo acelerar contains; trigram depende de volume e medição futuros.
 - Referências verificadas: https://tcgdex.dev/rest/set, https://tcgdex.dev/reference/card e https://tcgdex.dev/assets.
+
+## Revisão — Printing lifecycle e hardening final (pré-integração MAUI)
+
+- `Printing` ganhou `IsActive` (default `true`), espelhando exatamente o padrão já adotado por `Variant`: não há
+  remoção física. Ao final de um sync de set concluído com sucesso, Printings retornadas pelo provider são
+  ativadas/reativadas; Printings anteriormente conhecidas para aquele `SetId` e ausentes do lote atual são marcadas
+  `IsActive = false` dentro da mesma transação. Reaparecimento reativa exatamente o mesmo `PrintingId` (mesmo Guid),
+  preservando `CardId`, `SetId`, External IDs e todo o histórico associado.
+- A desativação só ocorre após o sync do set inteiro persistir com sucesso (upsert de Set, Cards, Printings e
+  Variants concluído e commitado). Timeout, HTTP 429/500, JSON inválido, cancelamento ou falha de persistência
+  interrompem a sincronização antes de qualquer `SaveChanges`/commit; nenhuma Printing é desativada nesses casos.
+- Catálogo público (`GET /api/v1/catalog/search`, `GET /api/v1/catalog/printings/{id}`) só retorna
+  `Printing.IsActive == true`; uma Printing inativa responde `404` no detalhe público e não aparece na busca.
+- `ICatalogCollectionReader` (usado por Collection) continua resolvendo Printings ativas e inativas via
+  `GetPrinting`/`GetPrintings`, agora expondo `IsActive` no DTO `CollectionPrintingDetails`. Isso preserva a leitura
+  de itens de coleção históricos mesmo quando a Printing correspondente deixou de ser oferecida pelo provider.
+- Novas inserções em Collection (`POST /api/v1/me/collection/items`) verificam `IsActive` e rejeitam com `409
+  Conflict` quando a Printing referenciada está inativa; leituras de entradas/itens já existentes não usam esse
+  gate e continuam funcionando normalmente.
+- Índice composto `ix_catalog_printings_set_active (SetId, IsActive)` foi adicionado por estar diretamente alinhado
+  às consultas de sync (`DeactivateMissingPrintings`) e de busca pública por set/atividade; nenhum índice isolado
+  adicional foi criado sem uso concreto.
+- Dívida técnica documentada: `CatalogSyncService` ainda fixa `GameCode = "pokemon"` internamente. Antes de um
+  segundo TCG/provider, esse valor precisa se tornar configuração por provider/fonte, não mais uma constante.
+- Limitação conhecida: se o processo morrer no meio de um sync, o `CatalogSyncRun` correspondente pode permanecer
+  com `Status = "running"` indefinidamente. Não há job manager para expirar/corrigir automaticamente esse estado
+  nesta entrega; runs muito antigos em `running` devem ser investigados manualmente.

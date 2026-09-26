@@ -102,6 +102,77 @@ public sealed class CatalogCollectionFlowTests(ApiFixture fixture)
     }
 
     [Fact]
+    public async Task PrintingLifecycleFollowsProviderAvailabilityAcrossSyncsAndProtectsCollectionAndPublicReads()
+    {
+        var provider = new MultiPrintingProvider();
+        Guid printingAId, printingBId, setId;
+        // Sync #1: both printings present -> both active.
+        await using (var scope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            await Sync(scope.ServiceProvider, provider).Synchronize("fake", provider.SetId, default);
+            var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+            var printings = await db.Printings.Where(x => x.Set.Name == provider.SetName).OrderBy(x => x.CollectorNumber).ToArrayAsync();
+            Assert.Equal(2, printings.Length);
+            Assert.All(printings, x => Assert.True(x.IsActive));
+            printingAId = printings[0].Id; printingBId = printings[1].Id; setId = printings[0].SetId;
+        }
+        using var client = fixture.Factory.CreateClient();
+        await Authenticate(client);
+        var addBeforeInactive = await client.PostAsJsonAsync("/api/v1/me/collection/items", new { printingId = printingBId, quantity = 1, condition = "NEAR_MINT" });
+        Assert.Equal(HttpStatusCode.Created, addBeforeInactive.StatusCode);
+        var historicalAdd = (await addBeforeInactive.Content.ReadFromJsonAsync<AddCollectibleItemsResponse>())!;
+
+        // Sync #2: provider stops returning Printing B -> B becomes inactive, A stays active. A failed sync must not have caused this.
+        provider.IncludeSecondPrinting = false;
+        await using (var scope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            await Sync(scope.ServiceProvider, provider).Synchronize("fake", provider.SetId, default);
+            var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+            Assert.True((await db.Printings.SingleAsync(x => x.Id == printingAId)).IsActive);
+            Assert.False((await db.Printings.SingleAsync(x => x.Id == printingBId)).IsActive);
+        }
+
+        // Search only returns the active Printing.
+        var search = await client.GetFromJsonAsync<CatalogSearchPage>($"/api/v1/catalog/search?q={Uri.EscapeDataString(provider.CardName)}&game=pokemon&page=1&pageSize=10");
+        Assert.DoesNotContain(search!.Items, x => x.PrintingId == printingBId);
+        Assert.Contains(search.Items, x => x.PrintingId == printingAId);
+
+        // Public detail hides the inactive Printing from anonymous callers.
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/v1/catalog/printings/{printingBId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/v1/catalog/printings/{printingAId}")).StatusCode);
+
+        // Historical Collection access to the now-inactive Printing must keep working.
+        var historicalRead = await client.GetAsync($"/api/v1/me/collection/entries/{historicalAdd.CollectionEntryId}");
+        historicalRead.EnsureSuccessStatusCode();
+
+        // New Collection additions referencing the inactive Printing are rejected.
+        var rejected = await client.PostAsJsonAsync("/api/v1/me/collection/items", new { printingId = printingBId, quantity = 1, condition = "NEAR_MINT" });
+        Assert.Equal(HttpStatusCode.Conflict, rejected.StatusCode);
+
+        // A sync that fails outright must not deactivate any Printing of the set.
+        provider.FailAfterFetch = true;
+        await using (var scope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() => Sync(scope.ServiceProvider, provider).Synchronize("fake", provider.SetId, default));
+            var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+            Assert.True((await db.Printings.SingleAsync(x => x.Id == printingAId)).IsActive);
+            Assert.False((await db.Printings.SingleAsync(x => x.Id == printingBId)).IsActive);
+        }
+        provider.FailAfterFetch = false;
+
+        // Sync #3: provider brings Printing B back -> same GUID reactivated.
+        provider.IncludeSecondPrinting = true;
+        await using (var scope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            await Sync(scope.ServiceProvider, provider).Synchronize("fake", provider.SetId, default);
+            var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+            var printingB = await db.Printings.SingleAsync(x => x.Id == printingBId);
+            Assert.True(printingB.IsActive);
+        }
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/v1/catalog/printings/{printingBId}")).StatusCode);
+    }
+
+    [Fact]
     public async Task ConcurrentSyncsIncludingAllAndSetAreSerializedByPostgresLock()
     {
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -213,6 +284,28 @@ public sealed class CatalogCollectionFlowTests(ApiFixture fixture)
             var printing = new ProviderPrinting("card-" + _key, CardName, "007 / 100", "en", Rarity, Artwork, Variants);
             // Different external identities claim the same canonical set/number/language. The DB must reject the entire batch.
             return new(Set, DuplicatePrinting ? [printing, printing with { ExternalId = "other-" + _key }] : [printing]);
+        }
+    }
+
+    private sealed class MultiPrintingProvider : ICatalogProvider
+    {
+        private readonly string _key = Guid.NewGuid().ToString("N");
+        public string Code => "fake";
+        public string SetId => "set-" + _key;
+        public string SetName => "Set " + _key;
+        public string CardName => "Pikachu " + _key;
+        public bool IncludeSecondPrinting { get; set; } = true;
+        public bool FailAfterFetch { get; set; }
+        private ProviderSet Set => new(SetId, SetName, null, new DateOnly(2026, 1, 1));
+        public Task<IReadOnlyList<ProviderSet>> GetSets(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ProviderSet>>([Set]);
+        public Task<ProviderSetDetails> GetSetDetails(string setId, CancellationToken cancellationToken)
+        {
+            if (FailAfterFetch) throw new InvalidOperationException("Simulated failure after fetching provider data.");
+            var printingA = new ProviderPrinting("card-a-" + _key, CardName, "001 / 100", "en", "Rare", "https://example.com/a.png", [new("normal", "Normal", "normal")]);
+            var printings = new List<ProviderPrinting> { printingA };
+            if (IncludeSecondPrinting)
+                printings.Add(new ProviderPrinting("card-b-" + _key, CardName, "002 / 100", "en", "Rare", "https://example.com/b.png", [new("normal", "Normal", "normal")]));
+            return Task.FromResult(new ProviderSetDetails(Set, printings));
         }
     }
 

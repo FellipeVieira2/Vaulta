@@ -55,10 +55,12 @@ internal sealed class PrintingConfiguration : IEntityTypeConfiguration<Printing>
         b.Property(x => x.Language).HasMaxLength(35).IsRequired(); b.Property(x => x.Rarity).HasMaxLength(80); b.Property(x => x.RawRarity).HasMaxLength(120);
         b.Property(x => x.ExternalArtworkUrl).HasMaxLength(2048);
         b.Property(x => x.ArtworkProvider).HasMaxLength(40);
+        b.Property(x => x.IsActive).HasDefaultValue(true);
         b.HasOne(x => x.Card).WithMany(x => x.Printings).HasForeignKey(x => x.CardId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Set).WithMany(x => x.Printings).HasForeignKey(x => x.SetId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.SetId, x.NormalizedCollectorNumber, x.Language }).IsUnique().HasDatabaseName("ux_catalog_printings_set_number_language");
         b.HasIndex(x => x.CardId).HasDatabaseName("ix_catalog_printings_card");
+        b.HasIndex(x => new { x.SetId, x.IsActive }).HasDatabaseName("ix_catalog_printings_set_active");
     }
 }
 
