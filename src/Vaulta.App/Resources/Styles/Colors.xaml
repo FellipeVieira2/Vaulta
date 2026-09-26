@@ -46,7 +46,7 @@
     <Color x:Key="SurfaceOverlay">#1C1F24</Color>
     <Color x:Key="TextPrimary">#FFFFFF</Color>
     <Color x:Key="TextSecondary">#8C919E</Color>
-    <Color x:Key="TextTertiary">#666B78</Color>
+    <Color x:Key="TextTertiary">#8C919E</Color>
     <Color x:Key="TextDisabled">#474D57</Color>
     <Color x:Key="TextInverse">#0A0A0D</Color>
     <Color x:Key="BorderDefault">#2E3038</Color>

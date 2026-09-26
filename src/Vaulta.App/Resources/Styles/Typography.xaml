@@ -50,9 +50,9 @@
         <Setter Property="TextColor" Value="{DynamicResource TextPrimary}" />
     </Style>
     <Style x:Key="CaptionTextStyle" TargetType="Label">
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontSize" Value="12" />
         <Setter Property="FontAttributes" Value="None" />
-        <Setter Property="LineHeight" Value="1.4545" />
+        <Setter Property="LineHeight" Value="1.5" />
         <Setter Property="TextColor" Value="{DynamicResource TextTertiary}" />
     </Style>
 </ResourceDictionary>

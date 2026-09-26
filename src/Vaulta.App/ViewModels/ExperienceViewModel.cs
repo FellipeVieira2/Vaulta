@@ -9,7 +9,7 @@ namespace Vaulta.App.ViewModels;
 
 public sealed record ScreenAction(string Title, string? Route, bool IsPrimary = false);
 public sealed record ScreenMetric(string Label, string Value, string? Detail = null);
-public sealed record ScreenCard(string Game, string Title, string Detail, string Price, string? Change = null);
+public sealed record ScreenCard(string Game, string Title, string Detail, string Price, string? Change = null, string? ArtworkUrl = null);
 
 public sealed record ScreenDefinition(
     string Id,
@@ -25,6 +25,8 @@ public sealed record ScreenDefinition(
 
 public static class ScreenCatalog
 {
+    // External provider reference for the explicitly labelled UI preview. No Vaulta asset is created.
+    public const string CharizardArtwork = "https://assets.tcgdex.net/en/sv/sv03/223/high.webp";
     private static readonly ScreenDefinition[] Definitions =
     [
         new("welcome", "Sua coleção.\nSeu próximo capítulo.", "Identifique, organize e acompanhe o valor das cartas que fazem parte da sua história.", "VAULTA · PREMIUM TCG VAULT", Actions: [new("Começar", "onboarding-1", true), new("Já tenho uma conta", "login")]),
@@ -35,8 +37,8 @@ public static class ScreenCatalog
         new("home", "Olá, colecionador", "Sua coleção, oportunidades e cartas favoritas em um só lugar.", "BEM-VINDO À VAULTA", Notice: "Prévia de interface · os dados de coleção e mercado são demonstrativos.", Metrics: [new("ESTIMATIVA TOTAL", "R$ 12.450,00"), new("CARTAS", "284", "na coleção")], Cards: [new("POKÉMON", "Charizard ex", "Obsidian Flames · 223/197", "R$ 420,00"), new("POKÉMON", "Pikachu VMAX", "Lost Origin · 029/196", "R$ 159,00"), new("MAGIC", "Black Lotus", "Collector edition", "R$ 1.950,00")], Actions: [new("Escanear carta", "scanner", true), new("Explorar catálogo", "catalog"), new("Ver meu portfólio", "portfolio")]),
         new("collection", "Minha coleção", "Suas cartas e o valor estimado do seu acervo.", "MEU VAULT", Notice: "Prévia de interface · alterações ainda não são persistidas.", Metrics: [new("CARTAS", "284"), new("VALOR ESTIMADO", "R$ 12.450")], Cards: [new("POKÉMON", "Charizard ex", "Obsidian Flames · Near Mint", "R$ 420,00"), new("ONE PIECE", "Monkey D. Luffy", "Awakening of the New Era", "R$ 180,00")], Actions: [new("Adicionar carta", "add-to-collection", true), new("Coleção vazia · prévia", "empty-collection")]),
         new("empty-collection", "Sua coleção começa aqui", "Escaneie ou busque sua primeira carta para acompanhar seu acervo.", "MEU VAULT", Actions: [new("Escanear carta", "scanner", true), new("Buscar manualmente", "catalog"), new("Adicionar anúncio", "market")]),
-        new("catalog", "Encontre sua próxima carta", "Busque cartas, sets e expansões de diferentes TCGs.", "CATÁLOGO", InputHint: "Buscar carta, set ou expansão...", Options: ["Pokémon", "Magic", "Yu-Gi-Oh!", "One Piece"], Cards: [new("POKÉMON", "Charizard ex", "Obsidian Flames · 223/197", "R$ 89,90"), new("POKÉMON", "Pikachu VMAX", "Lost Origin · 029/196", "R$ 159,00"), new("MAGIC", "Black Lotus", "Collector edition", "R$ 8.500,00")], Actions: [new("Abrir detalhes", "card-detail", true)]),
-        new("search-results", "Resultados da busca", "Cartas encontradas no catálogo Vaulta.", "142 CARTAS · CHARIZARD", InputHint: "Charizard", Cards: [new("POKÉMON", "Charizard ex", "Obsidian Flames · 223/197", "R$ 89,90"), new("POKÉMON", "Charizard VSTAR", "Brilliant Stars · 174/172", "R$ 142,00"), new("POKÉMON", "Charizard ex Shiny", "Paldean Fates · 234/091", "R$ 412,00")], Actions: [new("Ver carta", "card-detail", true)]),
+        new("catalog", "Encontre sua próxima carta", "Busque cartas, sets e expansões de diferentes TCGs.", "CATÁLOGO", InputHint: "Buscar carta, set ou expansão...", Options: ["Pokémon", "Magic", "Yu-Gi-Oh!", "One Piece"], Cards: [new("POKÉMON", "Charizard ex", "Obsidian Flames · 223/197", "R$ 89,90", ArtworkUrl: CharizardArtwork), new("POKÉMON", "Pikachu VMAX", "Lost Origin · 029/196", "R$ 159,00"), new("MAGIC", "Black Lotus", "Collector edition", "R$ 8.500,00")], Actions: [new("Abrir detalhes", "card-detail", true)]),
+        new("search-results", "Resultados da busca", "Cartas encontradas no catálogo Vaulta.", "142 CARTAS · CHARIZARD", InputHint: "Charizard", Cards: [new("POKÉMON", "Charizard ex", "Obsidian Flames · 223/197", "R$ 89,90", ArtworkUrl: CharizardArtwork), new("POKÉMON", "Charizard VSTAR", "Brilliant Stars · 174/172", "R$ 142,00"), new("POKÉMON", "Charizard ex Shiny", "Paldean Fates · 234/091", "R$ 412,00")], Actions: [new("Ver carta", "card-detail", true)]),
         new("card-detail", "Charizard ex", "Obsidian Flames · 223/197 · Pokémon TCG", "DETALHES DA CARTA", Metrics: [new("PREÇO DE MERCADO", "R$ 89,90"), new("NA SUA COLEÇÃO", "11 cartas")], Cards: [new("OBSIDIAN FLAMES", "Charizard ex", "Special illustration rare", "R$ 450,00"), new("SHINING FATES", "Charizard VMAX", "Secret rare", "R$ 380,00")], Actions: [new("Adicionar à coleção", "add-to-collection", true), new("Adicionar à wishlist", "wishlist")]),
         new("add-to-collection", "Adicionar à coleção", "Registre condição, quantidade e custo de aquisição.", "CHARIZARD ex · OBSIDIAN FLAMES", Notice: "Demonstração · a coleção ainda não está conectada ao backend.", Metrics: [new("PREÇO DE MERCADO", "R$ 89,90")], Options: ["Near Mint", "Lightly Played", "Moderately Played", "Heavily Played"], Actions: [new("Concluir prévia", "unsupported", true)]),
         new("collection-item", "Detalhes do card", "Charizard ex · Obsidian Flames · 125/197", "SUA COLEÇÃO", Metrics: [new("PAGO INICIAL", "R$ 65,00"), new("PREÇO DE MERCADO", "R$ 89,90"), new("LUCRO ESTIMADO", "+ R$ 24,90")], Actions: [new("Editar anúncio", "sell", true), new("Vender item", "sell"), new("Remover da coleção", "collection")]),
@@ -78,12 +80,18 @@ public partial class ExperienceViewModel : ObservableObject
     [ObservableProperty] private string username = string.Empty;
     [ObservableProperty] private string displayName = string.Empty;
     [ObservableProperty] private string searchText = string.Empty;
-    [ObservableProperty] private string? statusMessage;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasStatusMessage))] private string? statusMessage;
     [ObservableProperty] private bool isBusy;
     [ObservableProperty] private string selectedCondition = "Near Mint";
+    [ObservableProperty] private string quantity = "1";
+    [ObservableProperty] private string acquisitionCost = string.Empty;
+    [ObservableProperty] private string itemNotes = string.Empty;
+    public bool HasStatusMessage => !string.IsNullOrWhiteSpace(StatusMessage);
     public ObservableCollection<string> SelectedTcgs { get; } = [];
     public ScreenDefinition Screen => ScreenCatalog.Get(ScreenId);
     public string DisplayGreeting => string.IsNullOrWhiteSpace(_sessionState.User?.DisplayName) ? Screen.Title : $"Olá, {_sessionState.User.DisplayName}";
+
+    public void RefreshGreeting() => OnPropertyChanged(nameof(DisplayGreeting));
 
     partial void OnScreenIdChanged(string value)
     {
@@ -102,6 +110,9 @@ public partial class ExperienceViewModel : ObservableObject
     [RelayCommand]
     private async Task NavigateAsync(string? route)
     {
+        if (IsBusy) return;
+        if (ScreenId.StartsWith("onboarding-", StringComparison.Ordinal) && (route is "login" or "signup"))
+            AppShell.CompleteOnboarding();
         if (string.IsNullOrWhiteSpace(route) || route == "unsupported")
         {
             StatusMessage = "Esta ação estará disponível quando o serviço correspondente for integrado.";
@@ -161,6 +172,17 @@ public partial class ExperienceViewModel : ObservableObject
     [RelayCommand]
     private async Task RegisterAsync()
     {
+        if (string.IsNullOrWhiteSpace(DisplayName) || string.IsNullOrWhiteSpace(Username))
+        {
+            StatusMessage = "Informe seu nome e nome de usuário.";
+            return;
+        }
+        if (string.IsNullOrEmpty(Password) || Password.Length is < 12 or > 128 || !Password.Any(char.IsUpper) || !Password.Any(char.IsLower) ||
+            !Password.Any(char.IsDigit) || Password.All(char.IsLetterOrDigit))
+        {
+            StatusMessage = "Use uma senha de 12 a 128 caracteres, com maiúscula, minúscula, número e símbolo.";
+            return;
+        }
         await RunAuthenticationAsync(async () =>
         {
             await _authenticationService.RegisterAsync(new RegisterRequest(Email.Trim(), Password, Username.Trim(), DisplayName.Trim()));
@@ -176,20 +198,21 @@ public partial class ExperienceViewModel : ObservableObject
         try
         {
             await _authenticationService.LogoutAsync();
-            await Shell.Current.GoToAsync("//welcome");
         }
         catch (Exception exception)
         {
-            StatusMessage = exception.Message;
+            StatusMessage = AuthenticationError(exception);
         }
         finally
         {
             IsBusy = false;
+            await ((AppShell)Shell.Current).ShowLoginAsync();
         }
     }
 
     private async Task RunAuthenticationAsync(Func<Task> action)
     {
+        if (IsBusy) return;
         StatusMessage = null;
         if (string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Password))
         {
@@ -201,14 +224,25 @@ public partial class ExperienceViewModel : ObservableObject
         try
         {
             await action();
+            Password = string.Empty;
         }
         catch (Exception exception)
         {
-            StatusMessage = exception.Message;
+            StatusMessage = AuthenticationError(exception);
         }
         finally
         {
             IsBusy = false;
         }
     }
+    private static string AuthenticationError(Exception error) => error switch
+    {
+        HttpRequestException { StatusCode: System.Net.HttpStatusCode.Unauthorized } => "E-mail ou senha incorretos. Confira os dados e tente novamente.",
+        HttpRequestException { StatusCode: System.Net.HttpStatusCode.Conflict } => "Este e-mail ou nome de usuário já está em uso.",
+        HttpRequestException { StatusCode: System.Net.HttpStatusCode.BadRequest } => "Confira os dados informados e os requisitos da senha.",
+        HttpRequestException { StatusCode: System.Net.HttpStatusCode.TooManyRequests } => "Muitas tentativas. Aguarde um pouco antes de tentar novamente.",
+        HttpRequestException or TaskCanceledException => "Não foi possível conectar. Verifique sua conexão e tente novamente.",
+        _ => "Não foi possível concluir agora. Tente novamente em instantes."
+    };
+
 }

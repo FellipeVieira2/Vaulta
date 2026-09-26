@@ -4,20 +4,23 @@ using Microsoft.Maui.Controls.Shapes;
 
 namespace Vaulta.App.Views;
 
-public sealed class ExperiencePage : ContentPage, IQueryAttributable
+public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
 {
     private readonly ExperienceViewModel _viewModel;
     private readonly VerticalStackLayout _content;
+    private readonly ScrollView _scroll;
+    private string? _builtScreen;
+    private bool _visible;
 
     public ExperiencePage(ExperienceViewModel viewModel)
     {
         _viewModel = viewModel;
         BindingContext = viewModel;
         _content = new VerticalStackLayout { Padding = new Thickness(24, 28), Spacing = 18 };
-        Content = new ScrollView { Content = _content };
+        _scroll = new ScrollView { Content = _content };
+        Content = _scroll;
         BackgroundColor = ColorResource("BackgroundPrimary");
         Shell.SetNavBarIsVisible(this, false);
-        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         BuildContent();
     }
 
@@ -37,19 +40,39 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        BuildContent();
+        _visible = true;
+        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        if (_builtScreen != _viewModel.ScreenId) BuildContent();
+        _viewModel.RefreshGreeting();
+        _ = RevealAsync();
+    }
+
+    protected override void OnDisappearing()
+    {
+        _visible = false;
+        _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        Content?.CancelAnimations();
+        base.OnDisappearing();
+    }
+
+    private async Task RevealAsync()
+    {
+        if (!_visible || Content is not VisualElement view) return;
+        await UiMotion.RevealAsync(view);
     }
 
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
-        if (args.PropertyName is nameof(ExperienceViewModel.ScreenId) or nameof(ExperienceViewModel.StatusMessage))
+        if (args.PropertyName == nameof(ExperienceViewModel.ScreenId))
             MainThread.BeginInvokeOnMainThread(BuildContent);
     }
 
     private void BuildContent()
     {
         var screen = _viewModel.Screen;
+        _builtScreen = screen.Id;
         Title = screen.Title;
+        Shell.SetTabBarIsVisible(this, screen.Id is "home" or "collection" or "market" or "profile");
         if (screen.Id == "onboarding-1")
         {
             BuildOnboardingOne();
@@ -62,12 +85,23 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
             return;
         }
 
+        Content = _scroll;
         _content.Children.Clear();
+        if (screen.Id is not ("home" or "collection" or "market" or "profile" or "login"))
+        {
+            var back = CreateButton("‹  Voltar", false);
+            back.HorizontalOptions = LayoutOptions.Start;
+            back.BackgroundColor = Colors.Transparent;
+            back.Clicked += async (_, _) => await Shell.Current.GoToAsync("..");
+            _content.Children.Add(back);
+        }
 
         if (!string.IsNullOrWhiteSpace(screen.Eyebrow))
             _content.Children.Add(CreateLabel(screen.Eyebrow, "CaptionTextStyle", "BrandPrimary"));
 
-        _content.Children.Add(CreateLabel(screen.Id is "home" or "collection" or "market" or "profile" ? _viewModel.DisplayGreeting : screen.Title, "H1TextStyle"));
+        var heading = CreateLabel(screen.Title, "H1TextStyle");
+        if (screen.Id == "home") heading.SetBinding(Label.TextProperty, nameof(ExperienceViewModel.DisplayGreeting));
+        _content.Children.Add(heading);
 
         if (!string.IsNullOrWhiteSpace(screen.Subtitle))
             _content.Children.Add(CreateLabel(screen.Subtitle, "BodyTextStyle", "TextSecondary"));
@@ -93,11 +127,20 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
         if (screen.Metrics is not null)
             AddMetrics(screen);
 
+        if (screen.Id == "card-detail")
+            _content.Children.Add(CreateCardArtwork(ScreenCatalog.CharizardArtwork, "Charizard ex", 300));
+
         if (screen.Cards is not null)
             AddCards(screen);
 
-        if (!string.IsNullOrWhiteSpace(_viewModel.StatusMessage))
-            _content.Children.Add(CreateLabel(_viewModel.StatusMessage, "BodySmallTextStyle", "StatusWarning"));
+        var status = CreateLabel(null, "BodySmallTextStyle", "StatusWarning");
+        status.SetBinding(Label.TextProperty, nameof(ExperienceViewModel.StatusMessage));
+        status.SetBinding(IsVisibleProperty, nameof(ExperienceViewModel.HasStatusMessage));
+        _content.Children.Add(status);
+        var busy = new ActivityIndicator { Color = ColorResource("BrandPrimary"), HeightRequest = 24 };
+        busy.SetBinding(ActivityIndicator.IsRunningProperty, nameof(ExperienceViewModel.IsBusy));
+        busy.SetBinding(IsVisibleProperty, nameof(ExperienceViewModel.IsBusy));
+        _content.Children.Add(busy);
 
         if (screen.Actions is null) return;
         foreach (var action in screen.Actions)
@@ -105,6 +148,12 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
             var isGoogleSignIn = action.Title == "Continuar com Google";
             var button = isGoogleSignIn ? CreateGoogleSignInButton() : CreateButton(action.Title, action.IsPrimary);
             button.Clicked += async (_, _) => await _viewModel.NavigateCommand.ExecuteAsync(action.Route);
+            if (action.Route is "login-submit" or "signup-submit")
+                button.Triggers.Add(new DataTrigger(typeof(Button))
+                {
+                    Binding = new Binding(nameof(ExperienceViewModel.IsBusy)), Value = true,
+                    Setters = { new Setter { Property = Button.TextProperty, Value = "Aguarde…" } }
+                });
             _content.Children.Add(button);
         }
     }
@@ -118,11 +167,11 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
             Padding = new Thickness(24, 8, 24, 8),
             RowDefinitions =
             {
-                new RowDefinition(new GridLength(36)),
-                new RowDefinition(new GridLength(36)),
-                new RowDefinition(new GridLength(360)),
+                new RowDefinition(GridLength.Auto),
+                new RowDefinition(GridLength.Auto),
+                new RowDefinition(GridLength.Auto),
                 new RowDefinition(GridLength.Star),
-                new RowDefinition(new GridLength(132))
+                new RowDefinition(GridLength.Auto)
             }
         };
 
@@ -250,14 +299,14 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
         });
         copy.Children.Add(new Label
         {
-            Text = "Catalogue every card. Know exactly what you have in real-time.",
+            Text = "Catalogue suas cartas e encontre tudo o que você tem em um só lugar.",
             FontSize = 16,
             LineHeight = 1.5,
             TextColor = ColorResource("TextSecondary")
         });
         layout.Add(copy, 0, 3);
 
-        var footer = new Grid { RowDefinitions = { new RowDefinition(new GridLength(24)), new RowDefinition(new GridLength(76)) } };
+        var footer = new Grid { Padding = new Thickness(0, 12, 0, 8), RowDefinitions = { new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto) } };
         var progress = new HorizontalStackLayout { Spacing = 8, VerticalOptions = LayoutOptions.Center };
         var active = new Border
         {
@@ -269,7 +318,6 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
         };
         progress.Children.Add(active);
         progress.Children.Add(CreateProgressDot());
-        progress.Children.Add(CreateProgressDot());
         footer.Add(progress, 0, 0);
 
         var next = new Button
@@ -278,16 +326,19 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
             FontSize = 15,
             FontAttributes = FontAttributes.Bold,
             CornerRadius = 14,
-            HeightRequest = 52,
+            MinimumHeightRequest = 52,
             Margin = new Thickness(0, 24, 0, 0),
             TextColor = ColorResource("TextInverse"),
             BackgroundColor = ColorResource("BrandPrimary")
         };
         next.Clicked += async (_, _) => await _viewModel.NavigateCommand.ExecuteAsync("onboarding-2");
         footer.Add(next, 0, 1);
-        layout.Add(footer, 0, 4);
-
-        Content = layout;
+        Content = ComposeOnboarding(layout, footer);
+        UiMotion.AttachPress(next);
+        BindInteraction(next);
+        BindInteraction(skip);
+        skip.MinimumHeightRequest = 48;
+        skip.MinimumWidthRequest = 48;
     }
 
     private void BuildOnboardingTwo()
@@ -299,11 +350,11 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
             Padding = new Thickness(24, 8, 24, 8),
             RowDefinitions =
             {
-                new RowDefinition(new GridLength(36)),
-                new RowDefinition(new GridLength(36)),
-                new RowDefinition(new GridLength(400)),
+                new RowDefinition(GridLength.Auto),
+                new RowDefinition(GridLength.Auto),
+                new RowDefinition(GridLength.Auto),
                 new RowDefinition(GridLength.Star),
-                new RowDefinition(new GridLength(132))
+                new RowDefinition(GridLength.Auto)
             }
         };
 
@@ -328,7 +379,7 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
             {
                 new Label
                 {
-                    Text = "VALOR DA COLEÇÃO",
+                    Text = "EXEMPLO DE COLEÇÃO",
                     FontSize = 11,
                     FontAttributes = FontAttributes.Bold,
                     TextColor = ColorResource("TextSecondary")
@@ -345,8 +396,8 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
                     Spacing = 4,
                     Children =
                     {
-                        new Label { Text = "+14.8%", FontSize = 12, FontAttributes = FontAttributes.Bold, TextColor = Color.FromArgb("#10B981") },
-                        new Label { Text = "este mês", FontSize = 11, TextColor = Color.FromArgb("#4E4E5F") }
+                        new Label { Text = "+14,8%", FontSize = 12, FontAttributes = FontAttributes.Bold, TextColor = Color.FromArgb("#10B981") },
+                        new Label { Text = "este mês", FontSize = 11, TextColor = ColorResource("TextSecondary") }
                     }
                 }
             }
@@ -417,14 +468,14 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
         });
         copy.Children.Add(new Label
         {
-            Text = "Track real-time values, analyze price history, and watch your portfolio grow.",
+            Text = "Organize seu acervo e prepare sua coleção para acompanhar valores e tendências.",
             FontSize = 16,
             LineHeight = 1.5,
             TextColor = ColorResource("TextSecondary")
         });
         layout.Add(copy, 0, 3);
 
-        var footer = new Grid { RowDefinitions = { new RowDefinition(new GridLength(24)), new RowDefinition(new GridLength(76)) } };
+        var footer = new Grid { Padding = new Thickness(0, 12, 0, 8), RowDefinitions = { new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto) } };
         var progress = new HorizontalStackLayout { Spacing = 8, VerticalOptions = LayoutOptions.Center };
         progress.Children.Add(CreateProgressDot());
         progress.Children.Add(new Border
@@ -435,25 +486,27 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
             StrokeThickness = 0,
             StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(4) }
         });
-        progress.Children.Add(CreateProgressDot());
         footer.Add(progress, 0, 0);
 
         var next = new Button
         {
-            Text = "Próximo",
+            Text = "Criar minha conta",
             FontSize = 15,
             FontAttributes = FontAttributes.Bold,
             CornerRadius = 14,
-            HeightRequest = 52,
+            MinimumHeightRequest = 52,
             Margin = new Thickness(0, 24, 0, 0),
             TextColor = ColorResource("TextInverse"),
             BackgroundColor = ColorResource("BrandPrimary")
         };
         next.Clicked += async (_, _) => await _viewModel.NavigateCommand.ExecuteAsync("signup");
         footer.Add(next, 0, 1);
-        layout.Add(footer, 0, 4);
-
-        Content = layout;
+        Content = ComposeOnboarding(layout, footer);
+        UiMotion.AttachPress(next);
+        BindInteraction(next);
+        BindInteraction(skip);
+        skip.MinimumHeightRequest = 48;
+        skip.MinimumWidthRequest = 48;
     }
 
     private static Border CreateProgressDot() => new()
@@ -528,12 +581,13 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
     {
         if (registration)
         {
-            AddEntry("Nome", "Seu nome", value => _viewModel.DisplayName = value);
-            AddEntry("Username", "seu_usuario", value => _viewModel.Username = value);
+            AddEntry("Nome", "Seu nome", nameof(ExperienceViewModel.DisplayName));
+            AddEntry("Nome de usuário", "seu_usuario", nameof(ExperienceViewModel.Username));
         }
 
-        AddEntry("E-mail", "voce@exemplo.com", value => _viewModel.Email = value, Keyboard.Email);
-        AddEntry("Senha", "Mínimo de 8 caracteres", value => _viewModel.Password = value, isPassword: true);
+        AddEntry("E-mail", "voce@exemplo.com", nameof(ExperienceViewModel.Email), Keyboard.Email);
+        AddEntry("Senha", registration ? "Crie uma senha forte" : "Sua senha", nameof(ExperienceViewModel.Password), isPassword: true);
+        if (registration) _content.Children.Add(CreateLabel("Use 12 a 128 caracteres, com maiúscula, minúscula, número e símbolo.", "BodySmallTextStyle"));
     }
 
     private void AddSearchField(ScreenDefinition screen)
@@ -541,7 +595,9 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
         var search = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }, ColumnSpacing = 8 };
         var entry = new Entry { Placeholder = screen.InputHint, TextColor = ColorResource("TextPrimary"), PlaceholderColor = ColorResource("TextTertiary") };
         entry.SetDynamicResource(Entry.BackgroundColorProperty, "SurfaceDefault");
-        entry.TextChanged += (_, args) => _viewModel.SearchText = args.NewTextValue ?? string.Empty;
+        entry.SetBinding(Entry.TextProperty, nameof(ExperienceViewModel.SearchText), mode: BindingMode.TwoWay);
+        entry.MinimumHeightRequest = 48;
+        SemanticProperties.SetDescription(entry, "Buscar cartas");
         search.Add(entry, 0, 0);
         var searchButton = CreateButton("Buscar", true);
         searchButton.Clicked += async (_, _) => await _viewModel.NavigateCommand.ExecuteAsync("search-results");
@@ -571,22 +627,23 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
             choice.Clicked += (_, _) =>
             {
                 _viewModel.SelectConditionCommand.Execute(condition);
-                BuildContent();
+                UpdateConditionButtons();
             };
+            choice.ClassId = condition;
             _content.Children.Add(choice);
         }
 
-        AddEntry("Quantidade", "1", _ => { }, Keyboard.Numeric);
-        AddEntry(includeListingFields ? "Preço de venda" : "Custo de aquisição", "R$ 0,00", _ => { }, Keyboard.Numeric);
+        AddEntry("Quantidade", "1", nameof(ExperienceViewModel.Quantity), Keyboard.Numeric);
+        AddEntry(includeListingFields ? "Preço de venda" : "Custo de aquisição", "R$ 0,00", nameof(ExperienceViewModel.AcquisitionCost), Keyboard.Numeric);
         if (includeListingFields)
-            AddEntry("Descrição do anúncio (opcional)", "Detalhes de envio, idioma ou estado...", _ => { });
+            AddEntry("Descrição do anúncio (opcional)", "Detalhes de envio, idioma ou estado...", nameof(ExperienceViewModel.ItemNotes));
 
         var photoButton = CreateButton("Adicionar foto real", false);
         photoButton.Clicked += (_, _) => _viewModel.NavigateCommand.Execute("unsupported");
         _content.Children.Add(photoButton);
     }
 
-    private void AddEntry(string label, string placeholder, Action<string> update, Keyboard? keyboard = null, bool isPassword = false)
+    private void AddEntry(string label, string placeholder, string propertyName, Keyboard? keyboard = null, bool isPassword = false)
     {
         _content.Children.Add(CreateLabel(label.ToUpperInvariant(), "CaptionTextStyle"));
         var entry = new Entry
@@ -598,8 +655,20 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
             IsPassword = isPassword
         };
         entry.SetDynamicResource(Entry.BackgroundColorProperty, "SurfaceDefault");
-        entry.TextChanged += (_, args) => update(args.NewTextValue ?? string.Empty);
-        _content.Children.Add(entry);
+        entry.SetBinding(Entry.TextProperty, propertyName, mode: BindingMode.TwoWay);
+        BindInteraction(entry);
+        entry.MinimumHeightRequest = 48;
+        entry.FontSize = 16;
+        SemanticProperties.SetDescription(entry, label);
+        if (isPassword)
+        {
+            var row = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }, ColumnSpacing = 8 };
+            var toggle = CreateButton("Mostrar", false);
+            toggle.Clicked += (_, _) => { entry.IsPassword = !entry.IsPassword; toggle.Text = entry.IsPassword ? "Mostrar" : "Ocultar"; };
+            row.Add(entry); row.Add(toggle, 1);
+            _content.Children.Add(row);
+        }
+        else _content.Children.Add(entry);
     }
 
     private void AddOptions(ScreenDefinition screen)
@@ -663,35 +732,6 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
         }
     }
 
-    private void AddCards(ScreenDefinition screen)
-    {
-        foreach (var card in screen.Cards!)
-        {
-            var row = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }, ColumnSpacing = 12 };
-            var details = new VerticalStackLayout { Spacing = 4 };
-            details.Children.Add(CreateLabel(card.Game, "CaptionTextStyle", "BrandPrimary"));
-            details.Children.Add(CreateLabel(card.Title, "TitleTextStyle"));
-            details.Children.Add(CreateLabel(card.Detail, "BodySmallTextStyle"));
-            row.Add(details, 0, 0);
-            var price = new VerticalStackLayout { Spacing = 4, VerticalOptions = LayoutOptions.Center };
-            price.Children.Add(CreateLabel(card.Price, "LabelTextStyle"));
-            if (card.Change is not null)
-                price.Children.Add(CreateLabel(card.Change, "CaptionTextStyle", card.Change.StartsWith('-') ? "StatusError" : "StatusSuccess"));
-            row.Add(price, 1, 0);
-            var cardSurface = CreateSurface(row);
-            cardSurface.GestureRecognizers.Add(new TapGestureRecognizer
-            {
-                Command = new Command(async () => await _viewModel.NavigateCommand.ExecuteAsync(screen.Id switch
-                {
-                    "collection" => "collection-item",
-                    "scan-candidates" => "scan-confirmed",
-                    _ => "card-detail"
-                }))
-            });
-            _content.Children.Add(cardSurface);
-        }
-    }
-
     private Label CreateLabel(string? text, string style, string? colorResource = null)
     {
         var label = new Label { Text = text, Style = (Style)Application.Current!.Resources[style] };
@@ -718,7 +758,11 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
     {
         var button = new Button { Text = text, CornerRadius = 14, Padding = new Thickness(18, 14), FontAttributes = FontAttributes.Bold };
         button.SetDynamicResource(Button.BackgroundColorProperty, primary ? "BrandPrimary" : "SurfaceElevated");
-        button.SetDynamicResource(Button.TextColorProperty, "TextPrimary");
+        button.SetDynamicResource(Button.TextColorProperty, primary ? "TextInverse" : "TextPrimary");
+        button.MinimumHeightRequest = 48;
+        button.FontSize = 15;
+        BindInteraction(button);
+        UiMotion.AttachPress(button);
         return button;
     }
 
@@ -726,7 +770,7 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
     {
         var button = new Button
         {
-            ImageSource = "google-g.svg",
+            ImageSource = "google_g.png",
             WidthRequest = 52,
             HeightRequest = 52,
             Padding = new Thickness(14),
@@ -734,6 +778,8 @@ public sealed class ExperiencePage : ContentPage, IQueryAttributable
             HorizontalOptions = LayoutOptions.Center,
             BackgroundColor = ColorResource("SurfaceElevated")
         };
+        BindInteraction(button);
+        UiMotion.AttachPress(button);
         SemanticProperties.SetDescription(button, "Continuar com Google");
         return button;
     }

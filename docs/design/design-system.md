@@ -1,6 +1,6 @@
 # Design system Vaulta — MAUI
 
-Os arquivos exportados do Figma em `docs/design/tokens/` são a fonte de verdade. O token semântico disponível é `semantic.tokens.json`, com `com.figma.modeName` igual a `Dark`; o caminho `semantic-dark.tokens.json` não existe neste repositório. Não há uma paleta Light nesta fundação.
+Os arquivos exportados do Figma em `docs/design/tokens/` são a referência exportada do design. Os ajustes de acessibilidade aplicados no app estão documentados abaixo. O token semântico disponível é `semantic.tokens.json`, com `com.figma.modeName` igual a `Dark`; o caminho `semantic-dark.tokens.json` não existe neste repositório. Não há uma paleta Light nesta fundação.
 
 ## Camadas e cores
 
@@ -16,7 +16,7 @@ Os arquivos exportados do Figma em `docs/design/tokens/` são a fonte de verdade
 | `surface/overlay` | `neutral/800` | `SurfaceOverlay` |
 | `text/primary` | `neutral/white` | `TextPrimary` |
 | `text/secondary` | `neutral/400` | `TextSecondary` |
-| `text/tertiary` | `neutral/500` | `TextTertiary` |
+| `text/tertiary` | `neutral/400` (ajuste de contraste no app) | `TextTertiary` |
 | `text/disabled` | `neutral/600` | `TextDisabled` |
 | `text/inverse` | `neutral/950` | `TextInverse` |
 | `border/default` | `neutral/700` | `BorderDefault` |
@@ -66,7 +66,7 @@ As primitives de cores exportadas (neutros, brand, success, warning e error) tam
 | Body | 15/22 | 400 | 1.4667 |
 | Body Small | 13/20 | 400 | 1.5385 |
 | Label | 13/18 | 600 | 1.3846 |
-| Caption | 11/16 | 500 | 1.4545 |
+| Caption | 12/18 (ajuste no app) | 500 | 1.5000 |
 
 Aliases previstos no bootstrap do MAUI: `InterRegular`, `InterMedium`, `InterSemiBold` e `InterBold`, correspondendo a `Inter-Regular.ttf`, `Inter-Medium.ttf`, `Inter-SemiBold.ttf` e `Inter-Bold.ttf`. Os aliases e fontes MAUI são ativados somente se o arquivo correspondente existir em `Resources/Fonts`.
 
@@ -77,3 +77,16 @@ Aliases previstos no bootstrap do MAUI: `InterRegular`, `InterMedium`, `InterSem
 `Components.xaml` contém apenas styles básicos globais com tokens semânticos. Não define aparência final de componentes Vaulta; isso fica para as referências Figma de Components.
 
 `DesignSystemGalleryPage` demonstra cores, escala tipográfica, espaçamentos e raios. Ela é registrada e navegável somente em Debug pelo botão **Foundations gallery** da página inicial; não é uma rota de produção.
+
+
+## Ajustes de usabilidade do app
+
+O export original do Figma foi preservado. No app, `TextTertiary` usa `#8C919E` e captions usam 12/18 para legibilidade. Botões primários usam `TextInverse` sobre `BrandPrimary`: contraste calculado de aproximadamente 4,93:1, contra 4,01:1 do branco anterior. Isso não substitui uma auditoria completa de acessibilidade.
+
+A entrada de página usa fade de 200 ms com deslocamento de 8 dp. O toque em botões usa escala 0,98 por 80 ms e retorno de 120 ms. A preferência de movimento reduzido do iOS e a desativação de animadores do Android são respeitadas. As animações são canceladas ao sair/descarregar.
+
+Onboarding tem duas etapas, texto em português, conteúdo rolável e ação inferior separada. Só é marcado como visto ao escolher entrar/criar conta. Formulários preservam os campos ao exibir erros e bloqueiam novos envios enquanto aguardam autenticação. As abas usam rótulos curtos e ícones próprios.
+
+Catálogo, busca e coleção demonstrativos usam duas colunas quando há pelo menos 340 dp de conteúdo disponível, e uma coluna abaixo disso. O artwork de exemplo de Charizard ex (`sv03-223`) é uma referência externa TCGdex, com placeholder para ausência/falha e sem criação de asset interno. Outros exemplos sem artwork ficam explicitamente sem imagem. Os dados dessas telas ainda são demonstrativos; esta alteração visual não implementa busca ou gravação reais na coleção.
+
+Ver [validação das alterações](maui-ui-validation.md) para limites da verificação e roteiro em dispositivo.
