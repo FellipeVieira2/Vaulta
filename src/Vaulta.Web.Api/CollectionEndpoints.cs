@@ -24,9 +24,10 @@ public static class CollectionEndpoints
             Results.Ok(await handler.Handle(new GetCollectionSummaryQuery(UserId(principal)), ct)))
             .WithName("GetMyCollectionSummary").Produces<CollectionSummaryDto>().ProducesProblem(401);
 
-        collection.MapPost("/items", async (AddCollectibleItemsRequest request, ClaimsPrincipal principal, CollectionCommandHandlers handler, CancellationToken ct) =>
+        collection.MapPost("/items", async (AddCollectibleItemsRequest request, HttpRequest httpRequest, ClaimsPrincipal principal, CollectionCommandHandlers handler, CancellationToken ct) =>
         {
-            var result = await handler.Handle(new AddCollectibleItemsCommand(UserId(principal), request), ct);
+            var idempotencyKey = httpRequest.Headers.TryGetValue("Idempotency-Key", out var values) ? values.ToString() : null;
+            var result = await handler.Handle(new AddCollectibleItemsCommand(UserId(principal), request, idempotencyKey), ct);
             return Results.Created($"/api/v1/me/collection/entries/{result.CollectionEntryId}", result);
         }).WithName("AddCollectibleItems").Produces<AddCollectibleItemsResponse>(201).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404).ProducesProblem(409);
 

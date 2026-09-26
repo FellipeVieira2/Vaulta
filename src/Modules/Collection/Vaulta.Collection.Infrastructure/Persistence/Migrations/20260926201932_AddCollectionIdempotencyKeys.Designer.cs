@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Vaulta.Collection.Infrastructure;
@@ -11,9 +12,11 @@ using Vaulta.Collection.Infrastructure;
 namespace Vaulta.Collection.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(CollectionDbContext))]
-    partial class CollectionDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260926201932_AddCollectionIdempotencyKeys")]
+    partial class AddCollectionIdempotencyKeys
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

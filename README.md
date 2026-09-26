@@ -323,6 +323,100 @@ para consolidação entre printings. Nenhum merge por nome é feito. External ID
 Migration: `20260926045142_ExternalArtworkAndVariantAvailability`; adições nullable de artwork e `is_active` com default true.
 Não há backfill de imagens inventadas: reexecute o sync para preencher os artworks. Migrations anteriores permanecem intactas.
 
+## Collection: hardening final (pré-integração MAUI)
+
+`CollectionEntry` (agrupamento por `UserId + PrintingId + VariantId`) e `CollectibleItem` (unidade física
+individual) não mudaram de forma nesta rodada; os gaps abaixo foram corrigidos sem reescrever o modelo.
+
+### Conditions canônicas
+
+`CollectionRules.Condition` só persiste um destes sete códigos: `MINT`, `NEAR_MINT`, `LIGHTLY_PLAYED`,
+`MODERATELY_PLAYED`, `HEAVILY_PLAYED`, `DAMAGED`, `UNKNOWN`. Texto livre nunca mais vira condição distinta.
+Aliases de entrada aceitos (case/hífen/espaço insensíveis) são normalizados para o código canônico antes de
+qualquer persistência:
+
+| Alias de entrada | Código canônico |
+|---|---|
+| `M`, `MINT` | `MINT` |
+| `NM`, `NEAR MINT`, `NEAR-MINT`, `NEAR_MINT` | `NEAR_MINT` |
+| `LP`, `LIGHTLY PLAYED`, `LIGHTLY-PLAYED` | `LIGHTLY_PLAYED` |
+| `MP`, `MODERATELY PLAYED` | `MODERATELY_PLAYED` |
+| `HP`, `HEAVILY PLAYED` | `HEAVILY_PLAYED` |
+| `DMG`, `DAMAGED` | `DAMAGED` |
+| `UNKNOWN`, `UNSPECIFIED` | `UNKNOWN` |
+
+Qualquer outro valor (`PERFECT`, `EXCELENTE`, `SUPER_BONITA`, vazio) é rejeitado com `400` (`DomainException`
+→ `ProblemDetails`). A regra vive só em `CollectionRules`; handlers e endpoints não replicam `if condition == ...`.
+
+### `sort=name` agora é uma ordenação global
+
+Antes, `GET /api/v1/me/collection?sort=name` ordenava `CollectionEntry` por `PrintingId`, paginava no
+PostgreSQL e só então ordenava por nome a página já reduzida — o resultado era correto apenas dentro de
+cada página isolada. Agora, quando `sort=name`, a query materializa as identidades (`EntryId`, `PrintingId`,
+`VariantId`) de todas as entries filtradas, resolve `CardName`/`SetName`/`CollectorNumber`/`VariantCode` via
+`ICatalogCollectionReader` uma única vez, ordena a coleção inteira com tie-breaker estável
+(`CardName, SetName, CollectorNumber, VariantCode, CollectionEntryId`) e só então aplica `Skip`/`Take`. Os
+demais sorts (`recent`: `UpdatedAt DESC, EntryId`; `quantity`: `Count DESC, EntryId`) já eram calculados no
+banco antes da paginação e não precisaram mudar. Collection não ganhou FK cruzando o schema `catalog`; o
+boundary entre módulos continua por porta (`ICollectionCatalog`/`ICatalogCollectionReader`).
+
+### Idempotência de `POST /api/v1/me/collection/items`
+
+O header `Idempotency-Key` é **obrigatório** nesse endpoint; sua ausência responde `400`. A chave é escopada
+por `(UserId, Operation, IdempotencyKey)` em uma tabela nova, `collection.idempotency_keys`
+(migration `20260926201932_AddCollectionIdempotencyKeys`), com índice único
+`(user_id, operation, idempotency_key)`. Fluxo:
+
+- O `pg_advisory_xact_lock` existente (identidade `UserId+PrintingId+VariantId`) é adquirido **antes** da
+  checagem de idempotência, então retries verdadeiramente concorrentes com a mesma chave são serializados
+  pelo mesmo lock que já protege a criação de `CollectionEntry`/`CollectibleItem`.
+- Se a chave já existe com o mesmo hash de request (SHA-256 do payload serializado): nenhuma nova
+  `CollectionEntry`/`CollectibleItem`/evento de Outbox é criada; a resposta original (serializada em
+  `response_payload`) é devolvida sem reexecutar o domínio.
+- Se a chave já existe com um hash de request diferente: `409 Conflict` (nunca aceita silenciosamente um
+  payload diferente para a mesma chave).
+- Se a chave não existe: o fluxo normal roda e a linha de idempotência é gravada na **mesma transação/mesmo
+  `SaveChangesAsync`** que persiste a Entry, os Items e as mensagens de Outbox — não há como a operação ficar
+  "meio concluída".
+- Uma corrida residual entre duas requisições que colidem na mesma chave antes do lock (rara, dado que o
+  lock cobre a identidade de destino) é resolvida pela unique constraint da tabela: a segunda
+  `SaveChangesAsync` falha com violação de unicidade e é convertida em `409`, pedindo retry.
+
+Chaves diferentes para o mesmo payload são tratadas como intenções distintas (ex.: dois cliques reais de
+"Adicionar" no MAUI) e criam itens adicionais normalmente — idempotência nunca deduplica por conteúdo, só
+por chave.
+
+Quando o app MAUI integrar este endpoint (fora do escopo desta tarefa), a regra de geração de chave é: gerar
+um GUID novo por intenção lógica de "Adicionar à coleção" e reenviar o mesmo GUID em qualquer retry
+automático daquela mesma intenção (timeout, perda de resposta, etc.). Uma nova ação do usuário — mesmo que
+para o mesmo card — deve gerar um GUID novo. A geração da chave é responsabilidade do cliente; a API nunca
+gera uma chave automática em nome do cliente, pois isso anularia a proteção contra retries.
+
+### Printing/Variant inativa: nova inclusão bloqueada, histórico preservado
+
+`CollectionVariantDetails` (porta interna `ICatalogCollectionReader`) agora também expõe `IsActive`, igual
+`CollectionPrintingDetails` já expunha. `POST /api/v1/me/collection/items` valida ambos antes de criar
+qualquer coisa: `Printing.IsActive == false` **ou** `Variant.IsActive == false` (quando informada) →
+`409 Conflict`, sem consultar o lock nem tocar o banco de Collection. Leituras de entries/itens já existentes
+(`GET /entries/{id}`, `GET /items/{id}`, listagem) nunca aplicam esse filtro — `ICatalogCollectionReader`
+continua resolvendo identidades ativas e inativas, preservando artwork/nome/rarity de cópias físicas
+antigas mesmo depois que o Catalog parou de oferecer aquela Printing ou Variant.
+
+### Testes adicionados
+
+- `tests/Vaulta.Identity.UnitTests/CollectionDomainTests.cs`: aliases de condition (`NM`, `Near Mint`,
+  `near-mint`, `LP`, `MP`, `HP`, `DMG`, `unspecified`, …) e rejeição de códigos desconhecidos/vazios.
+- `tests/Vaulta.Identity.IntegrationTests/CollectionApiTests.cs` (novo): 401 sem Bearer, quantidade cria N
+  `CollectibleItem` com IDs/versions distintos, reuso de Entry na mesma identidade, Entries separadas por
+  Variant/usuário, Printing/Variant inexistente (`404`), Variant de outra Printing (`400`), update com
+  ETag/Version e conflito otimista (`409`), soft delete, summary, filtros (`query`/`condition`/`variantId`),
+  paginação inválida (`400`), ownership (`404` para outro usuário), concorrência real com chaves diferentes
+  (`pg_advisory_xact_lock`), retry idempotente com mesma chave/mesmo payload, `409` para mesma
+  chave/payload diferente, e `sort=name` com 5 cartas em 3 páginas provando ordenação global.
+- `tests/Vaulta.Identity.IntegrationTests/CatalogCollectionFlowTests.cs`: novo teste
+  `VariantLifecycleProtectsNewCollectionAdditionsWhileKeepingHistoricalItemsReadable`, análogo ao já
+  existente para Printing, cobrindo especificamente Variant inativa com Printing ainda ativa.
+
 Validação do backend sem workloads móveis:
 
 ```sh

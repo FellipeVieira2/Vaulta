@@ -8,12 +8,41 @@ public static partial class CollectionRules
     public const string ActiveStatus = "ACTIVE";
     public const string RemovedStatus = "REMOVED";
 
+    /// <summary>
+    /// The only condition codes persisted by Collection. Raw/free text from users or clients is
+    /// normalized and mapped to one of these via <see cref="ConditionAliases"/>; anything that does
+    /// not resolve to a known alias is rejected rather than stored as an arbitrary string.
+    /// </summary>
+    public static readonly IReadOnlyList<string> CanonicalConditions =
+    [
+        "MINT", "NEAR_MINT", "LIGHTLY_PLAYED", "MODERATELY_PLAYED", "HEAVILY_PLAYED", "DAMAGED", "UNKNOWN"
+    ];
+
+    private static readonly IReadOnlyDictionary<string, string> ConditionAliases = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["M"] = "MINT",
+        ["MINT"] = "MINT",
+        ["NM"] = "NEAR_MINT",
+        ["NEAR_MINT"] = "NEAR_MINT",
+        ["LP"] = "LIGHTLY_PLAYED",
+        ["LIGHTLY_PLAYED"] = "LIGHTLY_PLAYED",
+        ["MP"] = "MODERATELY_PLAYED",
+        ["MODERATELY_PLAYED"] = "MODERATELY_PLAYED",
+        ["HP"] = "HEAVILY_PLAYED",
+        ["HEAVILY_PLAYED"] = "HEAVILY_PLAYED",
+        ["DMG"] = "DAMAGED",
+        ["DAMAGED"] = "DAMAGED",
+        ["UNKNOWN"] = "UNKNOWN",
+        ["UNSPECIFIED"] = "UNKNOWN",
+    };
+
     public static string Condition(string value)
     {
         if (string.IsNullOrWhiteSpace(value)) throw new DomainException("Condition is required.");
-        var code = CodeRegex().Replace(value.Trim().ToUpperInvariant(), "_");
-        if (code.Length > 32 || code.Length == 0) throw new DomainException("Condition code is invalid.");
-        return code;
+        var normalized = CodeRegex().Replace(value.Trim().ToUpperInvariant(), "_").Trim('_');
+        return ConditionAliases.TryGetValue(normalized, out var canonical)
+            ? canonical
+            : throw new DomainException($"Unsupported condition code: '{value}'. Supported values: {string.Join(", ", CanonicalConditions)}.");
     }
 
     public static void ValidateAcquisitionPrice(Money? price)

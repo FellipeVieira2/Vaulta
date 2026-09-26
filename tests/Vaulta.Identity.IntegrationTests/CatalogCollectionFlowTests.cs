@@ -102,6 +102,47 @@ public sealed class CatalogCollectionFlowTests(ApiFixture fixture)
     }
 
     [Fact]
+    public async Task VariantLifecycleProtectsNewCollectionAdditionsWhileKeepingHistoricalItemsReadable()
+    {
+        var provider = new FixtureProvider { Variants = [new("normal", "Normal", "normal"), new("reverse", "Reverse", "reverse")] };
+        Guid printingId, normalVariantId;
+        await using (var scope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            await Sync(scope.ServiceProvider, provider).Synchronize("fake", provider.SetId, default);
+            var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+            var printing = await db.Printings.Include(x => x.Variants).SingleAsync(x => x.Set.Name == provider.SetName);
+            printingId = printing.Id;
+            normalVariantId = printing.Variants.Single(x => x.Code == "normal").Id;
+        }
+        using var client = fixture.Factory.CreateClient();
+        await Authenticate(client);
+
+        // Historical add while the Variant is still active.
+        var historicalAdd = await client.PostAsJsonAsync("/api/v1/me/collection/items", new { printingId, variantId = normalVariantId, quantity = 1, condition = "NEAR_MINT" });
+        Assert.Equal(HttpStatusCode.Created, historicalAdd.StatusCode);
+        var historicalEntryId = (await historicalAdd.Content.ReadFromJsonAsync<AddCollectibleItemsResponse>())!.CollectionEntryId;
+
+        // Sync #2: provider stops offering the "normal" treatment -> that Variant becomes inactive.
+        // The Printing itself stays active because "holo" is still offered.
+        provider.Variants = [new("holo", "Holo", "holo")];
+        await using (var scope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            await Sync(scope.ServiceProvider, provider).Synchronize("fake", provider.SetId, default);
+            var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+            Assert.True((await db.Printings.SingleAsync(x => x.Id == printingId)).IsActive);
+            Assert.False((await db.Variants.SingleAsync(x => x.Id == normalVariantId)).IsActive);
+        }
+
+        // Historical Collection access to the now-inactive Variant must keep working.
+        var historicalRead = await client.GetAsync($"/api/v1/me/collection/entries/{historicalEntryId}");
+        historicalRead.EnsureSuccessStatusCode();
+
+        // New Collection additions referencing the inactive Variant are rejected even though the Printing is active.
+        var rejected = await client.PostAsJsonAsync("/api/v1/me/collection/items", new { printingId, variantId = normalVariantId, quantity = 1, condition = "NEAR_MINT" });
+        Assert.Equal(HttpStatusCode.Conflict, rejected.StatusCode);
+    }
+
+    [Fact]
     public async Task PrintingLifecycleFollowsProviderAvailabilityAcrossSyncsAndProtectsCollectionAndPublicReads()
     {
         var provider = new MultiPrintingProvider();

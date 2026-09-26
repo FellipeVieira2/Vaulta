@@ -47,7 +47,7 @@ public sealed class CollectionDomainTests
 
         item.Update("LP", null, null, null, oldVersion, Now.AddMinutes(1));
 
-        Assert.Equal("LP", item.Condition);
+        Assert.Equal("LIGHTLY_PLAYED", item.Condition);
         Assert.NotEqual(oldVersion, item.Version);
         Assert.Equal(Now.AddMinutes(1), item.UpdatedAt);
         Assert.IsType<CollectibleItemUpdatedDomainEvent>(Assert.Single(item.DomainEvents));
@@ -91,6 +91,43 @@ public sealed class CollectionDomainTests
         item.RemoveAsset(secondAssetId, Now.AddMinutes(4));
         Assert.True(Assert.Single(item.Assets).IsPrimary);
     }
+
+    [Theory]
+    [InlineData("NM", "NEAR_MINT")]
+    [InlineData("Near Mint", "NEAR_MINT")]
+    [InlineData("near-mint", "NEAR_MINT")]
+    [InlineData("NEAR_MINT", "NEAR_MINT")]
+    [InlineData("M", "MINT")]
+    [InlineData("mint", "MINT")]
+    [InlineData("LP", "LIGHTLY_PLAYED")]
+    [InlineData("Lightly Played", "LIGHTLY_PLAYED")]
+    [InlineData("lightly-played", "LIGHTLY_PLAYED")]
+    [InlineData("MP", "MODERATELY_PLAYED")]
+    [InlineData("Moderately Played", "MODERATELY_PLAYED")]
+    [InlineData("HP", "HEAVILY_PLAYED")]
+    [InlineData("Heavily Played", "HEAVILY_PLAYED")]
+    [InlineData("DMG", "DAMAGED")]
+    [InlineData("damaged", "DAMAGED")]
+    [InlineData("unknown", "UNKNOWN")]
+    [InlineData("unspecified", "UNKNOWN")]
+    public void ConditionNormalizesRecognizedAliasesToCanonicalCodes(string input, string expected) =>
+        Assert.Equal(expected, CollectionRules.Condition(input));
+
+    [Theory]
+    [InlineData("PERFECT")]
+    [InlineData("EXCELLENT")]
+    [InlineData("EXCELENTE")]
+    [InlineData("SUPER_BONITA")]
+    [InlineData("QUASE_NOVA")]
+    [InlineData("ABC")]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ConditionRejectsUnrecognizedOrBlankCodes(string input) =>
+        Assert.Throws<DomainException>(() => CollectionRules.Condition(input));
+
+    [Fact]
+    public void ConditionRejectsNull() =>
+        Assert.Throws<DomainException>(() => CollectionRules.Condition(null!));
 
     private static CollectibleItem CreateItem() =>
         CollectibleItem.Create(Guid.NewGuid(), Guid.NewGuid(), "NM", null, null, null, Now);

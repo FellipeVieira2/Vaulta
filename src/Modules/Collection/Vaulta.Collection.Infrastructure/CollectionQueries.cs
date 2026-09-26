@@ -26,23 +26,54 @@ internal sealed class CollectionQueries(CollectionDbContext db, ICatalogCollecti
             filtered = filtered.Where(entry => db.Items.Any(item => item.CollectionEntryId == entry.Id && item.UserId == userId && item.Status == CollectionRules.ActiveStatus && item.Condition == condition));
 
         var total = await filtered.CountAsync(cancellationToken);
-        var selectedIds = filter.Sort switch
+        if (total == 0) return new CollectionPageDto([], filter.Page, filter.PageSize, total);
+
+        Guid[] selectedIds;
+        IReadOnlyDictionary<Guid, CollectionPrintingDetails>? preloadedPrintings = null;
+        IReadOnlyDictionary<Guid, CollectionVariantDetails>? preloadedVariants = null;
+
+        if (filter.Sort == "name")
         {
-            "quantity" => await filtered.Select(entry => new { entry.Id, Count = db.Items.Count(item => item.CollectionEntryId == entry.Id && item.UserId == userId && item.Status == CollectionRules.ActiveStatus) })
-                .OrderByDescending(x => x.Count).ThenBy(x => x.Id).Skip((filter.Page - 1) * filter.PageSize).Take(filter.PageSize).Select(x => x.Id).ToArrayAsync(cancellationToken),
-            "recent" => await filtered.OrderByDescending(x => x.UpdatedAt).ThenBy(x => x.Id).Skip((filter.Page - 1) * filter.PageSize).Take(filter.PageSize).Select(x => x.Id).ToArrayAsync(cancellationToken),
-            _ => await filtered.OrderBy(x => x.PrintingId).ThenBy(x => x.VariantId).ThenBy(x => x.Id).Skip((filter.Page - 1) * filter.PageSize).Take(filter.PageSize).Select(x => x.Id).ToArrayAsync(cancellationToken)
-        };
+            // sort=name must be a global ordering of the whole filtered collection, not a per-page
+            // re-sort (that legacy behavior only ordered the 20 rows already selected by PrintingId).
+            // Card/Set names live in Catalog, so every filtered candidate's identity is materialized
+            // here, resolved against Catalog once, ordered, and only then paginated. Collections are
+            // personal and bounded, so this stays a single extra round trip instead of a read model.
+            var candidates = await filtered.Select(x => new { x.Id, x.PrintingId, x.VariantId }).ToArrayAsync(cancellationToken);
+            var printingData = await catalog.GetPrintings(candidates.Select(x => x.PrintingId).Distinct().ToArray(), cancellationToken);
+            var variantData = await catalog.GetVariants(candidates.Where(x => x.VariantId.HasValue).Select(x => x.VariantId!.Value).Distinct().ToArray(), cancellationToken);
+            var printingLookup = printingData.ToDictionary(x => x.PrintingId);
+            var variantLookup = variantData.ToDictionary(x => x.VariantId);
+            preloadedPrintings = printingLookup;
+            preloadedVariants = variantLookup;
+            selectedIds = candidates.Where(x => printingLookup.ContainsKey(x.PrintingId))
+                .OrderBy(x => printingLookup[x.PrintingId].CardName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(x => printingLookup[x.PrintingId].SetName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(x => printingLookup[x.PrintingId].CollectorNumber, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(x => x.VariantId.HasValue && variantLookup.TryGetValue(x.VariantId.Value, out var variant) ? variant.Code : string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(x => x.Id)
+                .Skip((filter.Page - 1) * filter.PageSize).Take(filter.PageSize)
+                .Select(x => x.Id).ToArray();
+        }
+        else if (filter.Sort == "quantity")
+        {
+            selectedIds = await filtered.Select(entry => new { entry.Id, Count = db.Items.Count(item => item.CollectionEntryId == entry.Id && item.UserId == userId && item.Status == CollectionRules.ActiveStatus) })
+                .OrderByDescending(x => x.Count).ThenBy(x => x.Id).Skip((filter.Page - 1) * filter.PageSize).Take(filter.PageSize).Select(x => x.Id).ToArrayAsync(cancellationToken);
+        }
+        else
+        {
+            selectedIds = await filtered.OrderByDescending(x => x.UpdatedAt).ThenBy(x => x.Id).Skip((filter.Page - 1) * filter.PageSize).Take(filter.PageSize).Select(x => x.Id).ToArrayAsync(cancellationToken);
+        }
         if (selectedIds.Length == 0) return new CollectionPageDto([], filter.Page, filter.PageSize, total);
 
         var entries = await db.Entries.AsNoTracking().Where(x => selectedIds.Contains(x.Id))
             .Select(entry => new { Entry = entry, Quantity = db.Items.Count(item => item.CollectionEntryId == entry.Id && item.UserId == userId && item.Status == CollectionRules.ActiveStatus),
                 Conditions = db.Items.Where(item => item.CollectionEntryId == entry.Id && item.UserId == userId && item.Status == CollectionRules.ActiveStatus)
                     .GroupBy(item => item.Condition).Select(group => new { group.Key, Count = group.Count() }).ToArray() }).ToArrayAsync(cancellationToken);
-        var printingData = await catalog.GetPrintings(entries.Select(x => x.Entry.PrintingId).Distinct().ToArray(), cancellationToken);
-        var variantData = await catalog.GetVariants(entries.Where(x => x.Entry.VariantId.HasValue).Select(x => x.Entry.VariantId!.Value).Distinct().ToArray(), cancellationToken);
-        var printingMap = printingData.ToDictionary(x => x.PrintingId);
-        var variantMap = variantData.ToDictionary(x => x.VariantId);
+        var printingMap = preloadedPrintings ?? (await catalog.GetPrintings(entries.Select(x => x.Entry.PrintingId).Distinct().ToArray(), cancellationToken)).ToDictionary(x => x.PrintingId);
+        var variantMap = preloadedVariants ?? (await catalog.GetVariants(entries.Where(x => x.Entry.VariantId.HasValue).Select(x => x.Entry.VariantId!.Value).Distinct().ToArray(), cancellationToken)).ToDictionary(x => x.VariantId);
+        // `selectedIds` already carries the final global order (name/recent/quantity); the page must
+        // preserve it, not re-sort locally.
         var output = selectedIds.Select(id => entries.Single(row => row.Entry.Id == id)).Where(row => printingMap.ContainsKey(row.Entry.PrintingId)).Select(row =>
         {
             var printing = printingMap[row.Entry.PrintingId];
@@ -51,7 +82,6 @@ internal sealed class CollectionQueries(CollectionDbContext db, ICatalogCollecti
                 printing.SetName, printing.CollectorNumber, printing.Language, printing.Rarity, printing.ArtworkUrl, variant?.Code, row.Quantity,
                 row.Conditions.ToDictionary(x => x.Key, x => x.Count));
         }).ToArray();
-        if (filter.Sort == "name") output = output.OrderBy(x => x.CardName, StringComparer.OrdinalIgnoreCase).ThenBy(x => x.SetName, StringComparer.OrdinalIgnoreCase).ToArray();
         return new CollectionPageDto(output, filter.Page, filter.PageSize, total);
     }
 

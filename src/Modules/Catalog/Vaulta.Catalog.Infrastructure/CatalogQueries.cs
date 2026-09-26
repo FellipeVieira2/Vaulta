@@ -39,7 +39,7 @@ internal sealed class CatalogQueries(CatalogDbContext db) : ICatalogSearch, ICat
 
     async Task<IReadOnlyList<CollectionVariantDetails>> ICatalogCollectionReader.GetVariants(IReadOnlyCollection<Guid> variantIds, CancellationToken cancellationToken) =>
         await db.Variants.AsNoTracking().Where(x => variantIds.Contains(x.Id))
-            .Select(x => new CollectionVariantDetails(x.Id, x.PrintingId, x.Code, x.Name)).ToArrayAsync(cancellationToken);
+            .Select(x => new CollectionVariantDetails(x.Id, x.PrintingId, x.Code, x.Name, x.IsActive)).ToArrayAsync(cancellationToken);
 
     async Task<IReadOnlyList<Guid>> ICatalogCollectionReader.SearchPrintingIds(string? query, string? gameCode, Guid? setId, CancellationToken cancellationToken)
     {
@@ -58,6 +58,6 @@ internal sealed class CatalogQueries(CatalogDbContext db) : ICatalogSearch, ICat
 
     public Task<CollectionVariantDetails?> GetVariant(Guid variantId, CancellationToken cancellationToken) => db.Variants.AsNoTracking()
         .Where(x => x.Id == variantId)
-        .Select(x => new CollectionVariantDetails(x.Id, x.PrintingId, x.Code, x.Name))
+        .Select(x => new CollectionVariantDetails(x.Id, x.PrintingId, x.Code, x.Name, x.IsActive))
         .SingleOrDefaultAsync(cancellationToken);
 }

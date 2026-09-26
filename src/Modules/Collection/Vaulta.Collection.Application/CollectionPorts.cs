@@ -5,6 +5,12 @@ using Vaulta.Collection.Domain;
 
 namespace Vaulta.Collection.Application;
 
+/// <summary>
+/// Persisted record of a previously handled idempotent operation, scoped by user and operation name
+/// so that keys from different users or different endpoints never collide.
+/// </summary>
+public sealed record IdempotencyRecord(Guid Id, Guid UserId, string Operation, string IdempotencyKey, string RequestHash, int ResponseStatus, string ResponsePayload, DateTimeOffset CreatedAt);
+
 public interface ICollectionStore
 {
     Task LockEntryIdentity(Guid userId, Guid printingId, Guid? variantId, CancellationToken cancellationToken);
@@ -12,6 +18,8 @@ public interface ICollectionStore
     void AddEntry(CollectionEntry entry);
     void AddItems(IEnumerable<CollectibleItem> items);
     Task<CollectibleItem?> FindItem(Guid userId, Guid itemId, CancellationToken cancellationToken);
+    Task<IdempotencyRecord?> FindIdempotencyRecord(Guid userId, string operation, string idempotencyKey, CancellationToken cancellationToken);
+    void AddIdempotencyRecord(IdempotencyRecord record);
     Task Save(CancellationToken cancellationToken);
 }
 

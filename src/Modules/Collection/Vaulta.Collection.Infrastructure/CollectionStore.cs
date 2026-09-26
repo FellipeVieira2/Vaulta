@@ -23,6 +23,17 @@ internal sealed class CollectionStore(CollectionDbContext db) : ICollectionStore
     public Task<CollectibleItem?> FindItem(Guid userId, Guid itemId, CancellationToken cancellationToken) =>
         db.Items.Include(x => x.Assets).SingleOrDefaultAsync(x => x.UserId == userId && x.Id == itemId, cancellationToken);
 
+    public Task<IdempotencyRecord?> FindIdempotencyRecord(Guid userId, string operation, string idempotencyKey, CancellationToken cancellationToken) =>
+        db.IdempotencyKeys.AsNoTracking().Where(x => x.UserId == userId && x.Operation == operation && x.IdempotencyKey == idempotencyKey)
+            .Select(x => new IdempotencyRecord(x.Id, x.UserId, x.Operation, x.IdempotencyKey, x.RequestHash, x.ResponseStatus, x.ResponsePayload, x.CreatedAt))
+            .SingleOrDefaultAsync(cancellationToken);
+
+    public void AddIdempotencyRecord(IdempotencyRecord record) => db.IdempotencyKeys.Add(new CollectionIdempotencyKey
+    {
+        Id = record.Id, UserId = record.UserId, Operation = record.Operation, IdempotencyKey = record.IdempotencyKey,
+        RequestHash = record.RequestHash, ResponseStatus = record.ResponseStatus, ResponsePayload = record.ResponsePayload, CreatedAt = record.CreatedAt
+    });
+
     public async Task Save(CancellationToken cancellationToken)
     {
         await db.SaveChangesAsync(cancellationToken);

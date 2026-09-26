@@ -9,6 +9,7 @@ public sealed class CollectionDbContext(DbContextOptions<CollectionDbContext> op
     public DbSet<CollectionEntry> Entries => Set<CollectionEntry>();
     public DbSet<CollectibleItem> Items => Set<CollectibleItem>();
     public DbSet<CollectibleItemAsset> ItemAssets => Set<CollectibleItemAsset>();
+    public DbSet<CollectionIdempotencyKey> IdempotencyKeys => Set<CollectionIdempotencyKey>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -69,6 +70,18 @@ public sealed class CollectionDbContext(DbContextOptions<CollectionDbContext> op
             b.Property(x => x.Payload).HasColumnType("jsonb").IsRequired();
             b.Property(x => x.Error).HasColumnType("text");
         });
+        modelBuilder.Entity<CollectionIdempotencyKey>(b =>
+        {
+            b.ToTable("idempotency_keys");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Operation).HasMaxLength(100).IsRequired();
+            b.Property(x => x.IdempotencyKey).HasMaxLength(200).IsRequired();
+            b.Property(x => x.RequestHash).HasMaxLength(64).IsRequired();
+            b.Property(x => x.ResponsePayload).HasColumnType("jsonb").IsRequired();
+            b.Property(x => x.CreatedAt).IsRequired();
+            b.HasIndex(x => new { x.UserId, x.Operation, x.IdempotencyKey }).IsUnique().HasDatabaseName("ux_collection_idempotency_keys_user_operation_key");
+        });
         foreach (var entity in modelBuilder.Model.GetEntityTypes())
             foreach (var property in entity.GetProperties()) property.SetColumnName(Snake(property.Name));
     }
@@ -105,6 +118,14 @@ public sealed class CollectionDbContext(DbContextOptions<CollectionDbContext> op
                                                     postgres.ConstraintName is "ux_collection_entries_user_printing_no_variant" or "ux_collection_entries_user_printing_variant")
         {
             throw new ConflictException("Collection entry was concurrently created. Retry the add operation.");
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is Npgsql.PostgresException { SqlState: Npgsql.PostgresErrorCodes.UniqueViolation } postgres &&
+                                                    postgres.ConstraintName == "ux_collection_idempotency_keys_user_operation_key")
+        {
+            // Two concurrent requests raced past the advisory lock with the exact same Idempotency-Key
+            // (e.g. two truly simultaneous retries). Neither response is authoritative yet; the caller
+            // should retry so it observes the record persisted by whichever request committed first.
+            throw new ConflictException("This Idempotency-Key is being processed concurrently. Retry the request.");
         }
     }
 

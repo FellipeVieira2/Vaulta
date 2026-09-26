@@ -1,4 +1,5 @@
 using FluentValidation;
+using System.Text.Json;
 using Vaulta.Assets.Contracts;
 using Vaulta.Catalog.Contracts;
 using Vaulta.Collection.Application.Commands;
@@ -14,6 +15,9 @@ public sealed class CollectionCommandHandlers(ICollectionStore store, ICollectio
     public async Task<AddCollectibleItemsResponse> Handle(AddCollectibleItemsCommand command, CancellationToken cancellationToken)
     {
         await new AddCollectibleItemsValidator().ValidateAndThrowAsync(command.Request, cancellationToken);
+        if (string.IsNullOrWhiteSpace(command.IdempotencyKey))
+            throw new DomainException("The Idempotency-Key header is required for this operation.");
+
         var request = command.Request;
         var printing = await catalog.GetPrinting(request.PrintingId, cancellationToken) ?? throw new NotFoundException("Printing not found.");
         if (!printing.IsActive) throw new ConflictException("Printing is no longer available in the catalog and cannot be added to a collection.");
@@ -21,10 +25,23 @@ public sealed class CollectionCommandHandlers(ICollectionStore store, ICollectio
         {
             var variant = await catalog.GetVariant(variantId, cancellationToken) ?? throw new NotFoundException("Variant not found.");
             if (variant.PrintingId != printing.PrintingId) throw new DomainException("Variant does not belong to the specified printing.");
+            if (!variant.IsActive) throw new ConflictException("Variant is no longer available in the catalog and cannot be added to a collection.");
         }
 
         var now = clock.UtcNow;
+        // The advisory lock also serializes retries that reuse the same Idempotency-Key for this
+        // identity, so the idempotency check below never races with the entry/items being created.
         await store.LockEntryIdentity(command.UserId, request.PrintingId, request.VariantId, cancellationToken);
+
+        var requestHash = IdempotencyRequestHasher.Hash(request);
+        var existing = await store.FindIdempotencyRecord(command.UserId, CollectionOperations.AddCollectibleItems, command.IdempotencyKey, cancellationToken);
+        if (existing is not null)
+        {
+            if (existing.RequestHash != requestHash)
+                throw new ConflictException("This Idempotency-Key was already used with a different request payload.");
+            return JsonSerializer.Deserialize<AddCollectibleItemsResponse>(existing.ResponsePayload)!;
+        }
+
         var entry = await store.FindEntry(command.UserId, request.PrintingId, request.VariantId, cancellationToken);
         if (entry is null)
         {
@@ -34,8 +51,11 @@ public sealed class CollectionCommandHandlers(ICollectionStore store, ICollectio
         var price = request.AcquisitionPrice is null ? null : new Money(request.AcquisitionPrice.Amount, request.AcquisitionPrice.Currency);
         var items = entry.AddItems(request.Quantity, request.Condition, price, request.AcquisitionDate, request.Notes, now);
         store.AddItems(items);
+        var response = new AddCollectibleItemsResponse(entry.Id, items.Select(x => new CollectibleItemCreatedDto(x.Id, x.Version)).ToArray(), items.Count);
+        store.AddIdempotencyRecord(new IdempotencyRecord(Guid.NewGuid(), command.UserId, CollectionOperations.AddCollectibleItems, command.IdempotencyKey,
+            requestHash, 201, JsonSerializer.Serialize(response), now));
         await store.Save(cancellationToken);
-        return new AddCollectibleItemsResponse(entry.Id, items.Select(x => new CollectibleItemCreatedDto(x.Id, x.Version)).ToArray(), items.Count);
+        return response;
     }
 
     public async Task<Guid> Handle(UpdateCollectibleItemCommand command, CancellationToken cancellationToken)
