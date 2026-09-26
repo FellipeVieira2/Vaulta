@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Vaulta.App.Views.DesignSystemGalleryPage"
+             Title="Foundations"
+             BackgroundColor="{DynamicResource BackgroundPrimary}">
+    <ScrollView>
+        <VerticalStackLayout Padding="{DynamicResource Inset24}" Spacing="{DynamicResource Spacing24}">
+            <Label Text="Foundations" Style="{StaticResource H1TextStyle}" />
+
+            <VerticalStackLayout Spacing="{DynamicResource Spacing12}">
+                <Label Text="Colors · backgrounds" Style="{StaticResource H3TextStyle}" />
+                <FlexLayout Direction="Row" Wrap="Wrap" JustifyContent="Start" AlignItems="Start">
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource BackgroundPrimary}" HeightRequest="40" /><Label Text="BackgroundPrimary" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource BackgroundSecondary}" HeightRequest="40" /><Label Text="BackgroundSecondary" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource BackgroundTertiary}" HeightRequest="40" /><Label Text="BackgroundTertiary" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                </FlexLayout>
+                <Label Text="Surfaces" Style="{StaticResource H3TextStyle}" />
+                <FlexLayout Direction="Row" Wrap="Wrap" JustifyContent="Start" AlignItems="Start">
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource SurfaceDefault}" HeightRequest="40" /><Label Text="SurfaceDefault" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource SurfaceElevated}" HeightRequest="40" /><Label Text="SurfaceElevated" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource SurfaceOverlay}" HeightRequest="40" /><Label Text="SurfaceOverlay" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                </FlexLayout>
+                <Label Text="Text" Style="{StaticResource H3TextStyle}" />
+                <FlexLayout Direction="Row" Wrap="Wrap" JustifyContent="Start" AlignItems="Start">
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource TextPrimary}" HeightRequest="40" /><Label Text="TextPrimary" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource TextSecondary}" HeightRequest="40" /><Label Text="TextSecondary" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource TextTertiary}" HeightRequest="40" /><Label Text="TextTertiary" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource TextDisabled}" HeightRequest="40" /><Label Text="TextDisabled" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource TextInverse}" HeightRequest="40" /><Label Text="TextInverse" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                </FlexLayout>
+                <Label Text="Borders" Style="{StaticResource H3TextStyle}" />
+                <FlexLayout Direction="Row" Wrap="Wrap" JustifyContent="Start" AlignItems="Start">
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource BorderDefault}" HeightRequest="40" /><Label Text="BorderDefault" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource BorderSubtle}" HeightRequest="40" /><Label Text="BorderSubtle" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource BorderStrong}" HeightRequest="40" /><Label Text="BorderStrong" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                </FlexLayout>
+                <Label Text="Brand" Style="{StaticResource H3TextStyle}" />
+                <FlexLayout Direction="Row" Wrap="Wrap" JustifyContent="Start" AlignItems="Start">
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource BrandPrimary}" HeightRequest="40" /><Label Text="BrandPrimary" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource BrandSecondary}" HeightRequest="40" /><Label Text="BrandSecondary" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource BrandMuted}" HeightRequest="40" /><Label Text="BrandMuted" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                </FlexLayout>
+                <Label Text="Status" Style="{StaticResource H3TextStyle}" />
+                <FlexLayout Direction="Row" Wrap="Wrap" JustifyContent="Start" AlignItems="Start">
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource StatusSuccess}" HeightRequest="40" /><Label Text="StatusSuccess" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource StatusWarning}" HeightRequest="40" /><Label Text="StatusWarning" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource StatusError}" HeightRequest="40" /><Label Text="StatusError" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                </FlexLayout>
+                <Label Text="Interactive" Style="{StaticResource H3TextStyle}" />
+                <FlexLayout Direction="Row" Wrap="Wrap" JustifyContent="Start" AlignItems="Start">
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource InteractiveDefault}" HeightRequest="40" /><Label Text="InteractiveDefault" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource InteractiveHover}" HeightRequest="40" /><Label Text="InteractiveHover" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource InteractivePressed}" HeightRequest="40" /><Label Text="InteractivePressed" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="150" Padding="{DynamicResource Inset4}"><BoxView Color="{DynamicResource InteractiveDisabled}" HeightRequest="40" /><Label Text="InteractiveDisabled" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                </FlexLayout>
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="{DynamicResource Spacing12}">
+                <Label Text="Typography" Style="{StaticResource H2TextStyle}" />
+                <Label Text="Display · 36/44" Style="{StaticResource DisplayTextStyle}" />
+                <Label Text="H1 · 28/36" Style="{StaticResource H1TextStyle}" />
+                <Label Text="H2 · 24/32" Style="{StaticResource H2TextStyle}" />
+                <Label Text="H3 · 20/28" Style="{StaticResource H3TextStyle}" />
+                <Label Text="Title · 17/24" Style="{StaticResource TitleTextStyle}" />
+                <Label Text="Body · 15/22" Style="{StaticResource BodyTextStyle}" />
+                <Label Text="Body Small · 13/20" Style="{StaticResource BodySmallTextStyle}" />
+                <Label Text="Label · 13/18" Style="{StaticResource LabelTextStyle}" />
+                <Label Text="Caption · 11/16" Style="{StaticResource CaptionTextStyle}" />
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="{DynamicResource Spacing12}">
+                <Label Text="Spacing" Style="{StaticResource H2TextStyle}" />
+                <HorizontalStackLayout Spacing="{DynamicResource Spacing12}" VerticalOptions="Center"><BoxView WidthRequest="{DynamicResource Spacing4}" HeightRequest="{DynamicResource Spacing4}" Color="{DynamicResource BrandPrimary}" /><Label Text="4" /></HorizontalStackLayout>
+                <HorizontalStackLayout Spacing="{DynamicResource Spacing12}" VerticalOptions="Center"><BoxView WidthRequest="{DynamicResource Spacing8}" HeightRequest="{DynamicResource Spacing4}" Color="{DynamicResource BrandPrimary}" /><Label Text="8" /></HorizontalStackLayout>
+                <HorizontalStackLayout Spacing="{DynamicResource Spacing12}" VerticalOptions="Center"><BoxView WidthRequest="{DynamicResource Spacing12}" HeightRequest="{DynamicResource Spacing4}" Color="{DynamicResource BrandPrimary}" /><Label Text="12" /></HorizontalStackLayout>
+                <HorizontalStackLayout Spacing="{DynamicResource Spacing12}" VerticalOptions="Center"><BoxView WidthRequest="{DynamicResource Spacing16}" HeightRequest="{DynamicResource Spacing4}" Color="{DynamicResource BrandPrimary}" /><Label Text="16" /></HorizontalStackLayout>
+                <HorizontalStackLayout Spacing="{DynamicResource Spacing12}" VerticalOptions="Center"><BoxView WidthRequest="{DynamicResource Spacing20}" HeightRequest="{DynamicResource Spacing4}" Color="{DynamicResource BrandPrimary}" /><Label Text="20" /></HorizontalStackLayout>
+                <HorizontalStackLayout Spacing="{DynamicResource Spacing12}" VerticalOptions="Center"><BoxView WidthRequest="{DynamicResource Spacing24}" HeightRequest="{DynamicResource Spacing4}" Color="{DynamicResource BrandPrimary}" /><Label Text="24" /></HorizontalStackLayout>
+                <HorizontalStackLayout Spacing="{DynamicResource Spacing12}" VerticalOptions="Center"><BoxView WidthRequest="{DynamicResource Spacing32}" HeightRequest="{DynamicResource Spacing4}" Color="{DynamicResource BrandPrimary}" /><Label Text="32" /></HorizontalStackLayout>
+                <HorizontalStackLayout Spacing="{DynamicResource Spacing12}" VerticalOptions="Center"><BoxView WidthRequest="{DynamicResource Spacing40}" HeightRequest="{DynamicResource Spacing4}" Color="{DynamicResource BrandPrimary}" /><Label Text="40" /></HorizontalStackLayout>
+                <HorizontalStackLayout Spacing="{DynamicResource Spacing12}" VerticalOptions="Center"><BoxView WidthRequest="{DynamicResource Spacing48}" HeightRequest="{DynamicResource Spacing4}" Color="{DynamicResource BrandPrimary}" /><Label Text="48" /></HorizontalStackLayout>
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="{DynamicResource Spacing12}">
+                <Label Text="Radius" Style="{StaticResource H2TextStyle}" />
+                <FlexLayout Direction="Row" Wrap="Wrap" JustifyContent="Start" AlignItems="Start">
+                    <VerticalStackLayout WidthRequest="84" Padding="4" Spacing="4"><Border HeightRequest="48" Stroke="{DynamicResource BrandPrimary}" StrokeThickness="2" StrokeShape="{RoundRectangle CornerRadius={StaticResource RadiusNone}}" /><Label Text="none · 0" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="84" Padding="4" Spacing="4"><Border HeightRequest="48" Stroke="{DynamicResource BrandPrimary}" StrokeThickness="2" StrokeShape="{RoundRectangle CornerRadius={StaticResource RadiusXs}}" /><Label Text="xs · 4" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="84" Padding="4" Spacing="4"><Border HeightRequest="48" Stroke="{DynamicResource BrandPrimary}" StrokeThickness="2" StrokeShape="{RoundRectangle CornerRadius={StaticResource RadiusSm}}" /><Label Text="sm · 8" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="84" Padding="4" Spacing="4"><Border HeightRequest="48" Stroke="{DynamicResource BrandPrimary}" StrokeThickness="2" StrokeShape="{RoundRectangle CornerRadius={StaticResource RadiusMd}}" /><Label Text="md · 12" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="84" Padding="4" Spacing="4"><Border HeightRequest="48" Stroke="{DynamicResource BrandPrimary}" StrokeThickness="2" StrokeShape="{RoundRectangle CornerRadius={StaticResource RadiusLg}}" /><Label Text="lg · 16" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="84" Padding="4" Spacing="4"><Border HeightRequest="48" Stroke="{DynamicResource BrandPrimary}" StrokeThickness="2" StrokeShape="{RoundRectangle CornerRadius={StaticResource RadiusXl}}" /><Label Text="xl · 20" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="84" Padding="4" Spacing="4"><Border HeightRequest="48" Stroke="{DynamicResource BrandPrimary}" StrokeThickness="2" StrokeShape="{RoundRectangle CornerRadius={StaticResource Radius2Xl}}" /><Label Text="2xl · 24" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                    <VerticalStackLayout WidthRequest="84" Padding="4" Spacing="4"><Border HeightRequest="48" Stroke="{DynamicResource BrandPrimary}" StrokeThickness="2" StrokeShape="{RoundRectangle CornerRadius={StaticResource RadiusFull}}" /><Label Text="full · 999" Style="{StaticResource CaptionTextStyle}" /></VerticalStackLayout>
+                </FlexLayout>
+            </VerticalStackLayout>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -1,5 +1,7 @@
 <Solution>
-  <Folder Name="/src/" />
+  <Folder Name="/src/">
+    <Project Path="src/Vaulta.App/Vaulta.App.csproj" />
+  </Folder>
   <Folder Name="/src/API/">
     <Project Path="src/Vaulta.Web.Api/Vaulta.Web.Api.csproj" />
   </Folder>
@@ -11,6 +13,25 @@
     <Project Path="src/Vaulta.SharedKernel/Vaulta.SharedKernel.csproj" />
   </Folder>
   <Folder Name="/src/API/Modules/Identity/" />
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Assets/">
+    <Project Path="src/Modules/Assets/Vaulta.Assets.Application/Vaulta.Assets.Application.csproj" />
+    <Project Path="src/Modules/Assets/Vaulta.Assets.Contracts/Vaulta.Assets.Contracts.csproj" />
+    <Project Path="src/Modules/Assets/Vaulta.Assets.Domain/Vaulta.Assets.Domain.csproj" />
+    <Project Path="src/Modules/Assets/Vaulta.Assets.Infrastructure/Vaulta.Assets.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Catalog/">
+    <Project Path="src/Modules/Catalog/Vaulta.Catalog.Application/Vaulta.Catalog.Application.csproj" />
+    <Project Path="src/Modules/Catalog/Vaulta.Catalog.Contracts/Vaulta.Catalog.Contracts.csproj" />
+    <Project Path="src/Modules/Catalog/Vaulta.Catalog.Domain/Vaulta.Catalog.Domain.csproj" />
+    <Project Path="src/Modules/Catalog/Vaulta.Catalog.Infrastructure/Vaulta.Catalog.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Collection/">
+    <Project Path="src/Modules/Collection/Vaulta.Collection.Application/Vaulta.Collection.Application.csproj" />
+    <Project Path="src/Modules/Collection/Vaulta.Collection.Contracts/Vaulta.Collection.Contracts.csproj" />
+    <Project Path="src/Modules/Collection/Vaulta.Collection.Domain/Vaulta.Collection.Domain.csproj" />
+    <Project Path="src/Modules/Collection/Vaulta.Collection.Infrastructure/Vaulta.Collection.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Vaulta.ArchitectureTests/Vaulta.ArchitectureTests.csproj" />
     <Project Path="tests/Vaulta.Identity.IntegrationTests/Vaulta.Identity.IntegrationTests.csproj" />

@@ -2,7 +2,6 @@ using System.Diagnostics;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
-using Vaulta.Identity.Application;
 using Vaulta.SharedKernel;
 
 namespace Vaulta.Web.Api;

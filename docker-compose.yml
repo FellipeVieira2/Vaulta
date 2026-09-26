@@ -27,11 +27,51 @@ services:
       Jwt__Issuer: ${JWT_ISSUER:-vaulta}
       Jwt__Audience: ${JWT_AUDIENCE:-vaulta-app}
       Database__ApplyMigrations: "true"
+      Assets__S3__Bucket: ${ASSETS_BUCKET:-vaulta-assets}
+      Assets__S3__ServiceUrl: http://minio:9000
+      Assets__S3__Region: us-east-1
+      Assets__S3__ForcePathStyle: "true"
+      Assets__S3__AccessKey: ${MINIO_ROOT_USER:?Configure .env}
+      Assets__S3__SecretKey: ${MINIO_ROOT_PASSWORD:?Configure .env}
     ports:
       - "127.0.0.1:${API_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     restart: unless-stopped
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Configure .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Configure .env}
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - vaulta-minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  minio-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: >-
+      mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" &&
+      mc mb --ignore-existing "local/$${ASSETS_BUCKET}" &&
+      mc anonymous set none "local/$${ASSETS_BUCKET}"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Configure .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Configure .env}
+      ASSETS_BUCKET: ${ASSETS_BUCKET:-vaulta-assets}
 volumes:
   vaulta-postgres:
+  vaulta-minio:

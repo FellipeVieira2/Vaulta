@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Npgsql;
 using Vaulta.Identity.Application;
 using Vaulta.Identity.Domain;
+using Vaulta.SharedKernel;
 
 namespace Vaulta.Identity.Infrastructure;
 
@@ -50,17 +51,6 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             });
         }
     }
-}
-
-public sealed class OutboxMessage
-{
-    public Guid Id { get; set; }
-    public string Type { get; set; } = null!;
-    public string Payload { get; set; } = null!;
-    public DateTimeOffset OccurredAt { get; set; }
-    public DateTimeOffset? ProcessedAt { get; set; }
-    public string? Error { get; set; }
-    public int RetryCount { get; set; }
 }
 internal static class EventTypes
 {

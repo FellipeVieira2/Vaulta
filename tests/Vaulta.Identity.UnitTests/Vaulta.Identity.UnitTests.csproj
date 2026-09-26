@@ -5,5 +5,9 @@
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.1"><PrivateAssets>all</PrivateAssets></PackageReference>
     <ProjectReference Include="../../src/Modules/Identity/Vaulta.Identity.Application/Vaulta.Identity.Application.csproj" />
+    <ProjectReference Include="../../src/Modules/Catalog/Vaulta.Catalog.Domain/Vaulta.Catalog.Domain.csproj" />
+    <ProjectReference Include="../../src/Modules/Assets/Vaulta.Assets.Application/Vaulta.Assets.Application.csproj" />
+    <ProjectReference Include="../../src/Modules/Assets/Vaulta.Assets.Domain/Vaulta.Assets.Domain.csproj" />
+    <ProjectReference Include="../../src/Modules/Collection/Vaulta.Collection.Domain/Vaulta.Collection.Domain.csproj" />
   </ItemGroup>
 </Project>

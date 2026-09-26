@@ -22,6 +22,9 @@ public sealed class ApiFixture : IAsyncLifetime
                 ["ConnectionStrings:Vaulta"] = _postgres.GetConnectionString(),
                 ["Jwt:Secret"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48)),
                 ["Jwt:Issuer"] = "vaulta-test", ["Jwt:Audience"] = "vaulta-test-client",
+                ["Assets:S3:ServiceUrl"] = "http://127.0.0.1:9000",
+                ["Assets:S3:AccessKey"] = "test-access-key",
+                ["Assets:S3:SecretKey"] = "test-secret-key",
                 ["Database:ApplyMigrations"] = "true", ["Outbox:Enabled"] = "false", ["RateLimit:AuthPermitLimit"] = "1000"
             }));
         });

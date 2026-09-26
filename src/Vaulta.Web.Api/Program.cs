@@ -8,13 +8,19 @@ using Microsoft.OpenApi;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Vaulta.Assets.Infrastructure;
 using Vaulta.Identity.Infrastructure;
+using Vaulta.Catalog.Infrastructure;
+using Vaulta.Collection.Infrastructure;
 using Vaulta.Web.Api;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole(o => o.IncludeScopes = true);
 builder.Services.AddIdentityModule(builder.Configuration);
+builder.Services.AddCatalogModule(builder.Configuration);
+builder.Services.AddAssetsModule(builder.Configuration);
+builder.Services.AddCollectionModule(builder.Configuration);
 builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = c => c.ProblemDetails.Extensions["correlationId"] = c.HttpContext.TraceIdentifier);
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.Configure<Microsoft.AspNetCore.Routing.RouteHandlerOptions>(o => o.ThrowOnBadRequest = true);
@@ -56,6 +62,9 @@ if (args.Contains("--migrate") || builder.Configuration.GetValue<bool>("Database
 {
     await using var scope = app.Services.CreateAsyncScope();
     await scope.ServiceProvider.GetRequiredService<IdentityDbContext>().Database.MigrateAsync();
+    await scope.ServiceProvider.GetRequiredService<CatalogDbContext>().Database.MigrateAsync();
+    await scope.ServiceProvider.GetRequiredService<AssetsDbContext>().Database.MigrateAsync();
+    await scope.ServiceProvider.GetRequiredService<CollectionDbContext>().Database.MigrateAsync();
     if (args.Contains("--migrate")) return;
 }
 app.Use(async (context, next) =>
@@ -81,6 +90,9 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapIdentityEndpoints();
+app.MapCatalogEndpoints();
+app.MapAssetEndpoints();
+app.MapCollectionEndpoints();
 app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = c => c.Tags.Contains("ready") });
 app.Run();

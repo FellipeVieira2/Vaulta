@@ -38,7 +38,3 @@ public sealed record EventEnvelope(Guid Id, string Type, string Payload, DateTim
 public interface IEventBus { Task Publish(EventEnvelope message, CancellationToken ct); }
 public interface IEventConsumer { Task Handle(EventEnvelope message, CancellationToken ct); }
 // Future durable consumers use (message.Id, consumer name) as their inbox unique key.
-public sealed class NotFoundException(string message) : Exception(message);
-public sealed class ConflictException(string message) : Exception(message);
-public sealed class UnauthorizedException(string message = "Invalid credentials or session.") : Exception(message);
-public sealed class ForbiddenException(string message) : Exception(message);

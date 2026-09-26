@@ -11,6 +11,10 @@
 
   <ItemGroup>
     <ProjectReference Include="../Modules/Identity/Vaulta.Identity.Infrastructure/Vaulta.Identity.Infrastructure.csproj" />
+    <ProjectReference Include="../Modules/Catalog/Vaulta.Catalog.Infrastructure/Vaulta.Catalog.Infrastructure.csproj" />
+    <ProjectReference Include="../Modules/Assets/Vaulta.Assets.Infrastructure/Vaulta.Assets.Infrastructure.csproj" />
+    <ProjectReference Include="../Modules/Collection/Vaulta.Collection.Infrastructure/Vaulta.Collection.Infrastructure.csproj" />
+    <ProjectReference Include="../Modules/Collection/Vaulta.Collection.Contracts/Vaulta.Collection.Contracts.csproj" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.19.1" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.19.0" />

@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+	<ProjectReference Include="../Vaulta.Assets.Domain/Vaulta.Assets.Domain.csproj" />
+	<ProjectReference Include="../Vaulta.Assets.Contracts/Vaulta.Assets.Contracts.csproj" />
+  </ItemGroup>
+</Project>

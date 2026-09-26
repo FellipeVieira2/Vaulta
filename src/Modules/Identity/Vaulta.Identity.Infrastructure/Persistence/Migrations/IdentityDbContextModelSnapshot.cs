@@ -253,7 +253,7 @@ namespace Vaulta.Identity.Infrastructure.Persistence.Migrations
                     b.ToTable("user_tcg_interests", "identity");
                 });
 
-            modelBuilder.Entity("Vaulta.Identity.Infrastructure.OutboxMessage", b =>
+            modelBuilder.Entity("Vaulta.SharedKernel.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")

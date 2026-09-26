@@ -14,6 +14,10 @@ public abstract class AggregateRoot
     public void ClearDomainEvents() => _events.Clear();
 }
 public sealed class DomainException(string message) : Exception(message);
+public sealed class ConflictException(string message) : Exception(message);
+public sealed class NotFoundException(string message) : Exception(message);
+public sealed class UnauthorizedException(string message = "Invalid credentials or session.") : Exception(message);
+public sealed class ForbiddenException(string message) : Exception(message);
 
 public sealed record Money
 {

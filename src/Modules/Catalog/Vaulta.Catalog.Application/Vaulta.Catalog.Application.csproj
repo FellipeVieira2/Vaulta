@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+	<ProjectReference Include="../Vaulta.Catalog.Domain/Vaulta.Catalog.Domain.csproj" />
+	<ProjectReference Include="../Vaulta.Catalog.Contracts/Vaulta.Catalog.Contracts.csproj" />
+	<PackageReference Include="FluentValidation" Version="12.0.0" />
+  </ItemGroup>
+</Project>

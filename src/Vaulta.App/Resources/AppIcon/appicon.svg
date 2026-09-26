@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+	<linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+	  <stop offset="0" stop-color="#35F0FF"/>
+	  <stop offset="0.48" stop-color="#00A7FF"/>
+	  <stop offset="1" stop-color="#123BFF"/>
+	</linearGradient>
+	<linearGradient id="v" x1="0" y1="0" x2="1" y2="1">
+	  <stop offset="0" stop-color="#21E7FF"/>
+	  <stop offset="0.52" stop-color="#087BFF"/>
+	  <stop offset="1" stop-color="#1438E8"/>
+	</linearGradient>
+	<linearGradient id="spark" x1="0" y1="0" x2="1" y2="1">
+	  <stop offset="0" stop-color="#43F4FF"/>
+	  <stop offset="1" stop-color="#087BFF"/>
+	</linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="210" fill="#030817"/>
+  <g fill="none" stroke="url(#card)" stroke-width="34" stroke-linejoin="round">
+	<path d="M331 383 306 281q-8-34 26-43l133-34"/>
+	<path d="M390 374 384 257q-2-36 34-39l128-4"/>
+	<path d="m429 424 89-245q14-38 54-24l222 79q38 14 24 53L699 553"/>
+  </g>
+  <path fill="url(#spark)" d="m565 339 20 66 63 29-63 21-20 65-21-65-63-21 63-29z"/>
+  <path fill="url(#v)" stroke="#08CFFF" stroke-width="10" stroke-linejoin="round" d="M156 410h222q49 0 76 39l180 263q15 22-12 22H494q-47 0-73-39z"/>
+  <path fill="url(#v)" stroke="#08CFFF" stroke-width="10" stroke-linejoin="round" d="M868 420H721q-43 0-69 34L542 601l67 94z"/>
+</svg>

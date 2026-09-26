@@ -1,0 +1,58 @@
+{
+  "fontFamily": {
+    "primary": "Inter"
+  },
+  "fontWeight": {
+    "regular": 400,
+    "medium": 500,
+    "semiBold": 600,
+    "bold": 700
+  },
+  "typography": {
+    "display": {
+      "fontSize": 36,
+      "lineHeight": 44,
+      "fontWeight": 700
+    },
+    "h1": {
+      "fontSize": 28,
+      "lineHeight": 36,
+      "fontWeight": 600
+    },
+    "h2": {
+      "fontSize": 24,
+      "lineHeight": 32,
+      "fontWeight": 600
+    },
+    "h3": {
+      "fontSize": 20,
+      "lineHeight": 28,
+      "fontWeight": 600
+    },
+    "title": {
+      "fontSize": 17,
+      "lineHeight": 24,
+      "fontWeight": 600
+    },
+    "body": {
+      "fontSize": 15,
+      "lineHeight": 22,
+      "fontWeight": 400
+    },
+    "bodySmall": {
+      "fontSize": 13,
+      "lineHeight": 20,
+      "fontWeight": 400
+    },
+    "label": {
+      "fontSize": 13,
+      "lineHeight": 18,
+      "fontWeight": 600
+    },
+    "caption": {
+      "fontSize": 11,
+      "lineHeight": 16,
+      "fontWeight": 500
+    }
+  }
+}

@@ -1,5 +1,6 @@
 using Vaulta.Identity.Contracts;
 using Vaulta.Identity.Domain;
+using Vaulta.SharedKernel;
 
 namespace Vaulta.Identity.Application.Queries;
 
