@@ -48,3 +48,35 @@
 - A troca de provider não muda PKs, contratos canônicos nem entidades de domínio; adapters e mapeamentos externos é que evoluem.
 - Dados sem chave de identidade confiável não são automaticamente consolidados. Isso favorece integridade sobre reduzir contagem de registros; qualidade/limitações aparecem nas estatísticas do SyncRun.
 - Artwork é referência/proveniência de Catalog, não foto da unidade física. Cache de imagens depende de termos/licença do provider e fica fora desta decisão de identidade.
+
+## Revisão — TCGdex completo e Catalog → Collection (2026-09-26)
+
+- CardBrief é apenas identidade/resumo de exibição. O adapter consulta CardDetails por carta para rarity e o objeto booleano
+  `variants`, com concorrência limitada/configurável e atualização em cada sync. DTOs de JSON são privados de Infrastructure;
+  os modelos de ingestão neutros pertencem a Application. Não se acrescentam dependências HTTP/JSON ao Domain.
+- O ID TCGdex continua sendo external ID de Card e Printing independentes. Não há identidade canônica cross-printing
+  autoritativa nesse payload. Novos Cards separados contam como unresolved; nomes nunca provocam merge.
+  Novos Sets não recebem o ID TCGdex em `Set.Code`; códigos anteriormente armazenados permanecem intactos.
+- Treatments verdadeiros tornam-se Variant com Code/Name/RawValue. Preserva-se o formato minúsculo com hífens do modelo existente,
+  sem enum fechado. Ausência do objeto obrigatório de variants é erro de contrato, não autorização para apagar disponibilidade.
+- A Collection já armazena VariantId (referência lógica entre módulos, sem FK cruzando schemas no modelo atual).
+  Portanto, variants não são removidas fisicamente: IsActive=false mantém identidade e leituras históricas;
+  reaparecimento reativa o mesmo Guid. A API pública só oferece ativas, e o reader interno conserva acesso às inativas,
+  inclusive para representar cópias físicas antigas ainda possuídas por colecionadores.
+- Artwork pertence à Printing: ExternalArtworkUrl/ArtworkProvider são uma referência externa explícita.
+  Card.ImageAssetKey preserva a semântica de Asset interno; fotos de unidades físicas continuam em Collection/Assets.
+  O adapter centraliza `/high.png` e mantém URLs completas suportadas. Nada baixa ou espelha imagens; mudança de estratégia
+  futura será feita na projeção/adapter, preservando os contratos do app e avaliando licença/termos antes de qualquer cache.
+- Busca v1 passa de array para CatalogSearchPage (Items/Page/PageSize/TotalCount), com SetId e ArtworkUrl nos itens.
+  Detalhes incluem CardId/SetId e CatalogVariantDto(Id/Code/Name). É mudança incompatível intencional durante desenvolvimento,
+  documentada no README e refletida no OpenAPI. Nenhum DTO TCGdex integra o contrato público.
+- Todas as resoluções de CatalogExternalId recebem explicitamente source.Code. O lock PostgreSQL passa a proteger todo o
+  provider, evitando a corrida entre `all` e escopos de sets. Cada set é uma transação; o ChangeTracker é limpo após commit
+  e antes de salvar um resultado de falha, evitando flush acidental de entidades incompletas.
+- Não há roles administrativas robustas. O mecanismo escolhido é CLI no processo da API, acessível apenas a operadores com
+  acesso ao host/container e configuração do banco. Não se expõe endpoint de sync nem se adiciona fila/job runner nesta entrega.
+  Status permanece persistido e consultável por CLI; morte abrupta do processo pode exigir inspeção de runs `running`.
+- Índices atuais de Card/Game/name, Printing/CardId, Printing/SetId/number/language, Variant/PrintingId/code,
+  ExternalId/provider/type/id e SyncRun/provider/started atendem joins/identidade/filtros atuais. Nenhum B-tree adicional
+  foi criado prometendo acelerar contains; trigram depende de volume e medição futuros.
+- Referências verificadas: https://tcgdex.dev/rest/set, https://tcgdex.dev/reference/card e https://tcgdex.dev/assets.

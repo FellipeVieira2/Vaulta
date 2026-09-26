@@ -14,7 +14,7 @@ using Vaulta.Catalog.Infrastructure;
 using Vaulta.Collection.Infrastructure;
 using Vaulta.Web.Api;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(CatalogCommands.HostArguments(args));
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole(o => o.IncludeScopes = true);
 builder.Services.AddIdentityModule(builder.Configuration);
@@ -67,6 +67,8 @@ if (args.Contains("--migrate") || builder.Configuration.GetValue<bool>("Database
     await scope.ServiceProvider.GetRequiredService<CollectionDbContext>().Database.MigrateAsync();
     if (args.Contains("--migrate")) return;
 }
+if (await CatalogCommands.TryExecute(app, args)) return;
+
 app.Use(async (context, next) =>
 {
     var incoming = context.Request.Headers["X-Correlation-ID"].ToString();

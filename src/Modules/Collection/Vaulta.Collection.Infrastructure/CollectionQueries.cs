@@ -14,9 +14,13 @@ internal sealed class CollectionQueries(CollectionDbContext db, ICatalogCollecti
     public async Task<CollectionPageDto> GetMyCollection(Guid userId, CollectionQuery query, CancellationToken cancellationToken)
     {
         var filter = ValidateQuery(query);
-        var matchingPrintings = await catalog.SearchPrintingIds(filter.Query, filter.Game, filter.SetId, cancellationToken);
-        var filtered = db.Entries.AsNoTracking().Where(entry => entry.UserId == userId && matchingPrintings.Contains(entry.PrintingId) &&
+        var filtered = db.Entries.AsNoTracking().Where(entry => entry.UserId == userId &&
             db.Items.Any(item => item.CollectionEntryId == entry.Id && item.UserId == userId && item.Status == CollectionRules.ActiveStatus));
+        if (!string.IsNullOrWhiteSpace(filter.Query) || !string.IsNullOrWhiteSpace(filter.Game) || filter.SetId is not null)
+        {
+            var matchingPrintings = await catalog.SearchPrintingIds(filter.Query, filter.Game, filter.SetId, cancellationToken);
+            filtered = filtered.Where(entry => matchingPrintings.Contains(entry.PrintingId));
+        }
         if (filter.VariantId is { } variantId) filtered = filtered.Where(x => x.VariantId == variantId);
         if (filter.Condition is { Length: > 0 } condition)
             filtered = filtered.Where(entry => db.Items.Any(item => item.CollectionEntryId == entry.Id && item.UserId == userId && item.Status == CollectionRules.ActiveStatus && item.Condition == condition));

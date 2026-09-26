@@ -1,9 +1,10 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json.Serialization;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
 using Vaulta.Catalog.Application;
-using Vaulta.Catalog.Contracts;
 
 namespace Vaulta.Catalog.Infrastructure;
 
@@ -11,63 +12,161 @@ public sealed class TcgDexOptions
 {
     public string Language { get; set; } = "en";
     public string BaseAddress { get; set; } = "https://api.tcgdex.net/v2/";
+    public int Timeout { get; set; } = 30;
+    public int MaxConcurrency { get; set; } = 4;
+    public int RetryCount { get; set; } = 3;
+    public int MaxRetryDelaySeconds { get; set; } = 60;
 }
 
-public sealed class CatalogProviderException(string message, bool isTransient) : Exception(message)
+public sealed class CatalogProviderException(string message, bool isTransient, string errorCategory = "provider", Exception? innerException = null)
+    : Exception(message, innerException)
 {
     public bool IsTransient { get; } = isTransient;
+    public string ErrorCategory { get; } = errorCategory;
 }
 
-internal sealed class TcgDexProvider(HttpClient httpClient, IOptions<TcgDexOptions> options) : ICatalogProvider
+internal sealed partial class TcgDexProvider(HttpClient httpClient, IOptions<TcgDexOptions> options) : ICatalogProvider
 {
     private readonly TcgDexOptions _options = options.Value;
     public string Code => "tcgdex";
 
     public async Task<IReadOnlyList<ProviderSet>> GetSets(CancellationToken cancellationToken)
     {
-        var sets = await Get<IReadOnlyList<SetDto>>("sets", cancellationToken);
-        return sets.Select(x => new ProviderSet(x.Id, x.Name, x.Id, DateOnly.TryParse(x.ReleaseDate, out var date) ? date : null)).ToArray();
+        var sets = await Get<TcgDexSetDto[]>("sets", cancellationToken);
+        foreach (var set in sets) ValidateIdentity(set.Id, set.Name);
+        // TCGdex IDs are integration keys, not authoritative canonical set codes.
+        return sets.Select(x => new ProviderSet(x.Id, x.Name, null, null)).ToArray();
     }
 
-    public async Task<IReadOnlyList<ProviderPrinting>> GetPrintings(string setId, CancellationToken cancellationToken)
+    public async Task<ProviderSetDetails> GetSetDetails(string setId, CancellationToken cancellationToken)
     {
-        var set = await Get<SetDetailDto>($"sets/{Uri.EscapeDataString(setId)}", cancellationToken);
-        return (set.Cards ?? []).Select(card => new ProviderPrinting(
-            card.Id,
-            card.Name,
-            card.LocalId,
-            _options.Language,
-            card.Rarity,
-            card.Image,
-            card.Variants?.ToArray() ?? [])).ToArray();
+        var set = await Get<TcgDexSetDetailsDto>($"sets/{Uri.EscapeDataString(setId)}", cancellationToken);
+        ValidateIdentity(set.Id, set.Name);
+        if (set.Id != setId || set.Cards is null)
+            throw ContractError("TCGdex set identity or cards collection is invalid.");
+        if (set.Cards.Select(x => x.Id).Distinct(StringComparer.Ordinal).Count() != set.Cards.Length)
+            throw ContractError("TCGdex set contains duplicate card identities.");
+        DateOnly? releaseDate = null;
+        if (set.ReleaseDate is not null)
+        {
+            if (!DateOnly.TryParseExact(set.ReleaseDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+                throw ContractError("TCGdex release date is invalid.");
+            releaseDate = date;
+        }
+        var printings = new ProviderPrinting[set.Cards.Length];
+        await Parallel.ForEachAsync(Enumerable.Range(0, set.Cards.Length), new ParallelOptions
+        {
+            MaxDegreeOfParallelism = _options.MaxConcurrency,
+            CancellationToken = cancellationToken
+        }, async (index, ct) =>
+        {
+            var brief = set.Cards[index];
+            ValidateIdentity(brief.Id, brief.Name);
+            // Briefs omit rarity and treatments. Refresh details on every sync so metadata changes are observed.
+            var card = await Get<TcgDexCardDetailsDto>($"cards/{Uri.EscapeDataString(brief.Id)}", ct);
+            ValidateIdentity(card.Id, card.Name);
+            if (card.Id != brief.Id || card.Set?.Id != setId || card.Variants is null)
+                throw ContractError("TCGdex card does not match the requested card/set.");
+            var number = CollectorNumber(card.LocalId);
+            var variants = card.Variants.Where(x => x.Value)
+                .Select(x => new ProviderVariant(VariantCode(x.Key), VariantName(x.Key), x.Key))
+                .OrderBy(x => x.Code, StringComparer.Ordinal).ToArray();
+            if (variants.Select(x => x.Code).Distinct(StringComparer.Ordinal).Count() != variants.Length)
+                throw ContractError("TCGdex treatments normalize to duplicate codes.");
+            printings[index] = new ProviderPrinting(card.Id, card.Name, number, CultureInfo.GetCultureInfo(NormalizeLanguage(_options.Language)).Name,
+                card.Rarity, ArtworkUrl(card.Image), variants);
+        });
+        return new(new ProviderSet(set.Id, set.Name, null, releaseDate), printings);
     }
 
     private async Task<T> Get<T>(string path, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.GetAsync(path, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        var language = NormalizeLanguage(_options.Language);
+        for (var attempt = 0; ; attempt++)
         {
-            var transient = response.StatusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500;
-            throw new CatalogProviderException($"TCGdex returned HTTP {(int)response.StatusCode}.", transient);
-        }
-        try
-        {
-            return await response.Content.ReadFromJsonAsync<T>(cancellationToken: cancellationToken)
-                ?? throw new CatalogProviderException("TCGdex returned an empty response.", true);
-        }
-        catch (System.Text.Json.JsonException e)
-        {
-            throw new CatalogProviderException($"TCGdex response could not be parsed ({e.GetType().Name}).", false);
+            TimeSpan? retryAfter = null;
+            try
+            {
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(TimeSpan.FromSeconds(_options.Timeout));
+                using var response = await httpClient.GetAsync($"{Uri.EscapeDataString(language)}/{path}", HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+                if (!response.IsSuccessStatusCode)
+                {
+                    retryAfter = response.Headers.RetryAfter?.Delta;
+                    if (response.Headers.RetryAfter?.Date is { } retryDate) retryAfter = retryDate - DateTimeOffset.UtcNow;
+                    var transient = response.StatusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500;
+                    throw new CatalogProviderException($"TCGdex returned HTTP {(int)response.StatusCode}.", transient, $"http_{(int)response.StatusCode}");
+                }
+                return await response.Content.ReadFromJsonAsync<T>(cancellationToken: timeout.Token)
+                    ?? throw ContractError("TCGdex returned an empty response.");
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (JsonException e) { throw new CatalogProviderException("TCGdex response violates the JSON contract.", false, "invalid_json", e); }
+            catch (Exception e) when (e is CatalogProviderException or HttpRequestException or OperationCanceledException)
+            {
+                var failure = e as CatalogProviderException ?? new CatalogProviderException("TCGdex request failed.", true,
+                    e is OperationCanceledException ? "timeout" : "network", e);
+                if (!failure.IsTransient || attempt >= _options.RetryCount) throw failure;
+                // Do not retry before a long Retry-After, and do not hold a worker indefinitely either.
+                if (retryAfter > TimeSpan.FromSeconds(_options.MaxRetryDelaySeconds)) throw failure;
+                var delay = retryAfter ?? TimeSpan.FromMilliseconds(Math.Min(_options.MaxRetryDelaySeconds * 1000, 250 * Math.Pow(2, attempt)));
+                await Task.Delay(delay < TimeSpan.Zero ? TimeSpan.Zero : delay, cancellationToken);
+            }
         }
     }
 
-    private sealed record SetDto([property: JsonPropertyName("id")] string Id, [property: JsonPropertyName("name")] string Name, [property: JsonPropertyName("releaseDate")] string? ReleaseDate);
-    private sealed record SetDetailDto([property: JsonPropertyName("cards")] IReadOnlyList<CardDto>? Cards);
-    private sealed record CardDto(
-        [property: JsonPropertyName("id")] string Id,
-        [property: JsonPropertyName("name")] string Name,
-        [property: JsonPropertyName("localId")] string LocalId,
-        [property: JsonPropertyName("rarity")] string? Rarity,
-        [property: JsonPropertyName("image")] string? Image,
-        [property: JsonPropertyName("variants")] IReadOnlyList<string>? Variants);
+    internal static string? ArtworkUrl(string? image)
+    {
+        if (string.IsNullOrWhiteSpace(image)) return null;
+        if (!Uri.TryCreate(image, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps || !string.IsNullOrEmpty(uri.UserInfo) ||
+            !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
+            throw ContractError("TCGdex artwork URL is invalid.");
+        if (new[] { ".png", ".jpg", ".webp" }.Any(extension => uri.AbsolutePath.EndsWith(extension, StringComparison.OrdinalIgnoreCase))) return uri.AbsoluteUri;
+        // https://tcgdex.dev/assets: card base path + /high.png (no download or mirroring).
+        return uri.AbsoluteUri.TrimEnd('/') + "/high.png";
+    }
+
+    internal static string NormalizeLanguage(string language)
+    {
+        var normalized = language.Trim().Replace('_', '-').ToLowerInvariant();
+        // Provider path codes are not arbitrary BCP47 locales. Portuguese is `pt`, not `pt-BR`.
+        return normalized switch
+        {
+            "en" or "fr" or "es" or "it" or "pt" or "de" or "ja" or "ko" or "id" or "th" => normalized,
+            "zh-tw" => "zh-tw", "zh-cn" => "zh-cn",
+            _ => throw ContractError("Unsupported TCGdex language code.")
+        };
+    }
+
+    private static string CollectorNumber(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.String when !string.IsNullOrWhiteSpace(value.GetString()) => value.GetString()!,
+        JsonValueKind.Number => value.GetRawText(),
+        _ => throw ContractError("TCGdex collector number is missing or invalid.")
+    };
+    private static void ValidateIdentity(string? id, string? name)
+    {
+        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name)) throw ContractError("TCGdex identity/name is missing.");
+    }
+    private static string VariantCode(string raw)
+    {
+        var code = Domain.CatalogNormalizer.NormalizeName(CamelBoundary().Replace(raw, "$1 $2")).Replace(' ', '-');
+        if (code.Length is 0 or > 80) throw ContractError("TCGdex treatment code is invalid.");
+        return code;
+    }
+    private static string VariantName(string raw) => raw switch
+    {
+        "normal" => "Normal", "reverse" => "Reverse", "holo" => "Holo", "firstEdition" => "First edition", "wPromo" => "W promo",
+        _ => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(VariantCode(raw).Replace('-', ' '))
+    };
+    private static CatalogProviderException ContractError(string message) => new(message, false, "invalid_contract");
+    [GeneratedRegex("([a-z0-9])([A-Z])")]
+    private static partial Regex CamelBoundary();
+
+    private sealed record TcgDexSetDto(string Id, string Name);
+    private sealed record TcgDexSetDetailsDto(string Id, string Name, string? ReleaseDate, TcgDexCardBriefDto[]? Cards);
+    private sealed record TcgDexCardBriefDto(string Id, string Name, JsonElement LocalId, string? Image);
+    // Dictionary models the real boolean object and accepts future treatment keys without leaking them to the app.
+    private sealed record TcgDexCardDetailsDto(string Id, string Name, JsonElement LocalId, string? Rarity, string? Image,
+        Dictionary<string, bool>? Variants, TcgDexSetDto? Set);
 }

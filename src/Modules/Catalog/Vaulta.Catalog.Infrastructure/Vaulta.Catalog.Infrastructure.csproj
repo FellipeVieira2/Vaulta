@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <InternalsVisibleTo Include="Vaulta.Identity.UnitTests" />
+    <InternalsVisibleTo Include="Vaulta.Identity.IntegrationTests" />
 	<ProjectReference Include="../Vaulta.Catalog.Application/Vaulta.Catalog.Application.csproj" />
 	<ProjectReference Include="../../../Vaulta.SharedKernel/Vaulta.SharedKernel.csproj" />
 	<FrameworkReference Include="Microsoft.AspNetCore.App" />

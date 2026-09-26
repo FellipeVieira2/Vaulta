@@ -11,17 +11,27 @@ public static class DependencyInjection
     public static IServiceCollection AddCatalogModule(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<CatalogDbContext>(options => options.UseNpgsql(configuration.GetConnectionString("Vaulta")));
-        services.Configure<TcgDexOptions>(configuration.GetSection("Catalog:Providers:TcgDex"));
+        services.AddOptions<TcgDexOptions>().Bind(configuration.GetSection("Catalog:Providers:TcgDex"))
+            .Validate(o => Uri.TryCreate(o.BaseAddress, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps, "TCGdex requires an absolute HTTPS base address.")
+            .Validate(o => o.Timeout is >= 1 and <= 300 && o.MaxConcurrency is >= 1 and <= 8 && o.RetryCount is >= 0 and <= 5 && o.MaxRetryDelaySeconds is >= 1 and <= 300, "Invalid TCGdex HTTP limits.")
+            .Validate(o => !string.IsNullOrWhiteSpace(o.Language) && IsSupportedLanguage(o.Language), "Invalid TCGdex language.")
+            .ValidateOnStart();
         services.AddHttpClient<ICatalogProvider, TcgDexProvider>((provider, client) =>
         {
             var options = provider.GetRequiredService<IOptions<TcgDexOptions>>().Value;
-            client.BaseAddress = new Uri(options.BaseAddress, UriKind.Absolute);
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.BaseAddress = new Uri(options.BaseAddress.TrimEnd('/') + "/", UriKind.Absolute);
+            client.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Vaulta-Catalog/1.0");
         });
         services.AddScoped<ICatalogSync, CatalogSyncService>();
-        services.AddScoped<ICatalogSearch, CatalogQueries>();
+        services.AddScoped<CatalogQueries>();
+        services.AddScoped<ICatalogSearch>(provider => provider.GetRequiredService<CatalogQueries>());
         services.AddScoped<ICatalogCollectionReader>(provider => provider.GetRequiredService<CatalogQueries>());
         return services;
+    }
+    private static bool IsSupportedLanguage(string language)
+    {
+        try { TcgDexProvider.NormalizeLanguage(language); return true; }
+        catch (CatalogProviderException) { return false; }
     }
 }

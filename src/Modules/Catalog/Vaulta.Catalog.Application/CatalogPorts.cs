@@ -6,7 +6,7 @@ public interface ICatalogProvider
 {
     string Code { get; }
     Task<IReadOnlyList<ProviderSet>> GetSets(CancellationToken cancellationToken);
-    Task<IReadOnlyList<ProviderPrinting>> GetPrintings(string setId, CancellationToken cancellationToken);
+    Task<ProviderSetDetails> GetSetDetails(string setId, CancellationToken cancellationToken);
 }
 
 public interface ICatalogCollectionReader
@@ -25,6 +25,6 @@ public interface ICatalogSync
 
 public interface ICatalogSearch
 {
-    Task<IReadOnlyList<CatalogSearchResult>> Search(string query, string? gameCode, int page, int pageSize, CancellationToken cancellationToken);
+    Task<CatalogSearchPage> Search(string query, string? gameCode, int page, int pageSize, CancellationToken cancellationToken);
     Task<CatalogPrintingDetails?> GetPrinting(Guid id, CancellationToken cancellationToken);
 }

@@ -5,3 +5,6 @@
 .env
 TestResults/
 artifacts/
+
+catalog-smoke-result.json
+TestResults/

@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Vaulta.Catalog.Application;
 using Vaulta.Catalog.Domain;
-using Vaulta.Catalog.Contracts;
 using Vaulta.SharedKernel;
 
 namespace Vaulta.Catalog.Infrastructure;
@@ -19,6 +18,9 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
 
     public async Task<Guid> Synchronize(string provider, string scope, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(scope) || scope.Length > 200) throw new ArgumentException("Invalid sync scope.", nameof(scope));
+        scope = scope.Trim();
+        if (scope.Equals("all", StringComparison.OrdinalIgnoreCase)) scope = "all";
         var source = providers.SingleOrDefault(x => x.Code.Equals(provider, StringComparison.OrdinalIgnoreCase))
             ?? throw new ArgumentException("Unknown catalog provider.", nameof(provider));
         var game = await db.Games.SingleOrDefaultAsync(x => x.Code == GameCode, cancellationToken)
@@ -26,71 +28,110 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
         var run = new CatalogSyncRun { Id = Guid.NewGuid(), Provider = source.Code, Scope = scope, StartedAt = clock.UtcNow, Status = "running" };
         db.SyncRuns.Add(run);
         await db.SaveChangesAsync(cancellationToken);
-
+        using var logScope = logger.BeginScope(new Dictionary<string, object>
+        {
+            ["SyncRunId"] = run.Id, ["Provider"] = source.Code, ["Scope"] = scope
+        });
+        logger.LogInformation("Catalog sync started");
+        // Provider-wide: `all` and a single set must not mutate overlapping identities concurrently.
+        var advisoryKey = AdvisoryKey(source.Code, "catalog");
+        var acquired = false;
+        var opened = false;
+        string? currentSetId = null;
         try
         {
-            var advisoryKey = AdvisoryKey(source.Code, scope);
-            var lockConnection = (Npgsql.NpgsqlConnection)db.Database.GetDbConnection();
-            if (lockConnection.State != System.Data.ConnectionState.Open) await lockConnection.OpenAsync(cancellationToken);
-            await using var command = lockConnection.CreateCommand();
+            await db.Database.OpenConnectionAsync(cancellationToken);
+            opened = true;
+            var connection = (Npgsql.NpgsqlConnection)db.Database.GetDbConnection();
+            await using var command = connection.CreateCommand();
             command.CommandText = "SELECT pg_try_advisory_lock(@key)";
             command.Parameters.AddWithValue("key", advisoryKey);
-            var acquired = (bool)(await command.ExecuteScalarAsync(cancellationToken) ?? false);
+            acquired = (bool)(await command.ExecuteScalarAsync(cancellationToken) ?? false);
             if (!acquired)
             {
                 run.Status = "skipped";
-                run.CompletedAt = clock.UtcNow;
-                await db.SaveChangesAsync(cancellationToken);
                 return run.Id;
             }
-
-            try
+            var sets = await source.GetSets(cancellationToken);
+            run.RecordsRead += sets.Count;
+            var selected = sets.Where(x => scope == "all" || x.ExternalId.Equals(scope, StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (scope != "all" && selected.Length == 0)
+                throw new CatalogProviderException("Requested set was not found in the provider catalog.", false, "scope_not_found");
+            foreach (var providerSet in selected)
             {
-                var sets = await source.GetSets(cancellationToken);
-                run.RecordsRead += sets.Count;
-                foreach (var providerSet in sets.Where(x => scope == "all" || x.ExternalId.Equals(scope, StringComparison.OrdinalIgnoreCase)))
+                currentSetId = providerSet.ExternalId;
+                using var setLogScope = logger.BeginScope(new Dictionary<string, object> { ["SetId"] = providerSet.ExternalId });
+                var details = await source.GetSetDetails(providerSet.ExternalId, cancellationToken);
+                if (details.Set.ExternalId != providerSet.ExternalId)
+                    throw new CatalogProviderException("Set details do not match the requested identity.", false, "invalid_contract");
+                run.RecordsRead += details.Printings.Count;
+                var counters = (run.RecordsCreated, run.RecordsUpdated, run.RecordsUnresolved);
+                try
                 {
-                    var set = await UpsertSet(game, providerSet, run, cancellationToken);
-                    var printings = await source.GetPrintings(providerSet.ExternalId, cancellationToken);
-                    run.RecordsRead += printings.Count;
-                    foreach (var providerPrinting in printings)
-                        await UpsertPrinting(game, set, providerPrinting, run, cancellationToken);
+                    await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+                    var set = await UpsertSet(source.Code, game, details.Set, run, cancellationToken);
+                    foreach (var printing in details.Printings)
+                        await UpsertPrinting(source.Code, game, set, printing, run, cancellationToken);
                     await db.SaveChangesAsync(cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                    logger.LogInformation("Catalog set persisted with {PrintingCount} printings", details.Printings.Count);
                 }
-                run.Status = "completed";
+                catch
+                {
+                    (run.RecordsCreated, run.RecordsUpdated, run.RecordsUnresolved) = counters;
+                    throw;
+                }
+                // Bound EF tracking to one set when ingesting the complete catalog.
+                db.ChangeTracker.Clear();
+                db.SyncRuns.Attach(run);
             }
-            finally
-            {
-                await using var unlock = lockConnection.CreateCommand();
-                unlock.CommandText = "SELECT pg_advisory_unlock(@key)";
-                unlock.Parameters.AddWithValue("key", advisoryKey);
-                await unlock.ExecuteNonQueryAsync(CancellationToken.None);
-            }
+            run.Status = "completed";
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             run.Status = "cancelled";
-            run.ErrorCategory = "OperationCanceledException";
+            run.ErrorCategory = "cancelled";
             throw;
         }
         catch (Exception e)
         {
             run.Status = "failed";
-            run.ErrorCategory = e.GetType().Name;
-            logger.LogWarning("Catalog sync {SyncRunId} failed with {ErrorType}", run.Id, run.ErrorCategory);
+            run.ErrorCategory = e is CatalogProviderException failure
+                ? $"{(failure.IsTransient ? "transient" : "permanent")}:{failure.ErrorCategory}"
+                : e.GetType().Name;
+            logger.LogWarning("Catalog sync failed for set {SetId} with {ErrorType}", currentSetId, run.ErrorCategory);
             throw;
         }
         finally
         {
+            // Never flush half an unsuccessful set while recording its failure/cancellation.
+            db.ChangeTracker.Clear();
             run.CompletedAt = clock.UtcNow;
-            await db.SaveChangesAsync(CancellationToken.None);
+            db.SyncRuns.Update(run);
+            try { await db.SaveChangesAsync(CancellationToken.None); }
+            finally
+            {
+                try
+                {
+                    if (acquired)
+                    {
+                        await using var unlock = db.Database.GetDbConnection().CreateCommand();
+                        unlock.CommandText = "SELECT pg_advisory_unlock(@key)";
+                        var parameter = unlock.CreateParameter(); parameter.ParameterName = "key"; parameter.Value = advisoryKey;
+                        unlock.Parameters.Add(parameter);
+                        await unlock.ExecuteNonQueryAsync(CancellationToken.None);
+                    }
+                }
+                finally { if (opened) await db.Database.CloseConnectionAsync(); }
+            }
+            logger.LogInformation("Catalog sync finished with {Status} and {ErrorType}", run.Status, run.ErrorCategory);
         }
         return run.Id;
     }
 
-    private async Task<Set> UpsertSet(Game game, ProviderSet input, CatalogSyncRun run, CancellationToken ct)
+    private async Task<Set> UpsertSet(string providerCode, Game game, ProviderSet input, CatalogSyncRun run, CancellationToken ct)
     {
-        var external = await db.ExternalIds.SingleOrDefaultAsync(x => x.Provider == "tcgdex" && x.EntityType == EntitySet && x.ExternalId == input.ExternalId, ct);
+        var external = await db.ExternalIds.SingleOrDefaultAsync(x => x.Provider == providerCode && x.EntityType == EntitySet && x.ExternalId == input.ExternalId, ct);
         var normalizedName = CatalogNormalizer.NormalizeName(input.Name);
         Set set;
         var created = external is null;
@@ -101,7 +142,7 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
             set = new Set { Id = Guid.NewGuid(), GameId = game.Id, Code = input.Code, Name = input.Name, NormalizedName = normalizedName,
                 ReleaseDate = input.ReleaseDate?.ToString("yyyy-MM-dd") };
             db.Sets.Add(set);
-            external = NewExternal(EntitySet, set.Id, input.ExternalId, input);
+            external = NewExternal(providerCode, EntitySet, set.Id, input.ExternalId, input);
             db.ExternalIds.Add(external);
         }
         var changed = set.Name != input.Name || set.NormalizedName != normalizedName || set.ReleaseDate != input.ReleaseDate?.ToString("yyyy-MM-dd");
@@ -115,15 +156,16 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
         return set;
     }
 
-    private async Task UpsertPrinting(Game game, Set set, ProviderPrinting input, CatalogSyncRun run, CancellationToken ct)
+    private async Task UpsertPrinting(string providerCode, Game game, Set set, ProviderPrinting input, CatalogSyncRun run, CancellationToken ct)
     {
-        var cardExternal = await db.ExternalIds.SingleOrDefaultAsync(x => x.Provider == "tcgdex" && x.EntityType == EntityCard && x.ExternalId == input.ExternalId, ct);
+        var cardExternal = await db.ExternalIds.SingleOrDefaultAsync(x => x.Provider == providerCode && x.EntityType == EntityCard && x.ExternalId == input.ExternalId, ct);
         Card card;
         if (cardExternal is null)
         {
             card = new Card { Id = Guid.NewGuid(), GameId = game.Id, Name = input.Name, NormalizedName = CatalogNormalizer.NormalizeName(input.Name) };
             db.Cards.Add(card);
-            cardExternal = NewExternal(EntityCard, card.Id, input.ExternalId, input);
+            run.RecordsUnresolved++; // No authoritative cross-printing Card identity from this source.
+            cardExternal = NewExternal(providerCode, EntityCard, card.Id, input.ExternalId, input);
             db.ExternalIds.Add(cardExternal);
             run.RecordsCreated++;
         }
@@ -138,44 +180,59 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
             UpdateExternal(cardExternal, input);
         }
 
-        var printingExternal = await db.ExternalIds.SingleOrDefaultAsync(x => x.Provider == "tcgdex" && x.EntityType == EntityPrinting && x.ExternalId == input.ExternalId, ct);
+        var printingExternal = await db.ExternalIds.SingleOrDefaultAsync(x => x.Provider == providerCode && x.EntityType == EntityPrinting && x.ExternalId == input.ExternalId, ct);
         Printing printing;
         if (printingExternal is null)
         {
             printing = new Printing { Id = Guid.NewGuid(), CardId = card.Id, SetId = set.Id, CollectorNumber = input.CollectorNumber,
                 NormalizedCollectorNumber = CatalogNormalizer.NormalizeCollectorNumber(input.CollectorNumber), Language = CatalogNormalizer.NormalizeLanguage(input.Language),
-                Rarity = CatalogNormalizer.NormalizeCode(input.Rarity), RawRarity = input.Rarity };
+                Rarity = CatalogNormalizer.NormalizeCode(input.Rarity), RawRarity = input.Rarity,
+                ExternalArtworkUrl = input.ImageUrl, ArtworkProvider = input.ImageUrl is null ? null : providerCode };
             db.Printings.Add(printing);
-            db.ExternalIds.Add(NewExternal(EntityPrinting, printing.Id, input.ExternalId, input));
+            db.ExternalIds.Add(NewExternal(providerCode, EntityPrinting, printing.Id, input.ExternalId, input));
             run.RecordsCreated++;
         }
         else
         {
             printing = await db.Printings.Include(x => x.Variants).SingleAsync(x => x.Id == printingExternal.EntityId, ct);
             printing.CardId = card.Id; printing.SetId = set.Id;
-            var changed = printing.CollectorNumber != input.CollectorNumber || printing.Language != CatalogNormalizer.NormalizeLanguage(input.Language) || printing.Rarity != CatalogNormalizer.NormalizeCode(input.Rarity);
+            var changed = printing.CollectorNumber != input.CollectorNumber || printing.Language != CatalogNormalizer.NormalizeLanguage(input.Language) || printing.Rarity != CatalogNormalizer.NormalizeCode(input.Rarity) || printing.RawRarity != input.Rarity ||
+                printing.ExternalArtworkUrl != input.ImageUrl || printing.ArtworkProvider != (input.ImageUrl is null ? null : providerCode);
             if (changed)
             {
                 printing.CollectorNumber = input.CollectorNumber;
                 printing.NormalizedCollectorNumber = CatalogNormalizer.NormalizeCollectorNumber(input.CollectorNumber);
                 printing.Language = CatalogNormalizer.NormalizeLanguage(input.Language);
                 printing.Rarity = CatalogNormalizer.NormalizeCode(input.Rarity); printing.RawRarity = input.Rarity;
+                printing.ExternalArtworkUrl = input.ImageUrl; printing.ArtworkProvider = input.ImageUrl is null ? null : providerCode;
                 run.RecordsUpdated++;
             }
             var ext = await db.ExternalIds.SingleAsync(x => x.Id == printingExternal.Id, ct);
             UpdateExternal(ext, input);
         }
 
-        var variants = input.Variants.Select(CatalogNormalizer.NormalizeCode).Where(x => x is not null).Cast<string>().ToHashSet(StringComparer.Ordinal);
-        foreach (var existing in printing.Variants.Where(x => !variants.Contains(x.Code)).ToArray()) db.Variants.Remove(existing);
-        foreach (var variant in variants.Where(code => printing.Variants.All(x => x.Code != code)))
-            printing.Variants.Add(new Variant { Id = Guid.NewGuid(), Code = variant, Name = variant, RawValue = input.Variants.First(x => CatalogNormalizer.NormalizeCode(x) == variant) });
+        var variants = input.Variants.ToDictionary(x => x.Code, StringComparer.Ordinal);
+        foreach (var existing in printing.Variants)
+        {
+            var active = variants.TryGetValue(existing.Code, out var current);
+            if (existing.IsActive != active || (current is not null && (existing.Name != current.Name || existing.RawValue != current.RawValue)))
+            {
+                existing.IsActive = active;
+                if (current is not null) { existing.Name = current.Name; existing.RawValue = current.RawValue; }
+                run.RecordsUpdated++;
+            }
+        }
+        foreach (var variant in input.Variants.Where(v => printing.Variants.All(x => x.Code != v.Code)))
+        {
+            printing.Variants.Add(new Variant { Id = Guid.NewGuid(), Code = variant.Code, Name = variant.Name, RawValue = variant.RawValue });
+            run.RecordsCreated++;
+        }
     }
 
-    private CatalogExternalId NewExternal(string entityType, Guid entityId, string externalId, object payload)
+    private CatalogExternalId NewExternal(string providerCode, string entityType, Guid entityId, string externalId, object payload)
     {
         var json = JsonSerializer.Serialize(payload);
-        return new CatalogExternalId { Id = Guid.NewGuid(), Provider = "tcgdex", EntityType = entityType, EntityId = entityId,
+        return new CatalogExternalId { Id = Guid.NewGuid(), Provider = providerCode, EntityType = entityType, EntityId = entityId,
             ExternalId = externalId, ContentHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json))), FirstSeenAt = clock.UtcNow, LastSeenAt = clock.UtcNow };
     }
 

@@ -210,3 +210,108 @@ Tokens de sessão usam `SecureStorage`; não use Preferences para credenciais. A
 ### Galeria do design system
 
 Em Debug, abra o app e toque em **Foundations gallery** na página inicial. A galeria não é registrada em Release nem participa da navegação de produção. O mapeamento completo Figma→MAUI está em [`docs/design/design-system.md`](docs/design/design-system.md). Os arquivos oficiais de fonte Inter ainda precisam ser adicionados a `src/Vaulta.App/Resources/Fonts`; não são baixados pelo build.
+
+## Catalog: TCGdex e consumo pelo MAUI
+
+O adapter consulta `/{language}/sets`, `sets/{id}` (CardBrief) e `cards/{id}` (CardDetails).
+Rarity e variants vêm do detalhe; o resumo não é tratado como carta completa.
+Os detalhes são atualizados em cada sync, com no máximo quatro requisições simultâneas por padrão.
+Configuração: `Catalog:Providers:TcgDex` em appsettings/ambiente, com `BaseAddress` (raiz `/v2/`),
+`Language` (`en` por padrão; português é `pt`), `Timeout` (segundos por tentativa), `MaxConcurrency` (1–8),
+`RetryCount` (0–5) e `MaxRetryDelaySeconds`. Há retries finitos para 408/429/5xx, rede e timeout;
+JSON incompatível e 404 falham sem retry. Retry-After é respeitado; quando excede o orçamento configurado,
+a execução falha como transitória em vez de tentar antes do prazo. Cancelamento do chamador é propagado.
+
+Artwork é `Printing.ExternalArtworkUrl` + `ArtworkProvider`, nunca `Card.ImageAssetKey` nem foto do usuário.
+Uma URL base de carta TCGdex vira `/high.png`, conforme o contrato de assets do provider.
+Não ocorre download, cache, upload para S3/MinIO ou criação de Asset. A URL pode ser nula quando a fonte não possui imagem.
+
+### Contratos públicos (mudança incompatível de v1 durante desenvolvimento)
+
+`GET /api/v1/catalog/search?q=pikachu&game=pokemon&page=1&pageSize=20` agora retorna um objeto:
+
+```json
+{
+  "items": [{
+    "printingId": "<guid>", "gameCode": "pokemon", "setId": "<guid>",
+    "setName": "Base Set", "cardName": "Pikachu", "collectorNumber": "58",
+    "language": "en", "rarity": "common",
+    "artworkUrl": "https://assets.tcgdex.net/en/base/base1/58/high.png"
+  }],
+  "page": 1, "pageSize": 20, "totalCount": 1
+}
+```
+
+O total usa `COUNT` filtrado sem carregar entidades; os itens têm ordenação estável e projeção SQL.
+Os índices existentes cobrem joins, identidade e filtros por jogo; B-tree não acelera `contains`,
+por isso não se adicionou índice redundante nem trigram sem medição. Busca avançada permanece fora do escopo.
+
+`GET /api/v1/catalog/printings/{id}` retorna `printingId`, `cardId`, `setId`, `gameCode`, `setName`,
+`cardName`, `collectorNumber`, `language`, `rarity`, `artworkUrl` e `variants: [{ id, code, name }]`.
+Somente variants ativas aparecem para seleção. Códigos mantêm o padrão canônico existente em minúsculas
+(`normal`, `reverse`, `holo`, `first-edition`); flags falsas não geram variants. Treatments novos são normalizados
+sem enum fechado, preservando `RawValue`. Variants removidas da fonte ficam inativas e conservam seus GUIDs;
+se reaparecerem, o mesmo ID é reativado. Collection continua resolvendo referências históricas, inclusive inativas.
+
+O app usa diretamente os GUIDs retornados:
+
+```http
+POST /api/v1/me/collection/items
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{"printingId":"<guid>","variantId":"<guid>","quantity":2,"condition":"NEAR_MINT"}
+```
+
+Resultado esperado: HTTP 201, uma CollectionEntry e dois CollectibleItems.
+Clientes antigos precisam trocar o array de busca por `response.items` e as strings de variants por objetos.
+OpenAPI acompanha os DTOs; o app MAUI atualmente no repositório ainda não tem cliente Catalog a migrar.
+Os modelos de ingestão `Provider*` foram movidos de Contracts para Application; somente adapters e consumidores internos usam esses tipos.
+
+### Operação segura do sync
+
+Não há endpoint administrativo HTTP novo nem sistema de roles improvisado. Execute o comando no processo/container
+com acesso operacional ao banco e à configuração da API; não é um job durável nem prende uma requisição HTTP.
+Em Compose de desenvolvimento, as migrations são aplicadas no startup:
+
+```sh
+docker compose up --build -d
+docker compose exec -T vaulta-api dotnet Vaulta.Web.Api.dll --catalog-sync tcgdex base1
+docker compose exec -T vaulta-api dotnet Vaulta.Web.Api.dll --catalog-sync-runs
+docker compose exec -T vaulta-api dotnet Vaulta.Web.Api.dll --catalog-sync-run <run-guid>
+python3 scripts/smoke-catalog.py http://127.0.0.1:8080
+```
+
+Ou, com a configuração de banco no ambiente local:
+
+```sh
+dotnet run --project src/Vaulta.Web.Api -- --catalog-sync tcgdex base1
+```
+
+`--catalog-sync tcgdex all` é suportado, mas prefira um set no primeiro smoke. Cada execução registra provider,
+scope, contadores, erro e timestamps; logs incluem SyncRunId/Provider/Scope/SetId/ErrorType.
+O comando retorna código 1 em falha e 130 em cancelamento por Ctrl+C; o histórico lista as últimas 50 execuções.
+Em outro processo, consulte `--catalog-sync-runs` durante uma execução longa. Não existe fila em memória nem tarefa
+fire-and-forget: encerrar abruptamente o processo pode deixar uma execução como `running`; inspecione-a antes de repetir.
+O advisory lock é liberado pela sessão PostgreSQL e protege o provider inteiro, inclusive sobreposição `all`/set.
+Cada set é transacional: dados de sets anteriores permanecem, e um set incompleto é revertido antes de registrar a falha.
+`RecordsCreated`/`RecordsUpdated` contam Set/Card/Printing/Variant; `RecordsUnresolved` conta novos Cards sem chave autoritativa
+para consolidação entre printings. Nenhum merge por nome é feito. External IDs usam sempre o código do provider selecionado.
+
+Migration: `20260926045142_ExternalArtworkAndVariantAvailability`; adições nullable de artwork e `is_active` com default true.
+Não há backfill de imagens inventadas: reexecute o sync para preencher os artworks. Migrations anteriores permanecem intactas.
+
+Validação do backend sem workloads móveis:
+
+```sh
+dotnet test tests/Vaulta.Identity.UnitTests/Vaulta.Identity.UnitTests.csproj
+dotnet test tests/Vaulta.Identity.IntegrationTests/Vaulta.Identity.IntegrationTests.csproj
+dotnet test tests/Vaulta.ArchitectureTests/Vaulta.ArchitectureTests.csproj
+dotnet tool restore
+dotnet ef migrations has-pending-model-changes --project src/Modules/Catalog/Vaulta.Catalog.Infrastructure
+```
+
+Integração usa PostgreSQL 17 real via Testcontainers e requer Docker. A solution inteira também contém MAUI Android,
+portanto `dotnet restore/build/test Vaulta.slnx` exige workloads móveis e Android SDK. O workflow `Catalog validation`
+valida backend, testes e snapshot; na branch de implementação também executa Compose e smoke real de Base Set.
+O smoke cria uma conta descartável no ambiente informado e grava `catalog-smoke-result.json`, sem credenciais.

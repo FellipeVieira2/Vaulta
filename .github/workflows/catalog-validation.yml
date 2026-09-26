@@ -1,0 +1,73 @@
+name: Catalog validation
+on:
+  push:
+    branches: [fix/catalog-tcgdex-maui]
+  pull_request:
+    paths:
+      - 'src/Modules/Catalog/**'
+      - 'src/Modules/Collection/**'
+      - 'src/Vaulta.Web.Api/**'
+      - 'tests/**'
+      - '.github/workflows/catalog-validation.yml'
+      - 'scripts/smoke-catalog.py'
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore, build and test backend (PostgreSQL Testcontainers)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for project in tests/*/*.csproj; do
+            dotnet restore "$project"
+            dotnet build "$project" --no-restore
+            dotnet test "$project" --no-build --no-restore --logger trx --results-directory TestResults
+          done
+      - name: Check Catalog migration snapshot
+        run: |
+          dotnet tool restore
+          dotnet ef migrations has-pending-model-changes --project src/Modules/Catalog/Vaulta.Catalog.Infrastructure
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: catalog-test-results
+          path: TestResults
+  smoke:
+    # One controlled real-provider smoke on this implementation branch, never on forks/ordinary PRs.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate disposable development configuration
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import secrets
+          from pathlib import Path
+          Path('.env').write_text('\n'.join([
+            'POSTGRES_USER=vaulta', 'POSTGRES_PASSWORD=' + secrets.token_hex(24),
+            'JWT_SECRET=' + secrets.token_hex(32), 'MINIO_ROOT_USER=vaulta-minio',
+            'MINIO_ROOT_PASSWORD=' + secrets.token_hex(24)]) + '\n')
+          PY
+      - name: Start Compose
+        run: docker compose up --build -d --wait --wait-timeout 180
+      - name: Synchronize Base Set using real TCGdex
+        run: docker compose exec -T vaulta-api dotnet Vaulta.Web.Api.dll --catalog-sync tcgdex base1
+      - name: Verify public API and Collection
+        run: python3 scripts/smoke-catalog.py http://127.0.0.1:8080
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: catalog-real-smoke
+          path: catalog-smoke-result.json
+      - name: Stop services
+        if: always()
+        run: docker compose down

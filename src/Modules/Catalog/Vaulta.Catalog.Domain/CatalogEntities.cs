@@ -60,6 +60,8 @@ public sealed class Printing
     public string Language { get; set; } = null!;
     public string? Rarity { get; set; }
     public string? RawRarity { get; set; }
+    public string? ExternalArtworkUrl { get; set; }
+    public string? ArtworkProvider { get; set; }
     public Card Card { get; set; } = null!;
     public Set Set { get; set; } = null!;
     public ICollection<Variant> Variants { get; set; } = new List<Variant>();
@@ -72,6 +74,7 @@ public sealed class Variant
     public string Code { get; set; } = null!;
     public string Name { get; set; } = null!;
     public string? RawValue { get; set; }
+    public bool IsActive { get; set; } = true;
     public Printing Printing { get; set; } = null!;
 }
 

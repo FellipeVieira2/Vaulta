@@ -15,9 +15,9 @@ public static class CatalogEndpoints
                 return Results.Problem(statusCode: 400, title: "Query must contain searchable characters and be no longer than 200 characters.");
             var currentPage = page ?? 1;
             var limit = pageSize ?? 20;
-            if (currentPage < 1 || limit is < 1 or > 100) return Results.Problem(statusCode: 400, title: "Invalid pagination values.");
+            if (currentPage < 1 || limit is < 1 or > 100 || (long)(currentPage - 1) * limit > int.MaxValue) return Results.Problem(statusCode: 400, title: "Invalid pagination values.");
             return Results.Ok(await search.Search(q, game, currentPage, limit, ct));
-        }).WithName("SearchCatalog").Produces<IReadOnlyList<CatalogSearchResult>>().ProducesProblem(400);
+        }).WithName("SearchCatalog").Produces<CatalogSearchPage>().ProducesProblem(400);
 
         catalog.MapGet("/printings/{id:guid}", async (Guid id, ICatalogSearch search, CancellationToken ct) =>
         {

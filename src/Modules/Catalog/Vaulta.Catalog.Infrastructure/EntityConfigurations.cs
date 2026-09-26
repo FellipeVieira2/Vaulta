@@ -53,6 +53,8 @@ internal sealed class PrintingConfiguration : IEntityTypeConfiguration<Printing>
     {
         b.ToTable("printings"); b.HasKey(x => x.Id); b.Property(x => x.Id).ValueGeneratedNever(); b.Property(x => x.CollectorNumber).HasMaxLength(64).IsRequired(); b.Property(x => x.NormalizedCollectorNumber).HasMaxLength(64).IsRequired();
         b.Property(x => x.Language).HasMaxLength(35).IsRequired(); b.Property(x => x.Rarity).HasMaxLength(80); b.Property(x => x.RawRarity).HasMaxLength(120);
+        b.Property(x => x.ExternalArtworkUrl).HasMaxLength(2048);
+        b.Property(x => x.ArtworkProvider).HasMaxLength(40);
         b.HasOne(x => x.Card).WithMany(x => x.Printings).HasForeignKey(x => x.CardId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Set).WithMany(x => x.Printings).HasForeignKey(x => x.SetId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.SetId, x.NormalizedCollectorNumber, x.Language }).IsUnique().HasDatabaseName("ux_catalog_printings_set_number_language");
@@ -65,6 +67,7 @@ internal sealed class VariantConfiguration : IEntityTypeConfiguration<Variant>
     public void Configure(EntityTypeBuilder<Variant> b)
     {
         b.ToTable("variants"); b.HasKey(x => x.Id); b.Property(x => x.Id).ValueGeneratedNever(); b.Property(x => x.Code).HasMaxLength(80).IsRequired(); b.Property(x => x.Name).HasMaxLength(120).IsRequired(); b.Property(x => x.RawValue).HasMaxLength(120);
+        b.Property(x => x.IsActive).HasDefaultValue(true);
         b.HasOne(x => x.Printing).WithMany(x => x.Variants).HasForeignKey(x => x.PrintingId).OnDelete(DeleteBehavior.Cascade);
         b.HasIndex(x => new { x.PrintingId, x.Code }).IsUnique().HasDatabaseName("ux_catalog_variants_printing_code");
     }
