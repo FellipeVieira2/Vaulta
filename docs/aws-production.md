@@ -151,6 +151,8 @@ Rollback explícito, apenas para schema compatível com a imagem anterior:
 ./scripts/deploy-production.sh "$(cat .deploy/previous-tag)"
 ```
 
+Se uma tentativa nova falhou antes de registrar sucesso, `.deploy/current-tag` ainda contém a última tag saudável; use essa tag explicitamente para recuperar. `.deploy/previous-tag` representa o deploy saudável anterior a ela, não a tentativa que falhou.
+
 Não existe down-migration automática. O rollback repete a etapa idempotente de migrations da imagem escolhida; não desfaz migrations já aplicadas. Se o novo container falhar depois da migration, o último registro saudável fica preservado, mas a API nova pode estar indisponível: execute rollback explicitamente após verificar schema. Não há blue/green nem zero downtime; a substituição tem pequena janela de indisponibilidade.
 
 ## Backup diário e restore
