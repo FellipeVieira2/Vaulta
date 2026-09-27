@@ -1,0 +1,71 @@
+# Standalone file: do not merge with docker-compose.yml (development publishes PostgreSQL).
+name: vaulta-production
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vaulta}
+      POSTGRES_USER: ${POSTGRES_USER:-vaulta}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+    command: ["postgres", "-c", "shared_buffers=64MB", "-c", "max_connections=40", "-c", "work_mem=2MB", "-c", "maintenance_work_mem=32MB"]
+    volumes:
+      - vaulta-postgres:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 10s
+    mem_limit: 256m
+    memswap_limit: 512m
+    shm_size: 64m
+    restart: unless-stopped
+    logging: &logs
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+  vaulta-api:
+    image: 142767402064.dkr.ecr.us-east-1.amazonaws.com/vaulta-api:${IMAGE_TAG:?Provide an immutable image tag}
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__Vaulta: Host=postgres;Port=5432;Database=${POSTGRES_DB:-vaulta};Username=${POSTGRES_USER:-vaulta};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD};Maximum Pool Size=15;Minimum Pool Size=0;Timeout=15
+      Jwt__Secret: ${JWT_SECRET:?Set JWT_SECRET in .env.production}
+      Jwt__Issuer: ${JWT_ISSUER:-vaulta}
+      Jwt__Audience: ${JWT_AUDIENCE:-vaulta-app}
+      Database__ApplyMigrations: "false"
+      Assets__S3__Bucket: ${ASSETS_BUCKET:-vaulta-assets-142767402064-us-east-1}
+      Assets__S3__Region: ${AWS_REGION:-us-east-1}
+      Assets__S3__ForcePathStyle: "false"
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_EC2_METADATA_V1_DISABLED: "true"
+      ReverseProxy__KnownProxies__0: ${PROXY_GATEWAY:-172.30.42.1}
+      Cors__Origins__0: ${CORS_ORIGIN_0:-}
+      Cors__Origins__1: ${CORS_ORIGIN_1:-}
+      RateLimit__AuthPermitLimit: ${AUTH_PERMIT_LIMIT:-20}
+      Outbox__Enabled: "true"
+      DOTNET_gcServer: "0"
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks: [backend]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 384m
+    memswap_limit: 768m
+    stop_grace_period: 30s
+    restart: unless-stopped
+    logging: *logs
+networks:
+  backend:
+    driver: bridge
+    # Host Nginx reaches the API via this exact gateway; do not trust the whole subnet.
+    # Not internal:true: the API needs outbound S3, TCGdex and IMDSv2 access.
+    ipam:
+      config:
+        - subnet: ${DOCKER_SUBNET:-172.30.42.0/24}
+          gateway: ${PROXY_GATEWAY:-172.30.42.1}
+volumes:
+  vaulta-postgres:

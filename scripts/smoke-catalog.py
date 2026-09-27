@@ -10,6 +10,8 @@ base = sys.argv[1].rstrip('/') if len(sys.argv) > 1 else 'http://127.0.0.1:8080'
 
 def request(path, body=None, token=None):
     headers = {'Content-Type': 'application/json'}
+    if path == '/api/v1/me/collection/items' and body is not None:
+        headers['Idempotency-Key'] = str(uuid.uuid4())
     if token:
         headers['Authorization'] = 'Bearer ' + token
     req = urllib.request.Request(base + path, data=None if body is None else json.dumps(body).encode(), headers=headers)

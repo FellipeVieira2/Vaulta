@@ -12,6 +12,8 @@ public sealed class S3StorageOptions
     public string? ServiceUrl { get; set; }
     public string Region { get; set; } = "us-east-1";
     public bool ForcePathStyle { get; set; } = true;
+    public string? AccessKey { get; set; }
+    public string? SecretKey { get; set; }
 }
 
 internal sealed class S3ObjectStorage(IAmazonS3 client, IOptions<S3StorageOptions> options) : IObjectStorage

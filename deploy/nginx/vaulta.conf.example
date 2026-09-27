@@ -1,0 +1,27 @@
+# Replace api.example.com and certificate paths before installing. No TLS is provisioned here.
+# Nginx runs on the EC2 host, outside Compose. Use a valid certificate for your actual domain.
+server {
+    listen 80;
+    server_name api.example.com;
+    return 308 https://api.example.com$request_uri;
+}
+server {
+    listen 443 ssl;
+    server_name api.example.com;
+    ssl_certificate /etc/letsencrypt/live/api.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 1m; # Assets upload directly to S3, not through the API.
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        # Exactly one controlled proxy hop. Overwrite client-supplied forwarded headers.
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host "";
+        proxy_set_header Forwarded "";
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 60s;
+    }
+}

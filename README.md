@@ -63,7 +63,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Initialize-LocalEnvi
 docker compose up --build -d
 ```
 
-Alternativamente, copie `.env.example` para `.env` e substitua `POSTGRES_PASSWORD` e `JWT_SECRET`. Para gerar uma chave no Linux/macOS, use `openssl rand -base64 48`. O placeholder `change-me...` de JWT é recusado no startup. `.env` não é versionado nem incluído na imagem. O script preserva um `.env` existente.
+Alternativamente, copie `.env.example` para `.env` e preencha `POSTGRES_PASSWORD`, `JWT_SECRET` e `MINIO_ROOT_PASSWORD`. Para gerar uma chave no Linux/macOS, use `openssl rand -base64 48`. O placeholder `change-me...` de JWT é recusado no startup. `.env` não é versionado nem incluído na imagem. O script preserva um `.env` existente.
 
 - Swagger: http://localhost:8080/swagger
 - OpenAPI: http://localhost:8080/swagger/v1/swagger.json
@@ -431,3 +431,7 @@ Integração usa PostgreSQL 17 real via Testcontainers e requer Docker. A soluti
 portanto `dotnet restore/build/test Vaulta.slnx` exige workloads móveis e Android SDK. O workflow `Catalog validation`
 valida backend, testes e snapshot; na branch de implementação também executa Compose e smoke real de Base Set.
 O smoke cria uma conta descartável no ambiente informado e grava `catalog-smoke-result.json`, sem credenciais.
+
+## AWS Production / MVP
+
+O Compose local com MinIO permanece inalterado. Para EC2 + PostgreSQL Docker + S3 privado, use somente `docker-compose.production.yml`. Consulte [operação AWS](docs/aws-production.md) para configuração, deploy por tag, migration separada, Nginx/TLS, backup/restore e rollback.

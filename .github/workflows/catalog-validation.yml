@@ -5,12 +5,19 @@ on:
   pull_request:
     branches: [master]
     paths:
+      - 'src/Modules/Assets/**'
+      - 'src/Modules/Identity/**'
       - 'src/Modules/Catalog/**'
       - 'src/Modules/Collection/**'
       - 'src/Vaulta.Web.Api/**'
       - 'tests/**'
       - '.github/workflows/catalog-validation.yml'
-      - 'scripts/smoke-catalog.py'
+      - 'scripts/**'
+      - 'deploy/**'
+      - 'docker-compose*.yml'
+      - '.env*.example'
+      - '.dockerignore'
+      - 'Directory.Build.props'
   workflow_dispatch:
 permissions:
   contents: read
@@ -32,6 +39,14 @@ jobs:
             dotnet build "$project" --no-restore
             dotnet test "$project" --no-build --no-restore --logger trx --results-directory TestResults
           done
+      - name: Validate production operator scripts
+        run: |
+          bash -n scripts/deploy-production.sh scripts/backup-postgres.sh scripts/production-compose.sh scripts/lib/production.sh scripts/smoke-production-container.sh
+          python3 -m unittest discover -s tests/operations -v
+      - name: Build API Docker image
+        run: docker build -f src/Vaulta.Web.Api/Dockerfile -t vaulta-api:test .
+      - name: Production Docker smoke (no AWS)
+        run: ./scripts/smoke-production-container.sh
       - name: Check Catalog migration snapshot
         run: |
           dotnet tool restore

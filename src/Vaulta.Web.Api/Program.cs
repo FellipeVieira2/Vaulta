@@ -17,6 +17,7 @@ using Vaulta.Web.Api;
 var builder = WebApplication.CreateBuilder(CatalogCommands.HostArguments(args));
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole(o => o.IncludeScopes = true);
+builder.Services.AddTrustedReverseProxy(builder.Configuration);
 builder.Services.AddIdentityModule(builder.Configuration);
 builder.Services.AddCatalogModule(builder.Configuration);
 builder.Services.AddAssetsModule(builder.Configuration);
@@ -40,7 +41,8 @@ builder.Services.AddSwaggerGen(o =>
 });
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
 {
-    var origins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [];
+    var origins = (builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [])
+        .Where(origin => !string.IsNullOrWhiteSpace(origin)).ToArray();
     if (origins.Length > 0) p.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod().WithExposedHeaders("ETag", "X-Correlation-ID");
 }));
 builder.Services.AddRateLimiter(o =>
@@ -58,6 +60,9 @@ builder.Services.AddOpenTelemetry().ConfigureResource(r => r.AddService("Vaulta.
     .WithMetrics(m => m.AddAspNetCoreInstrumentation().AddMeter("Microsoft.AspNetCore.Hosting"));
 
 var app = builder.Build();
+if (app.Environment.IsProduction()) ProductionConfiguration.Validate(app.Configuration);
+// CLI commands exit before host StartAsync; validate JWT options before any migration or sync too.
+_ = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<JwtOptions>>().Value;
 if (args.Contains("--migrate") || builder.Configuration.GetValue<bool>("Database:ApplyMigrations"))
 {
     await using var scope = app.Services.CreateAsyncScope();
@@ -69,6 +74,7 @@ if (args.Contains("--migrate") || builder.Configuration.GetValue<bool>("Database
 }
 if (await CatalogCommands.TryExecute(app, args)) return;
 
+app.UseForwardedHeaders();
 app.Use(async (context, next) =>
 {
     var incoming = context.Request.Headers["X-Correlation-ID"].ToString();
@@ -85,7 +91,7 @@ app.Use(async (context, next) =>
 app.UseExceptionHandler();
 app.UseStatusCodePages(async context => await context.HttpContext.RequestServices.GetRequiredService<IProblemDetailsService>()
     .WriteAsync(new ProblemDetailsContext { HttpContext = context.HttpContext, ProblemDetails = new() { Status = context.HttpContext.Response.StatusCode } }));
-if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing")) { app.UseHsts(); app.UseHttpsRedirection(); }
+if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing")) app.UseProductionTransport();
 if (app.Environment.IsDevelopment()) { app.UseSwagger(); app.UseSwaggerUI(); }
 app.UseCors();
 app.UseRateLimiter();

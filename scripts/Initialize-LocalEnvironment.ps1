@@ -9,7 +9,8 @@ function New-RandomSecret {
     try { $rng.GetBytes($bytes); return [Convert]::ToBase64String($bytes) } finally { $rng.Dispose() }
 }
 $content = Get-Content -LiteralPath (Join-Path $root '.env.example') -Raw
-$content = $content.Replace('POSTGRES_PASSWORD=change-me', ('POSTGRES_PASSWORD=' + (New-RandomSecret)))
-$content = $content.Replace('JWT_SECRET=change-me-with-a-long-random-secret', ('JWT_SECRET=' + (New-RandomSecret)))
+$content = $content.Replace('POSTGRES_PASSWORD=', ('POSTGRES_PASSWORD=' + (New-RandomSecret)))
+$content = $content.Replace('JWT_SECRET=', ('JWT_SECRET=' + (New-RandomSecret)))
+$content = $content.Replace('MINIO_ROOT_PASSWORD=', ('MINIO_ROOT_PASSWORD=' + (New-RandomSecret)))
 [IO.File]::WriteAllText($target, $content, (New-Object System.Text.UTF8Encoding($false)))
 Write-Host '.env created with random local credentials. Do not commit this file.'

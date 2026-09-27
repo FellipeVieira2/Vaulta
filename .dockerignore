@@ -28,3 +28,10 @@ README.md
 !.git/config
 !.git/packed-refs
 !.git/refs/heads/**
+**/.env.*
+**/.deploy
+**/backups
+**/*.sql.gz
+**/*.pem
+**/*.key
+**/secrets.json

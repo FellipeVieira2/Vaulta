@@ -8,3 +8,14 @@ artifacts/
 
 catalog-smoke-result.json
 TestResults/
+
+.env.*
+!.env.example
+!.env.production.example
+.deploy/
+backups/
+*.sql.gz
+*.pem
+*.key
+secrets.json
+__pycache__/
