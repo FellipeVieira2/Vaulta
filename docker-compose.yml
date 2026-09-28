@@ -41,25 +41,30 @@ services:
       minio-init:
         condition: service_completed_successfully
     restart: unless-stopped
+  # minio/minio and minio/mc were removed entirely from Docker Hub: MinIO discontinued
+  # pre-built community-edition images (source-only distribution) in September 2025.
+  # bitnamilegacy/* are frozen last-known-good snapshots recommended by Bitnami for
+  # migration; this is development/testing-only, never used for Production (Production uses S3).
   minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
-    command: server /data --console-address ":9001"
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Configure .env}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Configure .env}
+      MINIO_API_PORT_NUMBER: "9000"
+      MINIO_CONSOLE_PORT_NUMBER: "9001"
     ports:
       - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
       - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
-      - vaulta-minio:/data
+      - vaulta-minio:/bitnami/minio/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 20
     restart: unless-stopped
   minio-init:
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    image: bitnamilegacy/minio-client:2025.7.21-debian-12-r3
     depends_on:
       minio:
         condition: service_healthy

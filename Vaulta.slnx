@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Vaulta.App/Vaulta.App.csproj" />
+    <Project Path="src/Vaulta.App.Core/Vaulta.App.Core.csproj" />
   </Folder>
   <Folder Name="/src/API/">
     <Project Path="src/Vaulta.Web.Api/Vaulta.Web.Api.csproj" />
@@ -33,6 +34,7 @@
     <Project Path="src/Modules/Collection/Vaulta.Collection.Infrastructure/Vaulta.Collection.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Vaulta.App.Core.UnitTests/Vaulta.App.Core.UnitTests.csproj" />
     <Project Path="tests/Vaulta.ArchitectureTests/Vaulta.ArchitectureTests.csproj" />
     <Project Path="tests/Vaulta.Identity.IntegrationTests/Vaulta.Identity.IntegrationTests.csproj" />
     <Project Path="tests/Vaulta.Identity.UnitTests/Vaulta.Identity.UnitTests.csproj" />

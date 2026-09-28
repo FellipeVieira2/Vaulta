@@ -46,6 +46,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../Modules/Identity/Vaulta.Identity.Contracts/Vaulta.Identity.Contracts.csproj" />
+    <ProjectReference Include="../Vaulta.App.Core/Vaulta.App.Core.csproj" />
     <EmbeddedResource Include="Configuration/appsettings.*.json" />
   </ItemGroup>
 

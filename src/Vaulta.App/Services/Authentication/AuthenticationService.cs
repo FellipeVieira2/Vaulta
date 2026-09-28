@@ -53,15 +53,39 @@ public sealed class AuthenticationService(
             if (tokens.ExpiresAt > timeProvider.GetUtcNow() + RefreshSafetyWindow)
                 return true;
 
-            var response = await apiClient.RefreshAsync(new RefreshRequest(tokens.RefreshToken), cancellationToken);
-            await tokenStore.SaveAsync(ToStoredTokens(response), cancellationToken);
-            sessionState.User = response.User;
-            return true;
+            return await RefreshCoreAsync(tokens, cancellationToken);
         }
         finally
         {
             _refreshGate.Release();
         }
+    }
+
+    public async Task<bool> ForceRefreshAsync(CancellationToken cancellationToken = default)
+    {
+        await _refreshGate.WaitAsync(cancellationToken);
+        try
+        {
+            var tokens = await tokenStore.GetAsync(cancellationToken);
+            if (tokens is null || string.IsNullOrWhiteSpace(tokens.RefreshToken))
+                return false;
+
+            // Bypasses the "still valid" short-circuit: a real 401 from the server means the
+            // client's own expiry estimate can no longer be trusted, so a network refresh is forced.
+            return await RefreshCoreAsync(tokens, cancellationToken);
+        }
+        finally
+        {
+            _refreshGate.Release();
+        }
+    }
+
+    private async Task<bool> RefreshCoreAsync(StoredTokens tokens, CancellationToken cancellationToken)
+    {
+        var response = await apiClient.RefreshAsync(new RefreshRequest(tokens.RefreshToken), cancellationToken);
+        await tokenStore.SaveAsync(ToStoredTokens(response), cancellationToken);
+        sessionState.User = response.User;
+        return true;
     }
 
     public async Task LogoutAsync(CancellationToken cancellationToken = default)

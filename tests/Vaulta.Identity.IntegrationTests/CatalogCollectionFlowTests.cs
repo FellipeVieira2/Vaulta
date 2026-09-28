@@ -57,7 +57,7 @@ public sealed class CatalogCollectionFlowTests(ApiFixture fixture)
         Assert.Equal("007 / 100", details.CollectorNumber); Assert.Equal("en", details.Language); Assert.Equal("rare", details.Rarity);
         Assert.Equal(variantId, details.Variants.Single(x => x.Code == "normal").Id);
         await Authenticate(client);
-        var add = await client.PostAsJsonAsync("/api/v1/me/collection/items", new { printingId, variantId, quantity = 2, condition = "NEAR_MINT" });
+        var add = await PostCollectionItem(client, new { printingId, variantId, quantity = 2, condition = "NEAR_MINT" });
         Assert.Equal(HttpStatusCode.Created, add.StatusCode);
         var added = (await add.Content.ReadFromJsonAsync<AddCollectibleItemsResponse>())!;
         Assert.Equal(2, added.CreatedItems.Count);
@@ -118,7 +118,7 @@ public sealed class CatalogCollectionFlowTests(ApiFixture fixture)
         await Authenticate(client);
 
         // Historical add while the Variant is still active.
-        var historicalAdd = await client.PostAsJsonAsync("/api/v1/me/collection/items", new { printingId, variantId = normalVariantId, quantity = 1, condition = "NEAR_MINT" });
+        var historicalAdd = await PostCollectionItem(client, new { printingId, variantId = normalVariantId, quantity = 1, condition = "NEAR_MINT" });
         Assert.Equal(HttpStatusCode.Created, historicalAdd.StatusCode);
         var historicalEntryId = (await historicalAdd.Content.ReadFromJsonAsync<AddCollectibleItemsResponse>())!.CollectionEntryId;
 
@@ -138,7 +138,7 @@ public sealed class CatalogCollectionFlowTests(ApiFixture fixture)
         historicalRead.EnsureSuccessStatusCode();
 
         // New Collection additions referencing the inactive Variant are rejected even though the Printing is active.
-        var rejected = await client.PostAsJsonAsync("/api/v1/me/collection/items", new { printingId, variantId = normalVariantId, quantity = 1, condition = "NEAR_MINT" });
+        var rejected = await PostCollectionItem(client, new { printingId, variantId = normalVariantId, quantity = 1, condition = "NEAR_MINT" });
         Assert.Equal(HttpStatusCode.Conflict, rejected.StatusCode);
     }
 
@@ -159,7 +159,7 @@ public sealed class CatalogCollectionFlowTests(ApiFixture fixture)
         }
         using var client = fixture.Factory.CreateClient();
         await Authenticate(client);
-        var addBeforeInactive = await client.PostAsJsonAsync("/api/v1/me/collection/items", new { printingId = printingBId, quantity = 1, condition = "NEAR_MINT" });
+        var addBeforeInactive = await PostCollectionItem(client, new { printingId = printingBId, quantity = 1, condition = "NEAR_MINT" });
         Assert.Equal(HttpStatusCode.Created, addBeforeInactive.StatusCode);
         var historicalAdd = (await addBeforeInactive.Content.ReadFromJsonAsync<AddCollectibleItemsResponse>())!;
 
@@ -187,7 +187,7 @@ public sealed class CatalogCollectionFlowTests(ApiFixture fixture)
         historicalRead.EnsureSuccessStatusCode();
 
         // New Collection additions referencing the inactive Printing are rejected.
-        var rejected = await client.PostAsJsonAsync("/api/v1/me/collection/items", new { printingId = printingBId, quantity = 1, condition = "NEAR_MINT" });
+        var rejected = await PostCollectionItem(client, new { printingId = printingBId, quantity = 1, condition = "NEAR_MINT" });
         Assert.Equal(HttpStatusCode.Conflict, rejected.StatusCode);
 
         // A sync that fails outright must not deactivate any Printing of the set.
@@ -303,6 +303,15 @@ public sealed class CatalogCollectionFlowTests(ApiFixture fixture)
         var login = await client.PostAsJsonAsync("/api/v1/auth/login", new LoginRequest(request.Email, request.Password));
         login.EnsureSuccessStatusCode();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", (await login.Content.ReadFromJsonAsync<AuthResponse>())!.AccessToken);
+    }
+
+    // AddCollectibleItems requires an Idempotency-Key; each call below represents a distinct
+    // voluntary add, so a fresh key per call is correct (retries of the same call would reuse it).
+    private static async Task<HttpResponseMessage> PostCollectionItem(HttpClient client, object body)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/me/collection/items") { Content = JsonContent.Create(body) };
+        request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+        return await client.SendAsync(request);
     }
 
     private sealed class FixtureProvider : ICatalogProvider

@@ -63,7 +63,7 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
 
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
-        if (args.PropertyName == nameof(ExperienceViewModel.ScreenId))
+        if (args.PropertyName is nameof(ExperienceViewModel.ScreenId) or nameof(ExperienceViewModel.Screen))
             MainThread.BeginInvokeOnMainThread(BuildContent);
     }
 
@@ -128,7 +128,10 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
             AddMetrics(screen);
 
         if (screen.Id == "card-detail")
-            _content.Children.Add(CreateCardArtwork(ScreenCatalog.CharizardArtwork, "Charizard ex", 300));
+            _content.Children.Add(CreateCardArtwork(_viewModel.SelectedPrinting?.ArtworkUrl, screen.Title, 300));
+
+        if (screen.Id == "collection-item")
+            AddCollectionItemFields(screen);
 
         if (screen.Cards is not null)
             AddCards(screen);
@@ -600,7 +603,7 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
         SemanticProperties.SetDescription(entry, "Buscar cartas");
         search.Add(entry, 0, 0);
         var searchButton = CreateButton("Buscar", true);
-        searchButton.Clicked += async (_, _) => await _viewModel.NavigateCommand.ExecuteAsync("search-results");
+        searchButton.Clicked += async (_, _) => await _viewModel.SearchNowCommand.ExecuteAsync(null);
         search.Add(searchButton, 1, 0);
         _content.Children.Add(search);
 
@@ -671,14 +674,43 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
         else _content.Children.Add(entry);
     }
 
+    private void AddCollectionItemFields(ScreenDefinition screen)
+    {
+        _content.Children.Add(CreateLabel("CONDIÇÃO", "CaptionTextStyle"));
+        foreach (var condition in screen.Options ?? [])
+        {
+            var choice = CreateButton(condition, _viewModel.SelectedCondition == condition);
+            choice.Clicked += (_, _) =>
+            {
+                _viewModel.SelectConditionCommand.Execute(condition);
+                UpdateConditionButtons();
+            };
+            choice.ClassId = condition;
+            _content.Children.Add(choice);
+        }
+
+        AddEntry("Notas (opcional)", "Adicione observações sobre o item...", nameof(ExperienceViewModel.ItemNotes));
+    }
+
     private void AddOptions(ScreenDefinition screen)
     {
-        if (screen.Id is "catalog" or "market" or "add-to-collection" or "sell")
+        if (screen.Id is "catalog" or "market" or "add-to-collection" or "sell" or "collection-item")
             return;
 
         foreach (var option in screen.Options!)
         {
-            if (screen.Id == "preferences-tcg")
+            if (screen.Id == "card-detail")
+            {
+                var variantChip = CreateButton(option, _viewModel.SelectedVariantLabel == option);
+                variantChip.ClassId = option;
+                variantChip.Clicked += (_, _) =>
+                {
+                    _viewModel.SelectVariantCommand.Execute(option);
+                    UpdateVariantButtons();
+                };
+                _content.Children.Add(variantChip);
+            }
+            else if (screen.Id == "preferences-tcg")
             {
                 var row = new HorizontalStackLayout { Spacing = 12, VerticalOptions = LayoutOptions.Center };
                 var checkBox = new CheckBox { IsChecked = _viewModel.SelectedTcgs.Contains(option), Color = ColorResource("BrandPrimary") };

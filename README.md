@@ -183,7 +183,9 @@ Compose é para desenvolvimento e publica portas somente no loopback. Produção
 
 ## Aplicativo mobile — Vaulta.App
 
-O app MAUI está em `src/Vaulta.App`. O target padrão é Android (`net10.0-android`); iOS é habilitado explicitamente em um Mac com `BuildIos=true`. O projeto usa MVVM com CommunityToolkit.Mvvm e consome apenas o assembly de contratos HTTP Identity, não a infraestrutura do servidor.
+O app MAUI está em `src/Vaulta.App`. O target padrão é Android (`net10.0-android`); iOS é habilitado explicitamente em um Mac com `BuildIos=true`. O projeto usa MVVM com CommunityToolkit.Mvvm e consome apenas os assemblies de contratos HTTP (Identity, Catalog, Collection, Assets), não a infraestrutura do servidor.
+
+`src/Vaulta.App.Core` é uma class library .NET puro (sem dependência de MAUI) que concentra a fundação HTTP reutilizável pelo app: `AuthorizingHttpMessageHandler` (Bearer token, retry único em 401 com refresh single-flight), `ApiErrorTranslator`/`ApiException`, e os clients `CatalogClient`, `CollectionClient` e `AssetClient`. Ela é coberta por `tests/Vaulta.App.Core.UnitTests` (client parsing, paginação, idempotency key, mapping de condition, fluxo de refresh/retry) usando `HttpMessageHandler` fake, sem chamadas de rede reais. Auth real (login/registro/refresh/logout com restauração de sessão), busca de Catálogo (com debounce e cancelamento), detalhe de Printing/Variant, adicionar/editar/remover item da Coleção (com `Idempotency-Key` e controle de concorrência otimista) já funcionam fim a fim contra o backend — as telas de Scanner, Pricing, Portfolio, Marketplace e Wishlist continuam demonstrativas nesta entrega.
 
 ```powershell
 dotnet restore Vaulta.slnx
@@ -203,9 +205,9 @@ dotnet build src/Vaulta.App/Vaulta.App.csproj -p:BuildIos=true --framework net10
 
 A configuração Debug está em `src/Vaulta.App/Configuration/appsettings.Development.json` e usa `http://10.0.2.2:8080/`, endereço do host visto pelo Android Emulator. O app não fixa URL em services. A política Android de cleartext permite apenas o domínio do emulador `10.0.2.2`. Inicie API e PostgreSQL conforme a seção [Executar com Docker](#executar-com-docker). Em uma execução no emulador, esse encaminhamento disponibiliza a API pela porta 8080.
 
-Antes de gerar uma versão Release, configure `Api:BaseUrl` em `src/Vaulta.App/Configuration/appsettings.Production.json` para o endpoint HTTPS do ambiente. O valor está vazio intencionalmente; o client tipado recusa uma URL ausente/inválida quando for resolvido.
+Produção aponta para `https://api.vaulta.com.br/`, já configurado em `src/Vaulta.App/Configuration/appsettings.Production.json`. O client tipado recusa uma `Api:BaseUrl` ausente/inválida (não-absoluta ou sem esquema http/https) quando for resolvido, para qualquer ambiente.
 
-Tokens de sessão usam `SecureStorage`; não use Preferences para credenciais. A renovação é exposta pela interface de autenticação e serializada para evitar refresh simultâneo. O retry automático de requests após 401 ainda não foi implementado.
+Tokens de sessão usam `SecureStorage`; não use Preferences para credenciais. A renovação é exposta pela interface de autenticação e serializada para evitar refresh simultâneo. Todo request autenticado (Catalog/Collection/Assets) passa por `AuthorizingHttpMessageHandler`: em um 401 ele dispara um refresh forçado (ignorando a janela de validade otimista do token) e repete a requisição original exatamente uma vez; refreshes concorrentes reaproveitam a mesma chamada em andamento; se o refresh falhar, a sessão local é limpa e o usuário volta para a tela de login — nunca há laço de retry.
 
 ### Galeria do design system
 
@@ -287,7 +289,7 @@ Content-Type: application/json
 
 Resultado esperado: HTTP 201, uma CollectionEntry e dois CollectibleItems.
 Clientes antigos precisam trocar o array de busca por `response.items` e as strings de variants por objetos.
-OpenAPI acompanha os DTOs; o app MAUI atualmente no repositório ainda não tem cliente Catalog a migrar.
+OpenAPI acompanha os DTOs; o app MAUI consome esses mesmos contratos via `Vaulta.App.Core.Catalog.CatalogClient` (busca com paginação e detalhe de Printing/Variants), sem duplicar DTOs.
 Os modelos de ingestão `Provider*` foram movidos de Contracts para Application; somente adapters e consumidores internos usam esses tipos.
 
 ### Operação segura do sync
@@ -323,7 +325,7 @@ para consolidação entre printings. Nenhum merge por nome é feito. External ID
 Migration: `20260926045142_ExternalArtworkAndVariantAvailability`; adições nullable de artwork e `is_active` com default true.
 Não há backfill de imagens inventadas: reexecute o sync para preencher os artworks. Migrations anteriores permanecem intactas.
 
-## Collection: hardening final (pré-integração MAUI)
+## Collection: hardening final (já integrado ao MAUI)
 
 `CollectionEntry` (agrupamento por `UserId + PrintingId + VariantId`) e `CollectibleItem` (unidade física
 individual) não mudaram de forma nesta rodada; os gaps abaixo foram corrigidos sem reescrever o modelo.
@@ -386,7 +388,7 @@ Chaves diferentes para o mesmo payload são tratadas como intenções distintas 
 "Adicionar" no MAUI) e criam itens adicionais normalmente — idempotência nunca deduplica por conteúdo, só
 por chave.
 
-Quando o app MAUI integrar este endpoint (fora do escopo desta tarefa), a regra de geração de chave é: gerar
+O app MAUI já integra este endpoint; a regra de geração de chave é: gerar
 um GUID novo por intenção lógica de "Adicionar à coleção" e reenviar o mesmo GUID em qualquer retry
 automático daquela mesma intenção (timeout, perda de resposta, etc.). Uma nova ação do usuário — mesmo que
 para o mesmo card — deve gerar um GUID novo. A geração da chave é responsabilidade do cliente; a API nunca

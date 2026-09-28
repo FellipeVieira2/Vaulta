@@ -44,13 +44,17 @@ public sealed partial class ExperiencePage
             details.Children.Add(CreateLabel(card.Change, "CaptionTextStyle", card.Change.StartsWith('-') ? "StatusError" : "StatusSuccess"));
         var open = CreateButton("Ver prévia", false);
         SemanticProperties.SetDescription(open, $"Ver prévia de {card.Title}");
-        open.Clicked += async (_, _) => await _viewModel.NavigateCommand.ExecuteAsync(screen.Id switch
+        open.Clicked += async (_, _) =>
         {
-            "collection" => "collection-item",
-            "scan-candidates" => "scan-confirmed",
-            "market" => "listing-detail",
-            _ => "card-detail"
-        });
+            _viewModel.SelectCard(screen.Id, card);
+            await _viewModel.NavigateCommand.ExecuteAsync(screen.Id switch
+            {
+                "collection" => "collection-item",
+                "scan-candidates" => "scan-confirmed",
+                "market" => "listing-detail",
+                _ => "card-detail"
+            });
+        };
         details.Children.Add(open);
         return CreateSurface(details);
     }

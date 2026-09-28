@@ -24,11 +24,15 @@ public sealed partial class ExperiencePage
         return root;
     }
 
-    private void UpdateConditionButtons()
+    private void UpdateConditionButtons() => UpdateChipButtons(_viewModel.SelectedCondition);
+
+    private void UpdateVariantButtons() => UpdateChipButtons(_viewModel.SelectedVariantLabel);
+
+    private void UpdateChipButtons(string? selectedValue)
     {
         foreach (var button in _content.Children.OfType<Button>().Where(x => x.ClassId is not null))
         {
-            var selected = button.ClassId == _viewModel.SelectedCondition;
+            var selected = button.ClassId == selectedValue;
             button.SetDynamicResource(Button.BackgroundColorProperty, selected ? "BrandPrimary" : "SurfaceElevated");
             button.SetDynamicResource(Button.TextColorProperty, selected ? "TextInverse" : "TextPrimary");
             SemanticProperties.SetDescription(button, button.ClassId + (selected ? ", selecionada" : ""));
