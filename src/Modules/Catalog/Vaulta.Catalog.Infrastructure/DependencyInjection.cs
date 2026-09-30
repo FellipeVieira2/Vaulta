@@ -23,6 +23,14 @@ public static class DependencyInjection
             client.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Vaulta-Catalog/1.0");
         });
+        services.AddHttpClient<PokemonTcgRecognitionProvider>((_, client) =>
+        {
+            client.BaseAddress = new Uri("https://api.pokemontcg.io/v2/", UriKind.Absolute);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Vaulta-Scanner/1.0");
+        });
+        services.AddScoped<ICardRecognitionProvider>(p => p.GetRequiredService<PokemonTcgRecognitionProvider>());
+        services.AddScoped<ICardSearchProvider>(p => p.GetRequiredService<PokemonTcgRecognitionProvider>());
+        services.AddScoped<ScannerService>();
         services.AddScoped<ICatalogSync, CatalogSyncService>();
         services.AddScoped<CatalogQueries>();
         services.AddScoped<ICatalogSearch>(provider => provider.GetRequiredService<CatalogQueries>());

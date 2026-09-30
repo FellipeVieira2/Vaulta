@@ -1,9 +1,85 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui">
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <!-- Page & Text defaults -->
     <Style TargetType="ContentPage">
         <Setter Property="BackgroundColor" Value="{DynamicResource BackgroundPrimary}" />
     </Style>
     <Style TargetType="Label">
         <Setter Property="TextColor" Value="{DynamicResource TextPrimary}" />
     </Style>
+
+    <!-- Primary Button: solid brand fill, rounded corners, press feedback via dynamic resources -->
+    <Style x:Key="PrimaryButton" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{DynamicResource BrandPrimary}" />
+        <Setter Property="TextColor" Value="{DynamicResource TextInverse}" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="20,14" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="BorderWidth" Value="0" />
+        <Setter Property="MinimumHeightRequest" Value="52" />
+    </Style>
+
+    <!-- Secondary Button: outlined, subtle background -->
+    <Style x:Key="SecondaryButton" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceElevated}" />
+        <Setter Property="TextColor" Value="{DynamicResource TextPrimary}" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="20,14" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="BorderColor" Value="{DynamicResource BorderDefault}" />
+        <Setter Property="BorderWidth" Value="1" />
+        <Setter Property="MinimumHeightRequest" Value="52" />
+    </Style>
+
+    <!-- Card Surface: elevated surface with subtle border and consistent radius -->
+    <Style x:Key="CardSurface" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceElevated}" />
+        <Setter Property="Stroke" Value="{DynamicResource BorderSubtle}" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="Padding" Value="16" />
+        <Setter Property="StrokeShape">
+            <RoundRectangle CornerRadius="16" />
+        </Setter>
+    </Style>
+
+    <!-- Input Fields: dark surface with visible border on focus -->
+    <Style TargetType="Entry">
+        <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceDefault}" />
+        <Setter Property="TextColor" Value="{DynamicResource TextPrimary}" />
+        <Setter Property="PlaceholderColor" Value="{DynamicResource TextTertiary}" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="Margin" Value="0,4" />
+    </Style>
+
+    <Style TargetType="Editor">
+        <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceDefault}" />
+        <Setter Property="TextColor" Value="{DynamicResource TextPrimary}" />
+        <Setter Property="PlaceholderColor" Value="{DynamicResource TextTertiary}" />
+        <Setter Property="FontSize" Value="16" />
+    </Style>
+
+    <!-- Picker styled consistently with Entry -->
+    <Style TargetType="Picker">
+        <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceDefault}" />
+        <Setter Property="TextColor" Value="{DynamicResource TextPrimary}" />
+        <Setter Property="FontSize" Value="16" />
+    </Style>
+
+    <!-- ActivityIndicator aligned to brand -->
+    <Style TargetType="ActivityIndicator">
+        <Setter Property="Color" Value="{DynamicResource BrandPrimary}" />
+    </Style>
+
+    <!-- SearchBar adapted to dark theme -->
+    <Style TargetType="SearchBar">
+        <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceDefault}" />
+        <Setter Property="TextColor" Value="{DynamicResource TextPrimary}" />
+        <Setter Property="PlaceholderColor" Value="{DynamicResource TextTertiary}" />
+        <Setter Property="CancelButtonColor" Value="{DynamicResource TextSecondary}" />
+        <Setter Property="FontSize" Value="16" />
+    </Style>
+
 </ResourceDictionary>

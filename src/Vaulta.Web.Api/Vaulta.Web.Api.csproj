@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -15,6 +15,16 @@
     <ProjectReference Include="../Modules/Assets/Vaulta.Assets.Infrastructure/Vaulta.Assets.Infrastructure.csproj" />
     <ProjectReference Include="../Modules/Collection/Vaulta.Collection.Infrastructure/Vaulta.Collection.Infrastructure.csproj" />
     <ProjectReference Include="../Modules/Collection/Vaulta.Collection.Contracts/Vaulta.Collection.Contracts.csproj" />
+    <ProjectReference Include="../Modules/Marketplace/Vaulta.Marketplace.Infrastructure/Vaulta.Marketplace.Infrastructure.csproj" />
+    <ProjectReference Include="../Modules/Orders/Vaulta.Orders.Infrastructure/Vaulta.Orders.Infrastructure.csproj" />
+    <ProjectReference Include="../Modules/Payments/Vaulta.Payments.Infrastructure/Vaulta.Payments.Infrastructure.csproj" />
+    <ProjectReference Include="../Modules/Shipping/Vaulta.Shipping.Infrastructure/Vaulta.Shipping.Infrastructure.csproj" />
+    <ProjectReference Include="../Modules/Reviews/Vaulta.Reviews.Infrastructure/Vaulta.Reviews.Infrastructure.csproj" />
+    <ProjectReference Include="../Modules/Wallets/Vaulta.Wallets.Infrastructure/Vaulta.Wallets.Infrastructure.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.6">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.19.1" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.19.0" />

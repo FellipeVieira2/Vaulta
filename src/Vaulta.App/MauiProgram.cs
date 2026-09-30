@@ -6,8 +6,13 @@ using Vaulta.App.Core.Assets;
 using Vaulta.App.Core.Catalog;
 using Vaulta.App.Core.Collection;
 using Vaulta.App.Core.Http;
+using Vaulta.App.Core.Marketplace;
+using Vaulta.App.Core.Orders;
+using Vaulta.App.Core.Payments;
+using Vaulta.App.Core.Wallets;
 using Vaulta.App.Services.Api;
 using Vaulta.App.Services.Authentication;
+using Vaulta.App.Services.Camera;
 using Vaulta.App.State;
 using Vaulta.App.ViewModels;
 using Vaulta.App.Views;
@@ -83,6 +88,18 @@ public static class MauiProgram
         builder.Services.AddHttpClient<ICollectionClient, CollectionClient>((serviceProvider, client) =>
                 client.BaseAddress = ResolveBaseAddress(serviceProvider))
             .AddHttpMessageHandler<AuthorizingHttpMessageHandler>();
+        builder.Services.AddHttpClient<IMarketplaceClient, MarketplaceClient>((serviceProvider, client) =>
+                client.BaseAddress = ResolveBaseAddress(serviceProvider))
+            .AddHttpMessageHandler<AuthorizingHttpMessageHandler>();
+        builder.Services.AddHttpClient<IOrdersClient, OrdersClient>((serviceProvider, client) =>
+                client.BaseAddress = ResolveBaseAddress(serviceProvider))
+            .AddHttpMessageHandler<AuthorizingHttpMessageHandler>();
+        builder.Services.AddHttpClient<IPaymentsClient, PaymentsClient>((serviceProvider, client) =>
+                client.BaseAddress = ResolveBaseAddress(serviceProvider))
+            .AddHttpMessageHandler<AuthorizingHttpMessageHandler>();
+        builder.Services.AddHttpClient<IWalletsClient, WalletsClient>((serviceProvider, client) =>
+                client.BaseAddress = ResolveBaseAddress(serviceProvider))
+            .AddHttpMessageHandler<AuthorizingHttpMessageHandler>();
 
         // AssetClient needs two HttpClients: one authorized (create/confirm) and one bare
         // (the presigned S3/MinIO PUT must carry only the URL's own signature, never our Bearer token).
@@ -96,6 +113,29 @@ public static class MauiProgram
             return new AssetClient(factory.CreateClient("Vaulta.Assets.Api"), factory.CreateClient("Vaulta.Assets.PresignedUpload"));
         });
 
+        // Price history: JustTCG API when configured, otherwise simulated data for immediate use.
+        builder.Services.AddHttpClient("Vaulta.JustTcg", client =>
+        {
+            client.BaseAddress = new Uri("https://api.justtcg.com/");
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+        });
+        builder.Services.AddSingleton<SimulatedPriceHistoryProvider>();
+        builder.Services.AddSingleton<IPriceHistoryProvider>(serviceProvider =>
+        {
+            var apiKey = builder.Configuration["JustTcg:ApiKey"];
+            if (string.IsNullOrWhiteSpace(apiKey))
+                return serviceProvider.GetRequiredService<SimulatedPriceHistoryProvider>();
+
+            var factory = serviceProvider.GetRequiredService<IHttpClientFactory>();
+            var httpClient = factory.CreateClient("Vaulta.JustTcg");
+            httpClient.DefaultRequestHeaders.Add("x-api-key", apiKey);
+            return new JustTcgPriceHistoryProvider(
+                httpClient,
+                serviceProvider.GetRequiredService<SimulatedPriceHistoryProvider>(),
+                apiKey);
+        });
+
+        builder.Services.AddSingleton<ICameraService, CameraService>();
         builder.Services.AddSingleton<AppShell>();
         builder.Services.AddTransient<ExperiencePage>();
         builder.Services.AddTransient<ExperienceViewModel>();

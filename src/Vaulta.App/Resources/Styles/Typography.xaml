@@ -1,34 +1,38 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+    <!-- Display & Headings: tighter tracking for impact on dark backgrounds -->
     <Style x:Key="DisplayTextStyle" TargetType="Label">
-        <Setter Property="FontSize" Value="36" />
+        <Setter Property="FontSize" Value="38" />
         <Setter Property="FontAttributes" Value="Bold" />
-        <Setter Property="LineHeight" Value="1.2222" />
+        <Setter Property="LineHeight" Value="1.15" />
+        <Setter Property="CharacterSpacing" Value="-0.5" />
         <Setter Property="TextColor" Value="{DynamicResource TextPrimary}" />
     </Style>
     <Style x:Key="H1TextStyle" TargetType="Label">
         <Setter Property="FontSize" Value="28" />
         <Setter Property="FontAttributes" Value="Bold" />
-        <Setter Property="LineHeight" Value="1.2857" />
+        <Setter Property="LineHeight" Value="1.2" />
+        <Setter Property="CharacterSpacing" Value="-0.3" />
         <Setter Property="TextColor" Value="{DynamicResource TextPrimary}" />
     </Style>
     <Style x:Key="H2TextStyle" TargetType="Label">
         <Setter Property="FontSize" Value="24" />
         <Setter Property="FontAttributes" Value="Bold" />
-        <Setter Property="LineHeight" Value="1.3333" />
+        <Setter Property="LineHeight" Value="1.25" />
+        <Setter Property="CharacterSpacing" Value="-0.2" />
         <Setter Property="TextColor" Value="{DynamicResource TextPrimary}" />
     </Style>
     <Style x:Key="H3TextStyle" TargetType="Label">
         <Setter Property="FontSize" Value="20" />
         <Setter Property="FontAttributes" Value="Bold" />
-        <Setter Property="LineHeight" Value="1.4" />
+        <Setter Property="LineHeight" Value="1.3" />
         <Setter Property="TextColor" Value="{DynamicResource TextPrimary}" />
     </Style>
     <Style x:Key="TitleTextStyle" TargetType="Label">
         <Setter Property="FontSize" Value="17" />
         <Setter Property="FontAttributes" Value="Bold" />
-        <Setter Property="LineHeight" Value="1.4118" />
+        <Setter Property="LineHeight" Value="1.35" />
         <Setter Property="TextColor" Value="{DynamicResource TextPrimary}" />
     </Style>
     <Style x:Key="BodyTextStyle" TargetType="Label">

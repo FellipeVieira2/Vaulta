@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Vaulta.Payments.Domain/Vaulta.Payments.Domain.csproj" />
+    <ProjectReference Include="../Vaulta.Payments.Contracts/Vaulta.Payments.Contracts.csproj" />
+    <ProjectReference Include="../../Orders/Vaulta.Orders.Contracts/Vaulta.Orders.Contracts.csproj" />
+    <ProjectReference Include="../../Orders/Vaulta.Orders.Domain/Vaulta.Orders.Domain.csproj" />
+    <ProjectReference Include="../../Marketplace/Vaulta.Marketplace.Contracts/Vaulta.Marketplace.Contracts.csproj" />
+    <ProjectReference Include="../../Marketplace/Vaulta.Marketplace.Domain/Vaulta.Marketplace.Domain.csproj" />
+    <ProjectReference Include="../../Orders/Vaulta.Orders.Application/Vaulta.Orders.Application.csproj" />
+    <ProjectReference Include="../../Wallets/Vaulta.Wallets.Application/Vaulta.Wallets.Application.csproj" />
+    <PackageReference Include="FluentValidation" Version="12.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.*" />
+  </ItemGroup>
+</Project>

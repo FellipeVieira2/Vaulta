@@ -1,14 +1,26 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Vaulta.App.Core.Assets;
 using Vaulta.App.Core.Catalog;
 using Vaulta.App.Core.Collection;
 using Vaulta.App.Core.Http;
+using Vaulta.App.Core.Marketplace;
+using Vaulta.App.Core.Orders;
+using Vaulta.App.Core.Payments;
+using Vaulta.App.Core.Wallets;
+using Vaulta.Assets.Contracts;
+using Vaulta.App.Services.Api;
 using Vaulta.App.Services.Authentication;
+using Vaulta.App.Services.Camera;
 using Vaulta.App.State;
 using Vaulta.Catalog.Contracts;
 using Vaulta.Collection.Contracts;
 using Vaulta.Identity.Contracts;
+using Vaulta.Marketplace.Contracts;
+using Vaulta.Orders.Contracts;
+using Vaulta.Payments.Contracts;
+using Vaulta.Wallets.Contracts;
 
 namespace Vaulta.App.ViewModels;
 
@@ -65,6 +77,8 @@ public static class ScreenCatalog
         new("portfolio", "Meu Vault", "Acompanhe o valor e a evolução estimada da sua coleção.", "PORTFÓLIO · DEMONSTRAÇÃO", Metrics: [new("TOTAL ESTIMADO", "R$ 12.450,00"), new("CUSTO DE AQUISIÇÃO", "R$ 8.920,00"), new("LUCRO TOTAL", "+ R$ 3.530,00")], Cards: [new("POKÉMON", "Charizard ex", "Mais valorizadas", "R$ 420,00", "+12,4%"), new("MAGIC", "Black Lotus", "Mais valioso", "R$ 1.950,00"), new("YU-GI-OH!", "Blue-Eyes White Dragon", "Acompanhe o mercado", "R$ 310,00", "-2,8%")]),
         new("market", "Mercado Vaulta", "Descubra cartas e oportunidades de colecionadores.", "MERCADO · DEMONSTRAÇÃO", InputHint: "Buscar carta, TCG ou edição...", Options: ["Pokémon", "Magic", "One Piece", "Yu-Gi-Oh!"], Cards: [new("ONE PIECE", "Monkey D. Luffy · OP-05", "Near Mint · Envio nacional", "R$ 950,00"), new("POKÉMON", "Espeon VMAX", "Promo · Near Mint", "R$ 320,00"), new("MAGIC", "Black Lotus", "Collector edition", "R$ 8.500,00")], Actions: [new("Ver anúncio", "listing-detail", true), new("Vender uma carta", "sell")]),
         new("listing-detail", "Detalhes do item", "Pokémon Card 151 · #094/165 · Reverse Holo", "POKÉMON TCG", Metrics: [new("PREÇO", "R$ 82,00"), new("MÉDIA DE MERCADO", "R$ 97,00")], Cards: [new("VENDEDOR", "Thiago TCG", "4,9 · 42 vendas · Belo Horizonte, MG", "envio nacional")], Actions: [new("Comprar agora", null, true), new("Fazer oferta", null)]),
+        new("checkout", "Endereço de entrega", "Informe onde devemos entregar seu pedido.", "CHECKOUT", Actions: [new("Confirmar e pagar", null, true)]),
+        new("wallet", "Minha Carteira", "Saldo disponível e histórico de transações.", "CARTEIRA", Metrics: [new("SALDO", "R$ 0,00")], Actions: [new("Solicitar saque", null, true)]),
         new("sell", "Vender carta", "Informe condição, preço e fotos reais do item.", "NOVO ANÚNCIO · DEMONSTRAÇÃO", Notice: "O marketplace ainda não está integrado; nenhum anúncio será publicado.", Options: ["Near Mint", "Lightly Played", "Moderately Played", "Heavily Played"], Actions: [new("Publicar anúncio", "unsupported", true)]),
         new("profile", "Lucas Oliveira", "@lucas_tcg · Colecionador desde 2012", "PERFIL DO COLECIONADOR", Metrics: [new("CARTAS", "284"), new("TROCAS", "57"), new("VALOR", "R$ 12,4k")], Actions: [new("Editar perfil", "settings", true), new("Configurações", "settings"), new("Minha coleção", "collection")]),
         new("settings", "Configurações", "Gerencie sua conta e preferências da Vaulta.", "CONTA E SEGURANÇA", Options: ["Conta", "TCGs preferidos", "Segurança", "Notificações", "Privacidade", "Tema: Escuro"], Actions: [new("TCGs preferidos", "preferences-tcg", true), new("Sair da conta", "logout")]),
@@ -83,22 +97,52 @@ public partial class ExperienceViewModel : ObservableObject
     private readonly SessionState _sessionState;
     private readonly ICatalogClient _catalogClient;
     private readonly ICollectionClient _collectionClient;
+    private readonly IVaultaApiClient _apiClient;
+    private readonly ICameraService _cameraService;
+    private readonly IMarketplaceClient _marketplaceClient;
+    private readonly IOrdersClient _ordersClient;
+    private readonly IPaymentsClient _paymentsClient;
+    private readonly IWalletsClient _walletsClient;
+    private readonly IPriceHistoryProvider _priceHistoryProvider;
+    private readonly ITokenStore _tokenStore;
+    private readonly IAssetClient _assetClient;
     private readonly Dictionary<string, Guid> _variantIdsByLabel = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<Guid> _sellPhotoAssetIds = [];
     private CancellationTokenSource? _searchDebounceCts;
     private AddToCollectionIntent? _addToCollectionIntent;
     private Guid? _loadedPrintingId;
     private bool _collectionLoadedOnce;
+    private MyProfileDto? _currentProfile;
+    private OrderPageDto? _userOrders;
 
     public ExperienceViewModel(
         IAuthenticationService authenticationService,
         SessionState sessionState,
         ICatalogClient catalogClient,
-        ICollectionClient collectionClient)
+        ICollectionClient collectionClient,
+        IVaultaApiClient apiClient,
+        ICameraService cameraService,
+        IMarketplaceClient marketplaceClient,
+        IOrdersClient ordersClient,
+        IPaymentsClient paymentsClient,
+        IWalletsClient walletsClient,
+        IPriceHistoryProvider priceHistoryProvider,
+        ITokenStore tokenStore,
+        IAssetClient assetClient)
     {
         _authenticationService = authenticationService;
         _sessionState = sessionState;
         _catalogClient = catalogClient;
         _collectionClient = collectionClient;
+        _apiClient = apiClient;
+        _cameraService = cameraService;
+        _marketplaceClient = marketplaceClient;
+        _ordersClient = ordersClient;
+        _paymentsClient = paymentsClient;
+        _walletsClient = walletsClient;
+        _priceHistoryProvider = priceHistoryProvider;
+        _tokenStore = tokenStore;
+        _assetClient = assetClient;
         SelectedTcgs = ["Pokémon"];
     }
 
@@ -119,7 +163,72 @@ public partial class ExperienceViewModel : ObservableObject
     [ObservableProperty] private CollectionEntryDetailsDto? selectedEntry;
     [ObservableProperty] private CollectibleItemDto? selectedItem;
     [ObservableProperty] private CollectionSummaryDto? collectionSummary;
+    [ObservableProperty] private CardScanResultDto? scanResult;
+    [ObservableProperty] private byte[]? capturedImageBytes;
+    [ObservableProperty] private ListingPageDto? marketplaceListings;
+    [ObservableProperty] private OrderDto? currentOrder;
+    [ObservableProperty] private PaymentDto? currentPayment;
+    [ObservableProperty] private Guid? selectedListingId;
+    [ObservableProperty] private IReadOnlyList<Vaulta.App.Views.Components.ChartPoint>? filterChartData;
+    [ObservableProperty] private string shippingStreet = string.Empty;
+    [ObservableProperty] private string shippingCity = string.Empty;
+    [ObservableProperty] private string shippingState = string.Empty;
+    [ObservableProperty] private string shippingZipCode = string.Empty;
+    [ObservableProperty] private decimal walletBalance;
+    [ObservableProperty] private IReadOnlyList<Vaulta.Wallets.Contracts.WalletTransactionDto>? walletTransactions;
+    [ObservableProperty] private string withdrawAmount = string.Empty;
+
+    [RelayCommand]
+    private async Task RequestWithdrawalAsync(CancellationToken cancellationToken)
+    {
+        if (!decimal.TryParse(WithdrawAmount, out var amount) || amount <= 0)
+        {
+            StatusMessage = "Informe um valor válido para saque.";
+            return;
+        }
+        IsBusy = true;
+        StatusMessage = null;
+        try
+        {
+            var wallet = await _walletsClient.RequestWithdrawalAsync(new Vaulta.Wallets.Contracts.WithdrawRequest(amount), cancellationToken);
+            WalletBalance = wallet.Balance;
+            WithdrawAmount = string.Empty;
+            StatusMessage = "Solicitação de saque registrada com sucesso.";
+            await LoadWalletAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            StatusMessage = ApiErrorMessage(ex);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task LoadWalletAsync(CancellationToken cancellationToken)
+    {
+        IsBusy = true;
+        StatusMessage = null;
+        try
+        {
+            var wallet = await _walletsClient.GetMyWalletAsync(cancellationToken);
+            WalletBalance = wallet.Balance;
+            var page = await _walletsClient.GetTransactionsAsync(1, 20, cancellationToken);
+            WalletTransactions = page.Items;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            StatusMessage = $"Erro ao carregar carteira: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
     public bool HasStatusMessage => !string.IsNullOrWhiteSpace(StatusMessage);
+    public bool HasScanCandidates => ScanResult?.Candidates is { Count: > 0 };
     public ObservableCollection<string> SelectedTcgs { get; } = [];
     public ObservableCollection<string> VariantLabels { get; } = [];
     public ObservableCollection<ScreenCard> CatalogResults { get; } = [];
@@ -131,6 +240,18 @@ public partial class ExperienceViewModel : ObservableObject
     public string DisplayGreeting => string.IsNullOrWhiteSpace(_sessionState.User?.DisplayName) ? Screen.Title : $"Olá, {_sessionState.User.DisplayName}";
 
     public void RefreshGreeting() => OnPropertyChanged(nameof(DisplayGreeting));
+
+    public IReadOnlyList<Vaulta.App.Views.Components.ChartPoint> GetPortfolioChartData()
+    {
+        var history = _priceHistoryProvider.GetPortfolioHistory(days: 7);
+        return history.Select(p => new Vaulta.App.Views.Components.ChartPoint(p.Date, p.Value, p.Label)).ToList();
+    }
+
+    public IReadOnlyList<Vaulta.App.Views.Components.ChartPoint> GetCardChartData(Guid printingId)
+    {
+        var history = _priceHistoryProvider.GetCardPriceHistory(printingId, days: 30);
+        return history.Select(p => new Vaulta.App.Views.Components.ChartPoint(p.Date, p.Value, p.Label)).ToList();
+    }
 
     /// <summary>
     /// Called when the user taps a rendered card. Stores the real backend ID carried by that
@@ -145,6 +266,9 @@ public partial class ExperienceViewModel : ObservableObject
                 break;
             case "collection" when card.EntryId is { } entryId:
                 SelectedEntryId = entryId;
+                break;
+            case "market" when card.ItemId is { } listingId:
+                SelectedListingId = listingId;
                 break;
         }
     }
@@ -167,6 +291,12 @@ public partial class ExperienceViewModel : ObservableObject
                 break;
             case "home":
                 _ = LoadHomeSummaryAsync();
+                break;
+            case "profile":
+                _ = LoadProfileAsync();
+                break;
+            case "orders":
+                _ = LoadOrdersAsync();
                 break;
             case "add-to-collection":
                 // Entering the screen is a new voluntary intent; any previous retry key is discarded.
@@ -205,6 +335,173 @@ public partial class ExperienceViewModel : ObservableObject
         await SearchCatalogAsync(SearchText, CancellationToken.None);
     }
 
+    [RelayCommand]
+    private async Task ScanCardAsync(CancellationToken cancellationToken)
+    {
+        IsBusy = true;
+        StatusMessage = null;
+        try
+        {
+            var imageData = await _cameraService.CapturePhotoAsync(cancellationToken);
+            if (imageData is null || imageData.Length == 0)
+            {
+                StatusMessage = "Captura cancelada ou indisponível.";
+                return;
+            }
+
+            CapturedImageBytes = imageData;
+            var result = await _apiClient.ScanCardAsync(imageData, "pokemon", cancellationToken);
+            ScanResult = result;
+
+            if (result.Candidates.Count == 0)
+            {
+                StatusMessage = "Nenhuma carta identificada. Tente buscar pelo nome.";
+            }
+            else
+            {
+                StatusMessage = $"{result.Candidates.Count} resultado(s) encontrado(s).";
+            }
+
+            OnPropertyChanged(nameof(Screen));
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = ApiErrorMessage(exception);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task AddScannedCardToCollectionAsync(CardScanCandidateDto? candidate, CancellationToken cancellationToken)
+    {
+        if (candidate is null || candidate.PrintingId == Guid.Empty)
+        {
+            StatusMessage = "Nenhuma carta selecionada para adicionar.";
+            return;
+        }
+
+        IsBusy = true;
+        StatusMessage = null;
+        try
+        {
+            var intent = _addToCollectionIntent ??= new AddToCollectionIntent();
+            var request = new AddCollectibleItemsRequest(
+                PrintingId: candidate.PrintingId,
+                VariantId: null,
+                Quantity: 1,
+                Condition: "Near Mint",
+                AcquisitionPrice: candidate.EstimatedMarketValueBrl.HasValue
+                    ? new AcquisitionPrice(candidate.EstimatedMarketValueBrl.Value, "BRL")
+                    : null,
+                AcquisitionDate: DateOnly.FromDateTime(DateTime.Today),
+                Notes: $"Adicionado via scanner ({candidate.ConfidenceScore:P0} confiança)");
+
+            var response = await _collectionClient.AddItemsAsync(request, intent.IdempotencyKey, cancellationToken);
+            StatusMessage = $"Carta adicionada à coleção! ({response.Quantity} item(ns))";
+            _addToCollectionIntent = null;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = ApiErrorMessage(exception);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task LoadMarketplaceListingsAsync(CancellationToken cancellationToken)
+    {
+        IsBusy = true;
+        StatusMessage = null;
+        try
+        {
+            MarketplaceListings = await _marketplaceClient.ListActiveListingsAsync(page: 1, pageSize: 20, sort: "newest", cancellationToken: cancellationToken);
+            if (MarketplaceListings.Items.Count == 0)
+                StatusMessage = "Nenhum anúncio ativo no momento.";
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = ApiErrorMessage(exception);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task BuyListingAsync(Guid listingId, CancellationToken cancellationToken)
+    {
+        SelectedListingId = listingId;
+        ShippingStreet = string.Empty;
+        ShippingCity = string.Empty;
+        ShippingState = string.Empty;
+        ShippingZipCode = string.Empty;
+        StatusMessage = null;
+        await NavigateCommand.ExecuteAsync("checkout");
+    }
+
+    [RelayCommand]
+    private async Task SubmitCheckoutAsync(CancellationToken cancellationToken)
+    {
+        if (SelectedListingId is not Guid listingId)
+        {
+            StatusMessage = "Listing não disponível para checkout.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(ShippingStreet) ||
+            string.IsNullOrWhiteSpace(ShippingCity) ||
+            string.IsNullOrWhiteSpace(ShippingState) ||
+            string.IsNullOrWhiteSpace(ShippingZipCode))
+        {
+            StatusMessage = "Preencha todos os campos de endereço.";
+            return;
+        }
+
+        IsBusy = true;
+        StatusMessage = null;
+        try
+        {
+            var order = await _ordersClient.CreateOrderAsync(
+                new CreateOrderRequest(listingId, ShippingStreet.Trim(), ShippingCity.Trim(), ShippingState.Trim(), ShippingZipCode.Trim()), cancellationToken);
+            CurrentOrder = order;
+
+            var payment = await _paymentsClient.InitiatePaymentAsync(
+                new CreatePaymentRequest(order.Id, "PIX", null), cancellationToken);
+            CurrentPayment = payment;
+
+            StatusMessage = !string.IsNullOrWhiteSpace(payment.PixQrCode)
+                ? "Pedido criado! Use o QR Code PIX para pagar."
+                : "Pedido criado! Aguardando confirmação de pagamento.";
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = ApiErrorMessage(exception);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
     private async Task SearchCatalogAsync(string query, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(query))
@@ -231,6 +528,7 @@ public partial class ExperienceViewModel : ObservableObject
                     PrintingId: item.PrintingId));
             }
             StatusMessage = CatalogResults.Count == 0 ? "Nenhum resultado encontrado." : null;
+            UpdateFilterChartData(query);
             OnPropertyChanged(nameof(Screen));
         }
         catch (OperationCanceledException)
@@ -240,6 +538,12 @@ public partial class ExperienceViewModel : ObservableObject
         {
             StatusMessage = ApiErrorMessage(exception);
         }
+    }
+
+    private void UpdateFilterChartData(string? filterLabel)
+    {
+        var history = _priceHistoryProvider.GetFilterPriceHistory(filterLabel ?? "all", days: 7);
+        FilterChartData = history.Select(p => new Vaulta.App.Views.Components.ChartPoint(p.Date, p.Value, p.Label)).ToList();
     }
 
     private async Task LoadCardDetailAsync(Guid printingId)
@@ -452,8 +756,87 @@ public partial class ExperienceViewModel : ObservableObject
         "collection" => MergeCollection(baseScreen),
         "collection-item" => MergeCollectionItem(baseScreen),
         "home" => MergeHome(baseScreen),
+        "profile" => MergeProfile(baseScreen),
+        "orders" => MergeOrders(baseScreen),
         _ => baseScreen
     };
+
+    private async Task LoadProfileAsync()
+    {
+        if (_currentProfile is not null || !_sessionState.IsAuthenticated) return;
+        IsBusy = true;
+        try
+        {
+            var tokens = await _tokenStore.GetAsync(CancellationToken.None);
+            if (tokens is null) return;
+            _currentProfile = await _apiClient.GetCurrentUserAsync(tokens.AccessToken, CancellationToken.None);
+            OnPropertyChanged(nameof(Screen));
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = ApiErrorMessage(exception);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task LoadOrdersAsync()
+    {
+        if (_userOrders is not null || !_sessionState.IsAuthenticated) return;
+        IsBusy = true;
+        try
+        {
+            _userOrders = await _ordersClient.GetUserOrdersAsync(cancellationToken: CancellationToken.None);
+            OnPropertyChanged(nameof(Screen));
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = ApiErrorMessage(exception);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private ScreenDefinition MergeProfile(ScreenDefinition baseScreen)
+    {
+        if (_currentProfile is null) return baseScreen;
+        var profile = _currentProfile;
+        var interests = profile.TcgInterests.Length > 0 ? string.Join(", ", profile.TcgInterests) : "Nenhum TCG selecionado";
+        var location = !string.IsNullOrWhiteSpace(profile.Location?.City) && !string.IsNullOrWhiteSpace(profile.Location?.State)
+            ? $"{profile.Location.City}, {profile.Location.State}"
+            : "Localização não informada";
+        return baseScreen with
+        {
+            Title = profile.DisplayName,
+            Subtitle = $"@{profile.Username} · {location}",
+            Metrics = [new("INTERESSES", interests), new("MOEDA", profile.Preferences.Currency), new("IDIOMA", profile.Preferences.Language)],
+            Actions = [new("Editar perfil", "settings", true), new("Configurações", "settings"), new("Minha coleção", "collection"), new("Meus pedidos", "orders")]
+        };
+    }
+
+    private ScreenDefinition MergeOrders(ScreenDefinition baseScreen)
+    {
+        if (_userOrders is null) return baseScreen;
+        if (_userOrders.Items.Count == 0)
+            return baseScreen with { Title = "Meus Pedidos", Subtitle = "Você ainda não realizou nenhum pedido.", Cards = null, Metrics = null };
+
+        var cards = _userOrders.Items.Select(order => new ScreenCard(
+            order.Status.ToUpperInvariant(),
+            $"R$ {order.Snapshot.TotalAmountBrl:N2}",
+            $"{order.CreatedAt:dd/MM/yyyy HH:mm} · {order.Snapshot.Currency}",
+            order.TrackingCode ?? "Sem rastreio")).ToArray();
+        return baseScreen with
+        {
+            Title = "Meus Pedidos",
+            Subtitle = $"{_userOrders.TotalCount} pedido(s) encontrado(s)",
+            Cards = cards,
+            Metrics = [new("TOTAL", _userOrders.TotalCount.ToString()), new("PÁGINA", $"{_userOrders.Page}/{Math.Max(1, (_userOrders.TotalCount + _userOrders.PageSize - 1) / _userOrders.PageSize)}")]
+        };
+    }
 
     private ScreenDefinition MergeCardDetail(ScreenDefinition baseScreen)
     {
@@ -683,4 +1066,92 @@ public partial class ExperienceViewModel : ObservableObject
         _ => "Não foi possível concluir agora. Tente novamente em instantes."
     };
 
+    [RelayCommand]
+    private async Task PickSellPhotoAsync()
+    {
+        try
+        {
+            var photo = await MediaPicker.CapturePhotoAsync(new MediaPickerOptions { Title = "Foto do card" });
+            if (photo is null) return;
+
+            using var stream = await photo.OpenReadAsync();
+            var length = stream.Length;
+            var contentType = photo.ContentType ?? "image/jpeg";
+
+            var upload = await _assetClient.CreateUploadAsync(
+                new CreateAssetUploadRequest("LISTING_PHOTO", contentType, length, null));
+
+            stream.Position = 0;
+            await _assetClient.UploadToPresignedUrlAsync(upload.UploadUrl, stream, contentType);
+            await _assetClient.ConfirmUploadAsync(upload.AssetId);
+
+            _sellPhotoAssetIds.Add(upload.AssetId);
+            StatusMessage = $"Foto adicionada ({_sellPhotoAssetIds.Count}).";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Erro ao adicionar foto: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private async Task SubmitListingAsync()
+    {
+        if (IsBusy) return;
+        if (_sellPhotoAssetIds.Count == 0)
+        {
+            StatusMessage = "Adicione pelo menos uma foto antes de publicar.";
+            return;
+        }
+        if (SelectedPrintingId is null)
+        {
+            StatusMessage = "Selecione um card para vender.";
+            return;
+        }
+        if (!decimal.TryParse(AcquisitionCost, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.GetCultureInfo("pt-BR"), out var priceBrl) || priceBrl <= 0)
+        {
+            StatusMessage = "Informe um preço válido.";
+            return;
+        }
+
+        IsBusy = true;
+        StatusMessage = null;
+        try
+        {
+            var collectibleItemId = SelectedEntry?.Items.FirstOrDefault()?.Id ?? Guid.Empty;
+            var variantId = (!string.IsNullOrWhiteSpace(SelectedVariantLabel) &&
+                            _variantIdsByLabel.TryGetValue(SelectedVariantLabel, out var vid)) ? (Guid?)vid : null;
+
+            var listing = await _marketplaceClient.CreateListingAsync(new CreateListingRequest(
+                collectibleItemId,
+                SelectedPrintingId.Value,
+                variantId,
+                SelectedCondition.Trim(),
+                priceBrl,
+                string.IsNullOrWhiteSpace(ItemNotes) ? null : ItemNotes.Trim()));
+
+            for (var i = 0; i < _sellPhotoAssetIds.Count; i++)
+            {
+                await _marketplaceClient.AddListingPhotoAsync(listing.Id, new ListingPhotoRequest(
+                    _sellPhotoAssetIds[i],
+                    i == 0 ? "FRONT" : "OTHER",
+                    i));
+            }
+
+            _sellPhotoAssetIds.Clear();
+            ItemNotes = string.Empty;
+            SelectedCondition = "Near Mint";
+            AcquisitionCost = string.Empty;
+            StatusMessage = "Anúncio publicado com sucesso!";
+            await Shell.Current.GoToAsync("//main/market/market-page");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Erro ao publicar: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
 }

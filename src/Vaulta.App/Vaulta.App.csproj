@@ -1,65 +1,51 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-	<TargetFrameworks Condition="'$(BuildIos)' != 'true'">net10.0-android</TargetFrameworks>
-	<TargetFrameworks Condition="'$(BuildIos)' == 'true'">net10.0-android;net10.0-ios</TargetFrameworks>
-	<OutputType>Exe</OutputType>
-	<RootNamespace>Vaulta.App</RootNamespace>
-	<UseMaui>true</UseMaui>
-	<SingleProject>true</SingleProject>
-	<ApplicationTitle>Vaulta</ApplicationTitle>
-	<ApplicationId>br.com.vaulta.app</ApplicationId>
-	<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-	<ApplicationVersion>1</ApplicationVersion>
-	<MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
-  </PropertyGroup>
 
-  <PropertyGroup Condition="Exists('Resources/Fonts/Inter-Regular.ttf')">
-    <DefineConstants>$(DefineConstants);VAULTA_INTER_REGULAR</DefineConstants>
-  </PropertyGroup>
-  <PropertyGroup Condition="Exists('Resources/Fonts/Inter-Medium.ttf')">
-    <DefineConstants>$(DefineConstants);VAULTA_INTER_MEDIUM</DefineConstants>
-  </PropertyGroup>
-  <PropertyGroup Condition="Exists('Resources/Fonts/Inter-SemiBold.ttf')">
-    <DefineConstants>$(DefineConstants);VAULTA_INTER_SEMIBOLD</DefineConstants>
-  </PropertyGroup>
-  <PropertyGroup Condition="Exists('Resources/Fonts/Inter-Bold.ttf')">
-    <DefineConstants>$(DefineConstants);VAULTA_INTER_BOLD</DefineConstants>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFrameworks>net10.0-android</TargetFrameworks>
+		<OutputType>Exe</OutputType>
+		<RootNamespace>Vaulta.App</RootNamespace>
+		<UseMaui>true</UseMaui>
+		<SingleProject>true</SingleProject>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<ApplicationTitle>Vaulta</ApplicationTitle>
+		<ApplicationId>com.vaulta.app</ApplicationId>
+		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+		<ApplicationVersion>1</ApplicationVersion>
+		<UserSecretsId>vaulta-maui-app-dev</UserSecretsId>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
+	</PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
-    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
-  </PropertyGroup>
+	<PropertyGroup Condition="'$(BuildIos)' != 'true'">
+		<RuntimeIdentifiers>android-arm;android-arm64;android-x86;android-x64</RuntimeIdentifiers>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <MauiIcon Include="Resources\Images\logoapp.png" />
-    <MauiImage Include="Resources/Images/*.svg" />
-	<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
-	<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
-  </ItemGroup>
+	<!-- Suppress warnings from transitive SkiaSharp dependency (no patched version available) -->
+	<PropertyGroup>
+		<NoWarn>$(NoWarn);NU1903;XA0141</NoWarn>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <MauiImage Remove="Resources\Images\vaulta_splash.gif" />
-  </ItemGroup>
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="../Modules/Identity/Vaulta.Identity.Contracts/Vaulta.Identity.Contracts.csproj" />
-    <ProjectReference Include="../Vaulta.App.Core/Vaulta.App.Core.csproj" />
-    <EmbeddedResource Include="Configuration/appsettings.*.json" />
-  </ItemGroup>
+	<ItemGroup>
+		<MauiIcon Include="Resources\Images\logoapp.png" />
+		<MauiImage Include="Resources/Images/*.svg" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <MauiXaml Update="Resources\Styles\Components.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </MauiXaml>
-    <MauiXaml Update="Resources\Styles\Dimensions.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </MauiXaml>
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="../Modules/Identity/Vaulta.Identity.Contracts/Vaulta.Identity.Contracts.csproj" />
+		<ProjectReference Include="../Modules/Marketplace/Vaulta.Marketplace.Contracts/Vaulta.Marketplace.Contracts.csproj" />
+		<ProjectReference Include="../Modules/Orders/Vaulta.Orders.Contracts/Vaulta.Orders.Contracts.csproj" />
+		<ProjectReference Include="../Modules/Payments/Vaulta.Payments.Contracts/Vaulta.Payments.Contracts.csproj" />
+		<ProjectReference Include="../Modules/Wallets/Vaulta.Wallets.Contracts/Vaulta.Wallets.Contracts.csproj" />
+		<ProjectReference Include="../Vaulta.App.Core/Vaulta.App.Core.csproj" />
+	</ItemGroup>
 
-  <PropertyGroup Condition="'$(BuildIos)' != 'true'">
-    <RuntimeIdentifiers>android-arm;android-arm64;android-x86;android-x64</RuntimeIdentifiers>
-  </PropertyGroup>
 </Project>

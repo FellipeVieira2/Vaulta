@@ -121,6 +121,12 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
         if (screen.Id is "add-to-collection" or "sell")
             AddItemFields(screen, screen.Id == "sell");
 
+        if (screen.Id == "checkout")
+            AddCheckoutAddressFields();
+
+        if (screen.Id == "wallet")
+            AddWalletView();
+
         if (screen.Options is not null)
             AddOptions(screen);
 
@@ -131,10 +137,63 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
             _content.Children.Add(CreateCardArtwork(_viewModel.SelectedPrinting?.ArtworkUrl, screen.Title, 300));
 
         if (screen.Id == "collection-item")
+        {
             AddCollectionItemFields(screen);
+            var cardHistory = _viewModel.SelectedPrintingId.HasValue
+                ? _viewModel.GetCardChartData(_viewModel.SelectedPrintingId.Value)
+                : null;
+            _content.Children.Add(new Vaulta.App.Views.Components.VaultaChart
+            {
+                ChartHeight = 120,
+                ItemsSource = cardHistory
+            });
+        }
 
-        if (screen.Cards is not null)
+        if (screen.Id == "market")
+        {
+            _viewModel.LoadMarketplaceListingsCommand.Execute(CancellationToken.None);
+            if (_viewModel.MarketplaceListings is { Items.Count: > 0 })
+            {
+                foreach (var listing in _viewModel.MarketplaceListings.Items)
+                {
+                    var details = new VerticalStackLayout
+                    {
+                        Spacing = 6,
+                        Children =
+                        {
+                            CreateLabel($"R$ {listing.PriceBrl:N2}", "H3TextStyle", "BrandPrimary"),
+                            CreateLabel(listing.Condition, "CaptionTextStyle", "TextSecondary"),
+                            CreateLabel(listing.Status, "CaptionTextStyle", "StatusSuccess"),
+                            CreateLabel($"Criado em: {listing.CreatedAt:dd/MM/yyyy}", "CaptionTextStyle", "TextTertiary")
+                        }
+                    };
+                    if (!string.IsNullOrWhiteSpace(listing.Description))
+                        details.Children.Add(CreateLabel(listing.Description, "BodySmallTextStyle"));
+                    var viewBtn = CreateButton("Ver detalhes", false);
+                    viewBtn.Clicked += async (_, _) =>
+                    {
+                        _viewModel.SelectCard("market", new ScreenCard(
+                            Title: $"Listing {listing.Id:N}",
+                            Game: "Marketplace",
+                            Detail: listing.Condition,
+                            Price: $"R$ {listing.PriceBrl:N2}",
+                            ArtworkUrl: listing.Photos.FirstOrDefault()?.Url,
+                            ItemId: listing.Id));
+                        await _viewModel.NavigateCommand.ExecuteAsync("listing-detail");
+                    };
+                    details.Children.Add(viewBtn);
+                    _content.Children.Add(CreateSurface(details));
+                }
+            }
+            else if (!_viewModel.IsBusy)
+            {
+                _content.Children.Add(CreateLabel("Nenhum anúncio ativo no momento.", "BodyTextStyle", "TextSecondary"));
+            }
+        }
+        else if (screen.Cards is not null)
+        {
             AddCards(screen);
+        }
 
         var status = CreateLabel(null, "BodySmallTextStyle", "StatusWarning");
         status.SetBinding(Label.TextProperty, nameof(ExperienceViewModel.StatusMessage));
@@ -145,12 +204,25 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
         busy.SetBinding(IsVisibleProperty, nameof(ExperienceViewModel.IsBusy));
         _content.Children.Add(busy);
 
-        if (screen.Actions is null) return;
+        if (screen.Actions is null || screen.Id is "checkout" or "wallet") return;
         foreach (var action in screen.Actions)
         {
             var isGoogleSignIn = action.Title == "Continuar com Google";
             var button = isGoogleSignIn ? CreateGoogleSignInButton() : CreateButton(action.Title, action.IsPrimary);
-            button.Clicked += async (_, _) => await _viewModel.NavigateCommand.ExecuteAsync(action.Route);
+            if (screen.Id == "listing-detail" && action.Title == "Comprar agora")
+            {
+                button.Clicked += async (_, _) =>
+                {
+                    if (_viewModel.SelectedListingId is Guid listingId)
+                        await _viewModel.BuyListingCommand.ExecuteAsync(listingId);
+                    else
+                        _viewModel.StatusMessage = "ID do listing não disponível para compra.";
+                };
+            }
+            else
+            {
+                button.Clicked += async (_, _) => await _viewModel.NavigateCommand.ExecuteAsync(action.Route);
+            }
             if (action.Route is "login-submit" or "signup-submit")
                 button.Triggers.Add(new DataTrigger(typeof(Button))
                 {
@@ -406,39 +478,12 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
             }
         };
 
-        var chart = new Grid
+        var portfolioHistory = _viewModel.GetPortfolioChartData();
+        var chart = new Vaulta.App.Views.Components.VaultaChart
         {
-            HeightRequest = 100,
-            ColumnDefinitions =
-            {
-                new ColumnDefinition(GridLength.Star),
-                new ColumnDefinition(GridLength.Star),
-                new ColumnDefinition(GridLength.Star),
-                new ColumnDefinition(GridLength.Star),
-                new ColumnDefinition(GridLength.Star)
-            },
-            ColumnSpacing = 8,
-            VerticalOptions = LayoutOptions.End
+            ChartHeight = 140,
+            ItemsSource = portfolioHistory
         };
-        var barHeights = new double[] { 38, 56, 44, 75, 100 };
-        for (var index = 0; index < barHeights.Length; index++)
-        {
-            var bar = new Border
-            {
-                WidthRequest = 18,
-                HeightRequest = barHeights[index],
-                HorizontalOptions = LayoutOptions.Center,
-                VerticalOptions = LayoutOptions.End,
-                StrokeThickness = 0,
-                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(4) },
-                Background = index == barHeights.Length - 1
-                    ? new LinearGradientBrush(
-                        [new GradientStop(Color.FromArgb("#9B8DF5"), 0), new GradientStop(Color.FromArgb("#7D6BF0"), 1)],
-                        new Point(0, 0), new Point(0, 1))
-                    : new SolidColorBrush(index == 3 ? Color.FromArgb("#2A264D") : Color.FromArgb("#1C1D23"))
-            };
-            chart.Add(bar, index, 0);
-        }
 
         var valuePanel = new Border
         {
@@ -525,30 +570,66 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
     {
         if (screen.Id == "scanner")
         {
-            var cardFrame = new Border
+            var captureButton = CreateButton("📷  Escanear Carta", true);
+            captureButton.MinimumHeightRequest = 64;
+            captureButton.FontSize = 18;
+            captureButton.Clicked += async (_, _) => await _viewModel.ScanCardCommand.ExecuteAsync(CancellationToken.None);
+            SemanticProperties.SetDescription(captureButton, "Abrir câmera para escanear carta Pokémon");
+            _content.Children.Add(captureButton);
+
+            if (_viewModel.CapturedImageBytes is not null)
             {
-                HeightRequest = 350,
-                WidthRequest = 250,
-                HorizontalOptions = LayoutOptions.Center,
-                VerticalOptions = LayoutOptions.Center,
-                StrokeThickness = 2,
-                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(22) },
-                Content = new VerticalStackLayout
+                var preview = new Image
                 {
-                    VerticalOptions = LayoutOptions.Center,
-                    HorizontalOptions = LayoutOptions.Center,
-                    Spacing = 12,
-                    Children =
+                    Source = ImageSource.FromStream(() => new MemoryStream(_viewModel.CapturedImageBytes)),
+                    Aspect = Aspect.AspectFit,
+                    HeightRequest = 280,
+                    Margin = new Thickness(0, 16, 0, 0)
+                };
+                SemanticProperties.SetDescription(preview, "Foto da carta capturada");
+                _content.Children.Add(preview);
+            }
+
+            if (_viewModel.HasScanCandidates && _viewModel.ScanResult is not null)
+            {
+                _content.Children.Add(CreateLabel("Resultados encontrados:", "TitleTextStyle"));
+                foreach (var candidate in _viewModel.ScanResult.Candidates)
+                {
+                    var details = new VerticalStackLayout
                     {
-                        CreateLabel("✦", "H1TextStyle", "BrandPrimary"),
-                        CreateLabel("Área de captura", "BodySmallTextStyle")
-                    }
+                        Spacing = 6,
+                        Children =
+                        {
+                            CreateLabel(candidate.Name, "H3TextStyle"),
+                            CreateLabel($"{candidate.SetName} · #{candidate.CollectorNumber}", "BodySmallTextStyle"),
+                            CreateLabel($"Confiança: {candidate.ConfidenceScore:P0}", "CaptionTextStyle", "StatusSuccess")
+                        }
+                    };
+                    if (candidate.EstimatedMarketValueBrl.HasValue)
+                        details.Children.Add(CreateLabel($"Valor estimado: {candidate.EstimatedMarketValueBrl.Value:C2}", "LabelTextStyle", "BrandPrimary"));
+                    else
+                        details.Children.Add(CreateLabel("Valor de mercado indisponível", "CaptionTextStyle", "TextTertiary"));
+
+                    var addBtn = CreateButton("Adicionar à Coleção", true);
+                    addBtn.Clicked += async (_, _) =>
+                    {
+                        await _viewModel.AddScannedCardToCollectionCommand.ExecuteAsync(candidate);
+                        if (_viewModel.StatusMessage?.Contains("adicionada", StringComparison.OrdinalIgnoreCase) == true)
+                        {
+                            _viewModel.SelectCard("scan-candidates", new ScreenCard(
+                                Title: candidate.Name,
+                                Game: "Pokémon",
+                                Detail: $"{candidate.SetName} · #{candidate.CollectorNumber}",
+                                Price: candidate.EstimatedMarketValueBrl?.ToString("C2") ?? "Valor indisponível",
+                                ArtworkUrl: candidate.ArtworkUrl,
+                                Change: null));
+                            await _viewModel.NavigateCommand.ExecuteAsync("scan-confirmed");
+                        }
+                    };
+                    details.Children.Add(addBtn);
+                    _content.Children.Add(CreateSurface(details));
                 }
-            };
-            cardFrame.SetDynamicResource(VisualElement.BackgroundColorProperty, "SurfaceDefault");
-            cardFrame.SetDynamicResource(Border.StrokeProperty, "BrandPrimary");
-            _content.Children.Add(cardFrame);
-            _content.Children.Add(CreateLabel("A câmera será ativada quando a integração de captura estiver disponível.", "CaptionTextStyle"));
+            }
             return;
         }
 
@@ -561,23 +642,21 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
             return;
         }
 
-        if (screen.Id == "scan-result")
+        if (screen.Id == "scan-confirmed")
         {
-            var match = CreateSurface(new VerticalStackLayout
+            var confirmed = new VerticalStackLayout
             {
-                Spacing = 10,
+                Spacing = 12,
+                HorizontalOptions = LayoutOptions.Center,
                 Children =
                 {
-                    CreateLabel("98% DE PRECISÃO", "CaptionTextStyle", "StatusSuccess"),
-                    CreateLabel("Match perfeito", "H3TextStyle"),
-                    CreateLabel("Pikachu VMAX · Lost Origin · 029/196", "BodySmallTextStyle")
+                    CreateLabel("✓", "DisplayTextStyle", "StatusSuccess"),
+                    CreateLabel("Carta adicionada com sucesso!", "H2TextStyle"),
+                    CreateLabel("Sua coleção foi atualizada.", "BodyTextStyle", "TextSecondary")
                 }
-            });
-            _content.Children.Add(match);
+            };
+            _content.Children.Add(CreateSurface(confirmed));
         }
-
-        if (screen.Id == "scan-confirmed")
-            _content.Children.Add(CreateLabel("✓", "DisplayTextStyle", "StatusSuccess"));
     }
 
     private void AddAuthenticationFields(bool registration)
@@ -618,6 +697,16 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
                 filters.Children.Add(filter);
             }
             _content.Children.Add(new ScrollView { Orientation = ScrollOrientation.Horizontal, Content = filters });
+
+            // Filter-specific price variation chart (updates when a filter/search is applied)
+            var filterChart = new Vaulta.App.Views.Components.VaultaChart
+            {
+                ChartHeight = 100,
+                Margin = new Thickness(0, 12, 0, 0)
+            };
+            filterChart.SetBinding(Vaulta.App.Views.Components.VaultaChart.ItemsSourceProperty,
+                new Binding(nameof(_viewModel.FilterChartData), source: _viewModel));
+            _content.Children.Add(filterChart);
         }
     }
 
@@ -641,9 +730,51 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
         if (includeListingFields)
             AddEntry("Descrição do anúncio (opcional)", "Detalhes de envio, idioma ou estado...", nameof(ExperienceViewModel.ItemNotes));
 
-        var photoButton = CreateButton("Adicionar foto real", false);
-        photoButton.Clicked += (_, _) => _viewModel.NavigateCommand.Execute("unsupported");
-        _content.Children.Add(photoButton);
+        if (includeListingFields)
+        {
+            var photoButton = CreateButton("📷 Adicionar foto do card", false);
+            photoButton.Clicked += async (_, _) => await _viewModel.PickSellPhotoCommand.ExecuteAsync(null);
+            _content.Children.Add(photoButton);
+
+            var submitButton = CreateButton("Publicar anúncio", true);
+            submitButton.Clicked += async (_, _) => await _viewModel.SubmitListingCommand.ExecuteAsync(null);
+            _content.Children.Add(submitButton);
+        }
+        else
+        {
+            var photoButton = CreateButton("Adicionar foto real", false);
+            photoButton.Clicked += (_, _) => _viewModel.NavigateCommand.Execute("unsupported");
+            _content.Children.Add(photoButton);
+        }
+    }
+
+    private void AddCheckoutAddressFields()
+    {
+        AddEntry("Rua / Logradouro", "Ex: Rua das Flores, 123", nameof(ExperienceViewModel.ShippingStreet));
+        AddEntry("Cidade", "Ex: São Paulo", nameof(ExperienceViewModel.ShippingCity));
+        AddEntry("Estado", "Ex: SP", nameof(ExperienceViewModel.ShippingState));
+        AddEntry("CEP", "00000-000", nameof(ExperienceViewModel.ShippingZipCode), Keyboard.Numeric);
+
+        var submitButton = CreateButton("Confirmar e pagar", true);
+        submitButton.Clicked += async (_, _) => await _viewModel.SubmitCheckoutCommand.ExecuteAsync(null);
+        _content.Children.Add(submitButton);
+    }
+
+    private void AddWalletView()
+    {
+        var balanceLabel = CreateLabel("R$ 0,00", "TitleTextStyle", "BrandPrimary");
+        balanceLabel.SetBinding(Label.TextProperty, new Binding(nameof(ExperienceViewModel.WalletBalance), stringFormat: "R$ {0:N2}"));
+        _content.Children.Add(balanceLabel);
+
+        _content.Children.Add(CreateLabel("HISTÓRICO DE TRANSAÇÕES", "CaptionTextStyle"));
+        _content.Children.Add(CreateLabel("Carregando transações...", "BodySmallTextStyle", "TextSecondary"));
+
+        AddEntry("Valor do saque", "Ex: 150,00", nameof(ExperienceViewModel.WithdrawAmount), Keyboard.Numeric);
+        var withdrawButton = CreateButton("Solicitar saque", true);
+        withdrawButton.Clicked += async (_, _) => await _viewModel.RequestWithdrawalCommand.ExecuteAsync(null);
+        _content.Children.Add(withdrawButton);
+
+        _ = _viewModel.LoadWalletCommand.ExecuteAsync(null);
     }
 
     private void AddEntry(string label, string placeholder, string propertyName, Keyboard? keyboard = null, bool isPassword = false)
@@ -764,7 +895,72 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
         }
     }
 
-    private Label CreateLabel(string? text, string style, string? colorResource = null)
+    private Border CreatePortfolioChart()
+{
+// Simulated 7-day price history for the portfolio chart (replace with real API data later)
+var values = new double[] { 12450, 12380, 12520, 12490, 12610, 12580, 12720 };
+var min = values.Min();
+var max = values.Max();
+var range = max - min > 0 ? max - min : 1;
+var chartHeight = 120.0;
+var pointCount = values.Length;
+var grid = new Grid
+{
+HeightRequest = chartHeight,
+ColumnSpacing = 0,
+RowSpacing = 0,
+VerticalOptions = LayoutOptions.End,
+HorizontalOptions = LayoutOptions.Fill
+};
+// Add column definitions
+for (int i = 0; i < pointCount; i++)
+grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+// Build vertical bar segments representing price movement per period
+for (int i = 0; i < pointCount - 1; i++)
+{
+var norm = (values[i] - min) / range;
+var barHeight = Math.Max(chartHeight * norm, 2);
+var isUp = values[i + 1] >= values[i];
+var bar = new Border
+{
+WidthRequest = 6,
+HeightRequest = barHeight,
+HorizontalOptions = LayoutOptions.Center,
+VerticalOptions = LayoutOptions.End,
+StrokeThickness = 0,
+StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(3) },
+Background = new SolidColorBrush(isUp ? Color.FromArgb("#22D3EE") : Color.FromArgb("#FB7185")),
+Margin = new Thickness(0, 0, 0, 0)
+};
+grid.Add(bar, i, 0);
+}
+// Add data points as circles
+for (int i = 0; i < pointCount; i++)
+{
+var norm = (values[i] - min) / range;
+var y = chartHeight * (1 - norm);
+var dot = new Border
+{
+WidthRequest = 8,
+HeightRequest = 8,
+StrokeThickness = 0,
+StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(4) },
+Background = new SolidColorBrush(Color.FromArgb("#22D3EE")),
+VerticalOptions = LayoutOptions.End,
+HorizontalOptions = LayoutOptions.Center,
+Margin = new Thickness(0, 0, 0, y)
+};
+grid.Add(dot, i, 0);
+}
+return new Border
+{
+Content = grid,
+Padding = new Thickness(16, 8, 16, 16),
+StrokeThickness = 1,
+StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(16) }
+};
+}
+private Label CreateLabel(string? text, string style, string? colorResource = null)
     {
         var label = new Label { Text = text, Style = (Style)Application.Current!.Resources[style] };
         if (colorResource is not null)

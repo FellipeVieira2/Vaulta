@@ -33,6 +33,42 @@
     <Project Path="src/Modules/Collection/Vaulta.Collection.Domain/Vaulta.Collection.Domain.csproj" />
     <Project Path="src/Modules/Collection/Vaulta.Collection.Infrastructure/Vaulta.Collection.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Marketplace/">
+    <Project Path="src/Modules/Marketplace/Vaulta.Marketplace.Application/Vaulta.Marketplace.Application.csproj" />
+    <Project Path="src/Modules/Marketplace/Vaulta.Marketplace.Contracts/Vaulta.Marketplace.Contracts.csproj" />
+    <Project Path="src/Modules/Marketplace/Vaulta.Marketplace.Domain/Vaulta.Marketplace.Domain.csproj" />
+    <Project Path="src/Modules/Marketplace/Vaulta.Marketplace.Infrastructure/Vaulta.Marketplace.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Orders/">
+    <Project Path="src/Modules/Orders/Vaulta.Orders.Application/Vaulta.Orders.Application.csproj" />
+    <Project Path="src/Modules/Orders/Vaulta.Orders.Contracts/Vaulta.Orders.Contracts.csproj" />
+    <Project Path="src/Modules/Orders/Vaulta.Orders.Domain/Vaulta.Orders.Domain.csproj" />
+    <Project Path="src/Modules/Orders/Vaulta.Orders.Infrastructure/Vaulta.Orders.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Payments/">
+    <Project Path="src/Modules/Payments/Vaulta.Payments.Application/Vaulta.Payments.Application.csproj" />
+    <Project Path="src/Modules/Payments/Vaulta.Payments.Contracts/Vaulta.Payments.Contracts.csproj" />
+    <Project Path="src/Modules/Payments/Vaulta.Payments.Domain/Vaulta.Payments.Domain.csproj" />
+    <Project Path="src/Modules/Payments/Vaulta.Payments.Infrastructure/Vaulta.Payments.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Reviews/">
+    <Project Path="src/Modules/Reviews/Vaulta.Reviews.Application/Vaulta.Reviews.Application.csproj" />
+    <Project Path="src/Modules/Reviews/Vaulta.Reviews.Contracts/Vaulta.Reviews.Contracts.csproj" />
+    <Project Path="src/Modules/Reviews/Vaulta.Reviews.Domain/Vaulta.Reviews.Domain.csproj" />
+    <Project Path="src/Modules/Reviews/Vaulta.Reviews.Infrastructure/Vaulta.Reviews.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Shipping/">
+    <Project Path="src/Modules/Shipping/Vaulta.Shipping.Application/Vaulta.Shipping.Application.csproj" />
+    <Project Path="src/Modules/Shipping/Vaulta.Shipping.Contracts/Vaulta.Shipping.Contracts.csproj" />
+    <Project Path="src/Modules/Shipping/Vaulta.Shipping.Domain/Vaulta.Shipping.Domain.csproj" />
+    <Project Path="src/Modules/Shipping/Vaulta.Shipping.Infrastructure/Vaulta.Shipping.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Wallets/">
+    <Project Path="src/Modules/Wallets/Vaulta.Wallets.Application/Vaulta.Wallets.Application.csproj" />
+    <Project Path="src/Modules/Wallets/Vaulta.Wallets.Contracts/Vaulta.Wallets.Contracts.csproj" />
+    <Project Path="src/Modules/Wallets/Vaulta.Wallets.Domain/Vaulta.Wallets.Domain.csproj" />
+    <Project Path="src/Modules/Wallets/Vaulta.Wallets.Infrastructure/Vaulta.Wallets.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Vaulta.App.Core.UnitTests/Vaulta.App.Core.UnitTests.csproj" />
     <Project Path="tests/Vaulta.ArchitectureTests/Vaulta.ArchitectureTests.csproj" />

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Vaulta.Wallets.Application/Vaulta.Wallets.Application.csproj" />
+    <ProjectReference Include="../Vaulta.Wallets.Domain/Vaulta.Wallets.Domain.csproj" />
+    <ProjectReference Include="../../Identity/Vaulta.Identity.Application/Vaulta.Identity.Application.csproj" />
+    <ProjectReference Include="../../../Vaulta.SharedKernel/Vaulta.SharedKernel.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.*" />
+  </ItemGroup>
+</Project>

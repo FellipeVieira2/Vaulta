@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Vaulta.Wallets.Contracts/Vaulta.Wallets.Contracts.csproj" />
+    <ProjectReference Include="../Vaulta.Wallets.Domain/Vaulta.Wallets.Domain.csproj" />
+    <ProjectReference Include="../../../Vaulta.SharedKernel/Vaulta.SharedKernel.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" Version="11.*" />
+  </ItemGroup>
+</Project>

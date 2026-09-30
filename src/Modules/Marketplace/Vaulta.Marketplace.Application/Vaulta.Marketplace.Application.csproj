@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+<ItemGroup>
+<ProjectReference Include="../Vaulta.Marketplace.Domain/Vaulta.Marketplace.Domain.csproj" />
+<ProjectReference Include="../Vaulta.Marketplace.Contracts/Vaulta.Marketplace.Contracts.csproj" />
+<ProjectReference Include="../../Catalog/Vaulta.Catalog.Contracts/Vaulta.Catalog.Contracts.csproj" />
+<ProjectReference Include="../../Assets/Vaulta.Assets.Contracts/Vaulta.Assets.Contracts.csproj" />
+<ProjectReference Include="../../Collection/Vaulta.Collection.Contracts/Vaulta.Collection.Contracts.csproj" />
+<PackageReference Include="FluentValidation" Version="12.0.0" />
+</ItemGroup>
+</Project>

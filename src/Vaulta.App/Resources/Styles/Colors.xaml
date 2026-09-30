@@ -38,28 +38,39 @@
     <Color x:Key="PrimitiveError500">#DB3838</Color>
     <Color x:Key="PrimitiveError600">#B82626</Color>
 
-    <Color x:Key="BackgroundPrimary">#0A0A0D</Color>
-    <Color x:Key="BackgroundSecondary">#121217</Color>
-    <Color x:Key="BackgroundTertiary">#17171C</Color>
-    <Color x:Key="SurfaceDefault">#121217</Color>
-    <Color x:Key="SurfaceElevated">#1C1F24</Color>
-    <Color x:Key="SurfaceOverlay">#1C1F24</Color>
-    <Color x:Key="TextPrimary">#FFFFFF</Color>
-    <Color x:Key="TextSecondary">#8C919E</Color>
-    <Color x:Key="TextTertiary">#8C919E</Color>
-    <Color x:Key="TextDisabled">#474D57</Color>
-    <Color x:Key="TextInverse">#0A0A0D</Color>
-    <Color x:Key="BorderDefault">#2E3038</Color>
-    <Color x:Key="BorderSubtle">#1C1F24</Color>
-    <Color x:Key="BorderStrong">#666B78</Color>
-    <Color x:Key="BrandPrimary">#7D6BF0</Color>
-    <Color x:Key="BrandSecondary">#6654DB</Color>
-    <Color x:Key="BrandMuted">#382B7D</Color>
-    <Color x:Key="StatusSuccess">#33C766</Color>
-    <Color x:Key="StatusWarning">#FABF2E</Color>
-    <Color x:Key="StatusError">#F05454</Color>
-    <Color x:Key="InteractiveDefault">#7D6BF0</Color>
-    <Color x:Key="InteractiveHover">#9987FA</Color>
-    <Color x:Key="InteractivePressed">#5442BF</Color>
-    <Color x:Key="InteractiveDisabled">#2E3038</Color>
+    <!-- Base surfaces with improved contrast hierarchy -->
+    <Color x:Key="BackgroundPrimary">#08080B</Color>
+    <Color x:Key="BackgroundSecondary">#0E0E14</Color>
+    <Color x:Key="BackgroundTertiary">#15151D</Color>
+    <Color x:Key="SurfaceDefault">#111118</Color>
+    <Color x:Key="SurfaceElevated">#1A1A24</Color>
+    <Color x:Key="SurfaceOverlay">#22222E</Color>
+
+    <!-- Text hierarchy with clearer differentiation -->
+    <Color x:Key="TextPrimary">#F4F4F8</Color>
+    <Color x:Key="TextSecondary">#9CA0B0</Color>
+    <Color x:Key="TextTertiary">#6B7084</Color>
+    <Color x:Key="TextDisabled">#3E4254</Color>
+    <Color x:Key="TextInverse">#08080B</Color>
+
+    <!-- Borders with visible separation -->
+    <Color x:Key="BorderDefault">#2A2A38</Color>
+    <Color x:Key="BorderSubtle">#1E1E2A</Color>
+    <Color x:Key="BorderStrong">#5A5E72</Color>
+
+    <!-- Brand: distinctive teal-cyan for TCG/collector identity (not generic purple) -->
+    <Color x:Key="BrandPrimary">#22D3EE</Color>
+    <Color x:Key="BrandSecondary">#0EA5E9</Color>
+    <Color x:Key="BrandMuted">#0C4A6E</Color>
+
+    <!-- Status colors with better vibrancy on dark backgrounds -->
+    <Color x:Key="StatusSuccess">#34D399</Color>
+    <Color x:Key="StatusWarning">#FBBF24</Color>
+    <Color x:Key="StatusError">#FB7185</Color>
+
+    <!-- Interactive states aligned to new brand -->
+    <Color x:Key="InteractiveDefault">#22D3EE</Color>
+    <Color x:Key="InteractiveHover">#67E8F9</Color>
+    <Color x:Key="InteractivePressed">#0891B2</Color>
+    <Color x:Key="InteractiveDisabled">#2A2A38</Color>
 </ResourceDictionary>

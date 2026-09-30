@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Vaulta.Catalog.Contracts;
 using Vaulta.Identity.Contracts;
 
 namespace Vaulta.App.Services.Api;
@@ -34,6 +35,33 @@ public sealed class VaultaApiClient(HttpClient httpClient) : IVaultaApiClient
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<MyProfileDto>(cancellationToken)
             ?? throw new InvalidDataException("The API returned an empty profile response.");
+    }
+
+    public async Task<CardScanResultDto> ScanCardAsync(byte[] imageData, string? gameCode, CancellationToken cancellationToken = default)
+    {
+        using var content = new MultipartFormDataContent();
+        var imageContent = new ByteArrayContent(imageData);
+        imageContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+        content.Add(imageContent, "image", "card.jpg");
+        if (gameCode is not null)
+            content.Add(new StringContent(gameCode), "gameCode");
+
+        using var response = await httpClient.PostAsync("api/v1/scanner/identify", content, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<CardScanResultDto>(cancellationToken)
+            ?? throw new InvalidDataException("The scanner API returned an empty response.");
+    }
+
+    public async Task<CardScanResultDto> SearchCardsAsync(string query, string? gameCode, CancellationToken cancellationToken = default)
+    {
+        var url = $"api/v1/scanner/search?query={Uri.EscapeDataString(query)}";
+        if (gameCode is not null)
+            url += $"&gameCode={Uri.EscapeDataString(gameCode)}";
+
+        using var response = await httpClient.GetAsync(url, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<CardScanResultDto>(cancellationToken)
+            ?? throw new InvalidDataException("The search API returned an empty response.");
     }
 
     private async Task<TResponse> PostAsync<TRequest, TResponse>(string path, TRequest request, CancellationToken cancellationToken)
