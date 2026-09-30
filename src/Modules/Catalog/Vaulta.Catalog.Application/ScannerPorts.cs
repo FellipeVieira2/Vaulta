@@ -17,3 +17,8 @@ public sealed record CardRecognitionCandidate(
     string? Currency,
     IReadOnlyList<string> VariantCodes,
     double ConfidenceScore);
+
+public interface IExternalIdResolver
+{
+    Task<IReadOnlyDictionary<string, Guid>> ResolvePrintingIdsAsync(IReadOnlyList<string> externalIds, CancellationToken cancellationToken);
+}

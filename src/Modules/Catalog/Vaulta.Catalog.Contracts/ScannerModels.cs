@@ -12,6 +12,7 @@ public sealed record CardScanCandidateDto(
     decimal? EstimatedMarketValueBrl,
     string? Currency,
     IReadOnlyList<string> VariantCodes,
-    double ConfidenceScore);
+    double ConfidenceScore,
+    string? ExternalPrintingId = null);
 
 public sealed record CardScanResultDto(IReadOnlyList<CardScanCandidateDto> Candidates);

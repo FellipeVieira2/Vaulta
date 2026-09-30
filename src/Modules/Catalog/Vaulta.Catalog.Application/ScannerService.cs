@@ -11,7 +11,8 @@ public interface ICardSearchProvider
 public sealed class ScannerService(
     IEnumerable<ICardRecognitionProvider> recognitionProviders,
     IEnumerable<ICardSearchProvider> searchProviders,
-    ICatalogSearch catalogSearch)
+    ICatalogSearch catalogSearch,
+    IExternalIdResolver externalIdResolver)
 {
     public async Task<CardScanResultDto> IdentifyAsync(CardScanRequest request, CancellationToken cancellationToken)
     {
@@ -46,7 +47,7 @@ public sealed class ScannerService(
             }
         }
 
-        return MapResult(candidates);
+        return await MapResult(candidates, cancellationToken);
     }
 
     public async Task<CardScanResultDto> SearchByNameAsync(string query, string? gameCode, CancellationToken cancellationToken)
@@ -82,24 +83,41 @@ public sealed class ScannerService(
             }
         }
 
-        return MapResult(candidates);
+        return await MapResult(candidates, cancellationToken);
     }
 
-    private static CardScanResultDto MapResult(List<CardRecognitionCandidate> candidates)
+    private async Task<CardScanResultDto> MapResult(List<CardRecognitionCandidate> candidates, CancellationToken cancellationToken)
     {
-        var dtos = candidates
-            .OrderByDescending(c => c.ConfidenceScore)
-            .Select(c => new CardScanCandidateDto(
-                Guid.TryParse(c.PrintingId, out var id) ? id : Guid.Empty,
-                c.Name,
-                c.SetName,
-                c.CollectorNumber,
-                c.Rarity,
-                c.ArtworkUrl,
-                c.EstimatedMarketValueBrl,
-                c.Currency,
-                c.VariantCodes,
-                c.ConfidenceScore))
+        var ordered = candidates.OrderByDescending(c => c.ConfidenceScore).ToList();
+        var externalIds = ordered
+            .Where(c => !Guid.TryParse(c.PrintingId, out _))
+            .Select(c => c.PrintingId)
+            .Distinct()
+            .ToList();
+
+        var resolved = externalIds.Count > 0
+            ? await externalIdResolver.ResolvePrintingIdsAsync(externalIds, cancellationToken)
+            : new Dictionary<string, Guid>();
+
+        var dtos = ordered
+            .Select(c =>
+            {
+                var hasGuid = Guid.TryParse(c.PrintingId, out var guid);
+                var printingId = hasGuid ? guid : (resolved.TryGetValue(c.PrintingId, out var resolvedId) ? resolvedId : Guid.Empty);
+                var externalPrintingId = !hasGuid ? c.PrintingId : null;
+                return new CardScanCandidateDto(
+                    printingId,
+                    c.Name,
+                    c.SetName,
+                    c.CollectorNumber,
+                    c.Rarity,
+                    c.ArtworkUrl,
+                    c.EstimatedMarketValueBrl,
+                    c.Currency,
+                    c.VariantCodes,
+                    c.ConfidenceScore,
+                    externalPrintingId);
+            })
             .ToArray();
 
         return new CardScanResultDto(dtos);

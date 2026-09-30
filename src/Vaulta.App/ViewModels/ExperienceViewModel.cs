@@ -391,7 +391,8 @@ public partial class ExperienceViewModel : ObservableObject
             }
 
             CapturedImageBytes = imageData;
-            var result = await _apiClient.ScanCardAsync(imageData, "pokemon", cancellationToken);
+            var gameCode = SelectedTcgs.Count > 0 ? SelectedTcgs[0]?.ToLowerInvariant() : "pokemon";
+            var result = await _apiClient.ScanCardAsync(imageData, gameCode, cancellationToken);
             ScanResult = result;
 
             if (result.Candidates.Count == 0)
@@ -421,9 +422,20 @@ public partial class ExperienceViewModel : ObservableObject
     [RelayCommand]
     private async Task AddScannedCardToCollectionAsync(CardScanCandidateDto? candidate, CancellationToken cancellationToken)
     {
-        if (candidate is null || candidate.PrintingId == Guid.Empty)
+        if (candidate is null)
         {
             StatusMessage = "Nenhuma carta selecionada para adicionar.";
+            return;
+        }
+
+        // Use ExternalPrintingId as fallback when PrintingId was not resolved to a Vaulta GUID
+        var printingId = candidate.PrintingId != Guid.Empty
+            ? candidate.PrintingId
+            : (Guid.TryParse(candidate.ExternalPrintingId, out var parsed) ? parsed : Guid.Empty);
+
+        if (printingId == Guid.Empty)
+        {
+            StatusMessage = "Não foi possível identificar esta carta no catálogo. Tente buscar manualmente.";
             return;
         }
 
@@ -433,7 +445,7 @@ public partial class ExperienceViewModel : ObservableObject
         {
             var intent = _addToCollectionIntent ??= new AddToCollectionIntent();
             var request = new AddCollectibleItemsRequest(
-                PrintingId: candidate.PrintingId,
+                PrintingId: printingId,
                 VariantId: null,
                 Quantity: 1,
                 Condition: "Near Mint",

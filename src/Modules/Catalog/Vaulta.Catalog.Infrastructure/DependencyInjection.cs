@@ -30,6 +30,9 @@ public static class DependencyInjection
         });
         services.AddScoped<ICardRecognitionProvider>(p => p.GetRequiredService<PokemonTcgRecognitionProvider>());
         services.AddScoped<ICardSearchProvider>(p => p.GetRequiredService<PokemonTcgRecognitionProvider>());
+        services.AddScoped<IExternalIdResolver, ExternalIdResolver>();
+        services.AddSingleton<Recognition.IOcrService, Recognition.TesseractOcrService>();
+        services.AddScoped<Recognition.FuzzyCardSearchService>();
         services.AddScoped<ScannerService>();
         services.AddScoped<ICatalogSync, CatalogSyncService>();
         services.AddScoped<CatalogQueries>();

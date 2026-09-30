@@ -10,11 +10,20 @@ public static class ScannerEndpoints
     {
         var scanner = app.MapGroup("/api/v1/scanner").WithTags("Scanner").RequireAuthorization();
 
-        scanner.MapPost("/identify", async (CardScanRequest request, ScannerService service, CancellationToken ct) =>
+        scanner.MapPost("/identify", async (IFormFile image, string? gameCode, ScannerService service, CancellationToken ct) =>
         {
+            if (image is null || image.Length == 0)
+                return Results.BadRequest(new { error = "Image file is required." });
+
+            using var stream = image.OpenReadStream();
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream, ct);
+            var imageData = memoryStream.ToArray();
+
+            var request = new CardScanRequest(Convert.ToBase64String(imageData), gameCode);
             var result = await service.IdentifyAsync(request, ct);
             return Results.Ok(result);
-        }).WithName("IdentifyCard").Produces<CardScanResultDto>().ProducesProblem(400).ProducesProblem(401);
+        }).WithName("IdentifyCard").DisableAntiforgery().Produces<CardScanResultDto>().ProducesProblem(400).ProducesProblem(401);
 
         scanner.MapGet("/search", async (string query, string? gameCode, ScannerService service, CancellationToken ct) =>
         {

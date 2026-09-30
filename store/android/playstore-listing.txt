@@ -1,0 +1,42 @@
+Título (30 caracteres máx):
+Vaulta - Sua Coleção TCG
+
+Descrição Curta (80 caracteres máx):
+Organize, acompanhe o valor e gerencie sua coleção de cartas TCG em um só lugar.
+
+Descrição Completa:
+Vaulta é o app definitivo para colecionadores de Trading Card Games (TCG). Organize sua coleção, acompanhe valores de mercado e descubra novas cartas em uma experiência premium.
+
+🎴 ORGANIZE SUA COLEÇÃO
+• Catalogue cartas de Pokémon, Magic, Yu-Gi-Oh!, One Piece e mais
+• Escaneie cartas com a câmera para identificação automática
+• Acompanhe quantidade, condição e custo de aquisição
+• Visualize o valor estimado do seu acervo
+
+💰 ACOMPANHE O MERCADO
+• Veja preços de mercado atualizados
+• Histórico de preços por carta
+• Tendências de valorização da sua coleção
+• Portfólio com métricas detalhadas
+
+🛒 MERCADO VAULTA
+• Compre e venda cartas com outros colecionadores
+• Publique anúncios com fotos reais
+• Checkout integrado com endereço e pagamento
+• Carteira digital para saques
+
+📱 EXPERIÊNCIA PREMIUM
+• Design escuro elegante otimizado para colecionadores
+• Navegação intuitiva por abas
+• Busca inteligente por nome, set ou expansão
+• Gráficos interativos de desempenho
+
+🔒 SEGURANÇA E PRIVACIDADE
+• Autenticação segura com senha forte
+• Tokens armazenados localmente
+• Conexão HTTPS criptografada
+• Seus dados são seus
+
+Vaulta transforma a maneira como você gerencia sua coleção de TCG. Baixe agora e comece a organizar seu vault!
+
+Tags: tcg, pokemon, magic, yugioh, one piece, coleção, trading cards, marketplace, portfolio

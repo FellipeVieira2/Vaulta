@@ -8,5 +8,8 @@
 	<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
 	<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.6" />
 	<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.6"><PrivateAssets>all</PrivateAssets></PackageReference>
+		<PackageReference Include="Tesseract" Version="5.2.0" />
+		<PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+		<PackageReference Include="FuzzySharp" Version="2.0.2" />
   </ItemGroup>
 </Project>

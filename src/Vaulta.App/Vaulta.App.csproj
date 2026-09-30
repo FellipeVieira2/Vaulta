@@ -14,6 +14,16 @@
 		<ApplicationVersion>1</ApplicationVersion>
 		<UserSecretsId>vaulta-maui-app-dev</UserSecretsId>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
+
+		<!-- Android signing configuration for Play Store publication (only when keystore password is provided) -->
+		<AndroidKeyStore Condition="'$(Configuration)' == 'Release' AND '$(VAULTA_KEYSTORE_PASS)' != ''">true</AndroidKeyStore>
+		<AndroidSigningKeyStore Condition="'$(Configuration)' == 'Release' AND '$(VAULTA_KEYSTORE_PASS)' != ''">vaulta-release.keystore</AndroidSigningKeyStore>
+		<AndroidSigningKeyAlias Condition="'$(Configuration)' == 'Release' AND '$(VAULTA_KEYSTORE_PASS)' != ''">vaulta</AndroidSigningKeyAlias>
+		<AndroidSigningKeyPass Condition="'$(Configuration)' == 'Release' AND '$(VAULTA_KEYSTORE_PASS)' != ''">$(VAULTA_KEYSTORE_PASS)</AndroidSigningKeyPass>
+		<AndroidSigningStorePass Condition="'$(Configuration)' == 'Release' AND '$(VAULTA_KEYSTORE_PASS)' != ''">$(VAULTA_KEYSTORE_PASS)</AndroidSigningStorePass>
+
+		<!-- Target SDK for Play Store compliance (API 36 supported by .NET 10 SDK) -->
+		<TargetPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">36.0</TargetPlatformVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(BuildIos)' != 'true'">
@@ -30,7 +40,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<MauiIcon Include="Resources\Images\logoapp.png" />
+		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appicon.svg" Color="#030817" />
 		<MauiImage Include="Resources/Images/*.svg" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
@@ -46,6 +56,10 @@
 		<ProjectReference Include="../Modules/Payments/Vaulta.Payments.Contracts/Vaulta.Payments.Contracts.csproj" />
 		<ProjectReference Include="../Modules/Wallets/Vaulta.Wallets.Contracts/Vaulta.Wallets.Contracts.csproj" />
 		<ProjectReference Include="../Vaulta.App.Core/Vaulta.App.Core.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<EmbeddedResource Include="Configuration\appsettings.*.json" />
 	</ItemGroup>
 
 </Project>

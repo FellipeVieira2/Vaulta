@@ -3,24 +3,49 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Vaulta.Catalog.Application;
+using Vaulta.Catalog.Infrastructure.Recognition;
 
 namespace Vaulta.Catalog.Infrastructure;
 
 public sealed class PokemonTcgRecognitionProvider(
     HttpClient httpClient,
+    IOcrService ocrService,
+    FuzzyCardSearchService fuzzySearch,
     ILogger<PokemonTcgRecognitionProvider> logger) : ICardRecognitionProvider, ICardSearchProvider
 {
     public string GameCode => "pokemon";
 
     public async Task<IReadOnlyList<CardRecognitionCandidate>> IdentifyAsync(byte[] imageData, CancellationToken cancellationToken)
     {
-        // MVP: Image recognition requires external ML service. For now, we return empty
-        // and the app should fallback to text search via ICatalogSearch.
-        // Future: integrate with Google Vision / AWS Rekognition / custom model to extract
-        // card name/set from the image, then query pokemontcg.io for full details + pricing.
-        logger.LogWarning("Image-based card recognition not yet implemented. Use text search fallback.");
-        await Task.CompletedTask;
-        return [];
+        try
+        {
+            var ocrResult = await ocrService.ExtractTextAsync(imageData, cancellationToken);
+            if (string.IsNullOrWhiteSpace(ocrResult.RawText))
+            {
+                logger.LogWarning("OCR returned no text from card image");
+                return [];
+            }
+
+            logger.LogInformation("OCR extracted {CharCount} chars, {RegionCount} regions from card image",
+                ocrResult.RawText.Length, ocrResult.Regions.Count);
+
+            var candidates = await fuzzySearch.SearchAsync(ocrResult, GameCode, cancellationToken);
+            if (candidates.Count == 0)
+            {
+                logger.LogWarning("Fuzzy search found no matches for OCR-extracted text");
+                return [];
+            }
+
+            logger.LogInformation("Scanner identified {Count} candidate(s), best confidence: {Confidence:P1}",
+                candidates.Count, candidates[0].ConfidenceScore);
+
+            return candidates;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Card recognition failed unexpectedly");
+            return [];
+        }
     }
 
     public async Task<IReadOnlyList<CardRecognitionCandidate>> SearchByNameAsync(string query, CancellationToken cancellationToken)
@@ -62,7 +87,6 @@ public sealed class PokemonTcgRecognitionProvider(
 
     private static decimal? ExtractPrice(PokemonTcgCard card)
     {
-        // Prefer TCGPlayer market price, fallback to Cardmarket averageSellPrice
         var tcgPrices = card.Tcgplayer?.Prices;
         if (tcgPrices is not null)
         {
