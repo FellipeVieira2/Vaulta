@@ -77,11 +77,7 @@ if (app.Environment.IsProduction()) ProductionConfiguration.Validate(app.Configu
 _ = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<JwtOptions>>().Value;
 if (args.Contains("--migrate") || builder.Configuration.GetValue<bool>("Database:ApplyMigrations"))
 {
-    await using var scope = app.Services.CreateAsyncScope();
-    await scope.ServiceProvider.GetRequiredService<IdentityDbContext>().Database.MigrateAsync();
-    await scope.ServiceProvider.GetRequiredService<CatalogDbContext>().Database.MigrateAsync();
-    await scope.ServiceProvider.GetRequiredService<AssetsDbContext>().Database.MigrateAsync();
-    await scope.ServiceProvider.GetRequiredService<CollectionDbContext>().Database.MigrateAsync();
+    await DatabaseMigrations.ApplyAsync(app.Services);
     if (args.Contains("--migrate")) return;
 }
 if (await CatalogCommands.TryExecute(app, args)) return;
