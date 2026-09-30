@@ -50,7 +50,7 @@ Command → Handler → Aggregate → DbContext
                                Outbox → Event Dispatcher
 ```
 
-As setas mostram o fluxo de execução, não dependências de assemblies. Domain depende apenas de SharedKernel; Infrastructure implementa os ports da Application. [Decisões arquiteturais](docs/architecture.md).
+As setas mostram o fluxo de execução, não dependências de assemblies. Domain depende apenas de SharedKernel; Infrastructure implementa os ports da Application. [Decisões arquiteturais](docs/architecture.md). [Regras de negócio](docs/regras-de-negocio.md).
 
 ## Executar com Docker
 
