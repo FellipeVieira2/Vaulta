@@ -87,6 +87,10 @@ public sealed class UserProfile
     public string? CountryCode { get; private set; }
     public string? State { get; private set; }
     public string? City { get; private set; }
+    public string? ShippingStreet { get; private set; }
+    public string? ShippingCity { get; private set; }
+    public string? ShippingState { get; private set; }
+    public string? ShippingZipCode { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
     internal void Update(string name, string? bio, string? avatar, string? country, string? state, string? city, DateTimeOffset now)
@@ -94,6 +98,14 @@ public sealed class UserProfile
         DisplayName = IdentityRules.Required(name, 100, "displayName"); Bio = IdentityRules.Optional(bio, 500, "bio");
         AvatarUrl = IdentityRules.Avatar(avatar); CountryCode = IdentityRules.Country(country);
         State = IdentityRules.Optional(state, 100, "state"); City = IdentityRules.Optional(city, 100, "city"); UpdatedAt = now;
+    }
+    public void UpdateShippingAddress(string? street, string? city, string? state, string? zipCode, DateTimeOffset now)
+    {
+        ShippingStreet = IdentityRules.Optional(street, 200, "shippingStreet");
+        ShippingCity = IdentityRules.Optional(city, 100, "shippingCity");
+        ShippingState = IdentityRules.Optional(state, 100, "shippingState");
+        ShippingZipCode = IdentityRules.Optional(zipCode, 9, "shippingZipCode");
+        UpdatedAt = now;
     }
 }
 

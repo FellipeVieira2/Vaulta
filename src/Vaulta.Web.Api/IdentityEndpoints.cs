@@ -46,6 +46,11 @@ public static class IdentityEndpoints
             context.Response.Headers.ETag = ETag(next); return Results.NoContent();
         }).WithName("UpdatePreferences").WithDescription("Send current ETag in If-Match. Supported currencies: BRL/USD/EUR; languages: pt-BR/en-US/es-ES; IANA time zone; TCGs: POKEMON/MAGIC/YUGIOH/ONE_PIECE.")
             .Produces(204).ProducesProblem(400).ProducesProblem(401).ProducesProblem(409);
+        me.MapPut("/shipping-address", async (UpdateShippingAddressRequest request, HttpContext context, CommandHandlers handler, CancellationToken ct) =>
+        {
+            await handler.Handle(new UpdateShippingAddressCommand(UserId(context.User), request.Street, request.City, request.State, request.ZipCode), ct);
+            return Results.NoContent();
+        }).WithName("UpdateShippingAddress").Produces(204).ProducesProblem(400).ProducesProblem(401);
         me.MapPost("/change-password", async (ChangePasswordRequest request, ClaimsPrincipal principal, CommandHandlers handler, CancellationToken ct) =>
         {
             await handler.Handle(new ChangePasswordCommand(UserId(principal), request), ct); return Results.NoContent();
@@ -59,3 +64,5 @@ public static class IdentityEndpoints
     private static Guid ParseVersion(string? version) => Guid.TryParse(version?.Trim('"'), out var id)
         ? id : throw new DomainException("Send the current ETag from GET /me in the If-Match header.");
 }
+
+public sealed record UpdateShippingAddressRequest(string? Street, string? City, string? State, string? ZipCode);

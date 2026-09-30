@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "arena": {
+      "source": "Jakeschincariol/arena-skill",
+      "sourceType": "github",
+      "skillPath": "skills/arena/SKILL.md",
+      "computedHash": "1446bb7b09c400bf70d05e8001dec9f32c89127f4ef4bbe54c3d4a1d527ab4ef"
+    }
+  }
+}

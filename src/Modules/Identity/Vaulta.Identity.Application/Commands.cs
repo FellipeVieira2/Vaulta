@@ -9,3 +9,4 @@ public sealed record LogoutCommand(Guid UserId, string Token);
 public sealed record UpdateProfileCommand(Guid UserId, Guid ExpectedVersion, ProfilePatch Patch);
 public sealed record UpdatePreferencesCommand(Guid UserId, Guid ExpectedVersion, PreferencesPatch Patch);
 public sealed record ChangePasswordCommand(Guid UserId, ChangePasswordRequest Request);
+public sealed record UpdateShippingAddressCommand(Guid UserId, string? Street, string? City, string? State, string? ZipCode);

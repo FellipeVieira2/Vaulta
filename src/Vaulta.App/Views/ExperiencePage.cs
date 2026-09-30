@@ -750,10 +750,21 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
 
     private void AddCheckoutAddressFields()
     {
+        AddEntry("CEP", "00000-000", nameof(ExperienceViewModel.ShippingZipCode), Keyboard.Numeric);
+
+        var addressLoadingIndicator = new ActivityIndicator
+        {
+            Color = ColorResource("BrandPrimary"),
+            HeightRequest = 20,
+            Margin = new Thickness(0, -8, 0, 4)
+        };
+        addressLoadingIndicator.SetBinding(ActivityIndicator.IsRunningProperty, nameof(ExperienceViewModel.IsAddressLoading));
+        addressLoadingIndicator.SetBinding(IsVisibleProperty, nameof(ExperienceViewModel.IsAddressLoading));
+        _content.Children.Add(addressLoadingIndicator);
+
         AddEntry("Rua / Logradouro", "Ex: Rua das Flores, 123", nameof(ExperienceViewModel.ShippingStreet));
         AddEntry("Cidade", "Ex: São Paulo", nameof(ExperienceViewModel.ShippingCity));
         AddEntry("Estado", "Ex: SP", nameof(ExperienceViewModel.ShippingState));
-        AddEntry("CEP", "00000-000", nameof(ExperienceViewModel.ShippingZipCode), Keyboard.Numeric);
 
         var submitButton = CreateButton("Confirmar e pagar", true);
         submitButton.Clicked += async (_, _) => await _viewModel.SubmitCheckoutCommand.ExecuteAsync(null);

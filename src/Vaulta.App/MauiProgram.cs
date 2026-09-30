@@ -10,6 +10,7 @@ using Vaulta.App.Core.Marketplace;
 using Vaulta.App.Core.Orders;
 using Vaulta.App.Core.Payments;
 using Vaulta.App.Core.Wallets;
+using Vaulta.App.Core.Address;
 using Vaulta.App.Services.Api;
 using Vaulta.App.Services.Authentication;
 using Vaulta.App.Services.Camera;
@@ -100,6 +101,8 @@ public static class MauiProgram
         builder.Services.AddHttpClient<IWalletsClient, WalletsClient>((serviceProvider, client) =>
                 client.BaseAddress = ResolveBaseAddress(serviceProvider))
             .AddHttpMessageHandler<AuthorizingHttpMessageHandler>();
+        builder.Services.AddHttpClient<IViaCepClient, ViaCepClient>(client =>
+                client.BaseAddress = new Uri("https://viacep.com.br/ws/"));
 
         // AssetClient needs two HttpClients: one authorized (create/confirm) and one bare
         // (the presigned S3/MinIO PUT must carry only the URL's own signature, never our Bearer token).

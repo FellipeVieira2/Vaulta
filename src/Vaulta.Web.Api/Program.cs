@@ -85,6 +85,7 @@ if (args.Contains("--migrate") || builder.Configuration.GetValue<bool>("Database
     if (args.Contains("--migrate")) return;
 }
 if (await CatalogCommands.TryExecute(app, args)) return;
+if (await SeedAdminCommand.TryExecute(app, args)) return;
 
 app.UseForwardedHeaders();
 app.Use(async (context, next) =>

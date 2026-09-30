@@ -10,8 +10,10 @@ public sealed record LocationDto(string? CountryCode, string? State, string? Cit
 public sealed record PreferencesDto(string Currency, string Language, string TimeZone);
 public sealed record UserSummaryDto(Guid Id, string Username, string DisplayName, string? AvatarUrl);
 public sealed record AuthResponse(string AccessToken, int ExpiresIn, string RefreshToken, UserSummaryDto User);
+public sealed record ShippingAddressDto(string? Street, string? City, string? State, string? ZipCode);
 public sealed record MyProfileDto(Guid Id, string Email, string Username, string DisplayName, string? Bio,
-    string? AvatarUrl, LocationDto Location, PreferencesDto Preferences, string[] TcgInterests, Guid Version);
+    string? AvatarUrl, LocationDto Location, PreferencesDto Preferences, string[] TcgInterests,
+    ShippingAddressDto? DefaultShippingAddress, Guid Version);
 public sealed record PublicProfileDto(string Username, string DisplayName, string? Bio, string? AvatarUrl, LocationDto Location);
 
 // Setters distinguish omitted properties (keep) from explicit null (clear).

@@ -12,4 +12,5 @@ public interface IVaultaApiClient
     Task<MyProfileDto> GetCurrentUserAsync(string accessToken, CancellationToken cancellationToken = default);
     Task<CardScanResultDto> ScanCardAsync(byte[] imageData, string? gameCode, CancellationToken cancellationToken = default);
     Task<CardScanResultDto> SearchCardsAsync(string query, string? gameCode, CancellationToken cancellationToken = default);
+    Task UpdateShippingAddressAsync(string accessToken, string? street, string? city, string? state, string? zipCode, CancellationToken cancellationToken = default);
 }

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Vaulta.App.Core.Address;
 using Vaulta.App.Core.Assets;
 using Vaulta.App.Core.Catalog;
 using Vaulta.App.Core.Collection;
@@ -103,12 +104,14 @@ public partial class ExperienceViewModel : ObservableObject
     private readonly IOrdersClient _ordersClient;
     private readonly IPaymentsClient _paymentsClient;
     private readonly IWalletsClient _walletsClient;
+    private readonly IViaCepClient _viaCepClient;
     private readonly IPriceHistoryProvider _priceHistoryProvider;
     private readonly ITokenStore _tokenStore;
     private readonly IAssetClient _assetClient;
     private readonly Dictionary<string, Guid> _variantIdsByLabel = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<Guid> _sellPhotoAssetIds = [];
     private CancellationTokenSource? _searchDebounceCts;
+    private CancellationTokenSource? _cepDebounceCts;
     private AddToCollectionIntent? _addToCollectionIntent;
     private Guid? _loadedPrintingId;
     private bool _collectionLoadedOnce;
@@ -126,6 +129,7 @@ public partial class ExperienceViewModel : ObservableObject
         IOrdersClient ordersClient,
         IPaymentsClient paymentsClient,
         IWalletsClient walletsClient,
+        IViaCepClient viaCepClient,
         IPriceHistoryProvider priceHistoryProvider,
         ITokenStore tokenStore,
         IAssetClient assetClient)
@@ -140,6 +144,7 @@ public partial class ExperienceViewModel : ObservableObject
         _ordersClient = ordersClient;
         _paymentsClient = paymentsClient;
         _walletsClient = walletsClient;
+        _viaCepClient = viaCepClient;
         _priceHistoryProvider = priceHistoryProvider;
         _tokenStore = tokenStore;
         _assetClient = assetClient;
@@ -174,7 +179,43 @@ public partial class ExperienceViewModel : ObservableObject
     [ObservableProperty] private string shippingCity = string.Empty;
     [ObservableProperty] private string shippingState = string.Empty;
     [ObservableProperty] private string shippingZipCode = string.Empty;
+    [ObservableProperty] private bool isAddressLoading;
     [ObservableProperty] private decimal walletBalance;
+
+    partial void OnShippingZipCodeChanged(string value)
+    {
+        _cepDebounceCts?.Cancel();
+        _cepDebounceCts = new CancellationTokenSource();
+        _ = LookupAddressAsync(value, _cepDebounceCts.Token);
+    }
+
+    private async Task LookupAddressAsync(string cep, CancellationToken cancellationToken)
+    {
+        var cleanCep = new string(cep.Where(char.IsDigit).ToArray());
+        if (cleanCep.Length != 8) return;
+
+        try
+        {
+            await Task.Delay(300, cancellationToken);
+            IsAddressLoading = true;
+            var result = await _viaCepClient.GetByCepAsync(cleanCep, cancellationToken);
+            if (result is not null)
+            {
+                ShippingStreet = result.Logradouro ?? string.Empty;
+                ShippingCity = result.Localidade ?? string.Empty;
+                ShippingState = result.Uf ?? string.Empty;
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Silently ignore lookup failures; user can still type manually
+        }
+        finally
+        {
+            if (!cancellationToken.IsCancellationRequested)
+                IsAddressLoading = false;
+        }
+    }
     [ObservableProperty] private IReadOnlyList<Vaulta.Wallets.Contracts.WalletTransactionDto>? walletTransactions;
     [ObservableProperty] private string withdrawAmount = string.Empty;
 
@@ -447,10 +488,11 @@ public partial class ExperienceViewModel : ObservableObject
     private async Task BuyListingAsync(Guid listingId, CancellationToken cancellationToken)
     {
         SelectedListingId = listingId;
-        ShippingStreet = string.Empty;
-        ShippingCity = string.Empty;
-        ShippingState = string.Empty;
-        ShippingZipCode = string.Empty;
+        var savedAddress = _currentProfile?.DefaultShippingAddress;
+        ShippingStreet = savedAddress?.Street ?? string.Empty;
+        ShippingCity = savedAddress?.City ?? string.Empty;
+        ShippingState = savedAddress?.State ?? string.Empty;
+        ShippingZipCode = savedAddress?.ZipCode ?? string.Empty;
         StatusMessage = null;
         await NavigateCommand.ExecuteAsync("checkout");
     }
@@ -488,6 +530,25 @@ public partial class ExperienceViewModel : ObservableObject
             StatusMessage = !string.IsNullOrWhiteSpace(payment.PixQrCode)
                 ? "Pedido criado! Use o QR Code PIX para pagar."
                 : "Pedido criado! Aguardando confirmação de pagamento.";
+
+            try
+            {
+                var tokens = await _tokenStore.GetAsync(CancellationToken.None);
+                if (tokens is not null)
+                {
+                    await _apiClient.UpdateShippingAddressAsync(
+                        tokens.AccessToken,
+                        ShippingStreet.Trim(),
+                        ShippingCity.Trim(),
+                        ShippingState.Trim(),
+                        ShippingZipCode.Trim(),
+                        cancellationToken);
+                }
+            }
+            catch
+            {
+                // Address save is best-effort; order was already created successfully
+            }
         }
         catch (OperationCanceledException)
         {

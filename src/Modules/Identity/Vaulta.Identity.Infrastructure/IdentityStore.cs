@@ -24,7 +24,11 @@ internal sealed class IdentityStore(IdentityDbContext db) : IIdentityStore, IPro
         .Select(x => new MyProfileDto(x.Id, x.Email, x.Profile.Username, x.Profile.DisplayName, x.Profile.Bio, x.Profile.AvatarUrl,
             new LocationDto(x.Profile.CountryCode, x.Profile.State, x.Profile.City),
             new PreferencesDto(x.Preferences.PreferredCurrency, x.Preferences.Language, x.Preferences.TimeZone),
-            x.TcgInterests.Select(t => t.TcgCode).ToArray(), x.Version)).SingleOrDefaultAsync(ct);
+            x.TcgInterests.Select(t => t.TcgCode).ToArray(),
+            x.Profile.ShippingStreet != null || x.Profile.ShippingCity != null || x.Profile.ShippingState != null || x.Profile.ShippingZipCode != null
+                ? new ShippingAddressDto(x.Profile.ShippingStreet, x.Profile.ShippingCity, x.Profile.ShippingState, x.Profile.ShippingZipCode)
+                : null,
+            x.Version)).SingleOrDefaultAsync(ct);
     public Task<PublicProfileDto?> GetPublic(string username, CancellationToken ct) => db.Users.AsNoTracking()
         .Where(x => x.Profile.NormalizedUsername == username && (x.Status == UserStatus.Active || x.Status == UserStatus.PendingVerification))
         .Select(x => new PublicProfileDto(x.Profile.Username, x.Profile.DisplayName, x.Profile.Bio, x.Profile.AvatarUrl,

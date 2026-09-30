@@ -64,6 +64,15 @@ public sealed class VaultaApiClient(HttpClient httpClient) : IVaultaApiClient
             ?? throw new InvalidDataException("The search API returned an empty response.");
     }
 
+    public async Task UpdateShippingAddressAsync(string accessToken, string? street, string? city, string? state, string? zipCode, CancellationToken cancellationToken = default)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Put, "api/v1/me/shipping-address");
+        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        message.Content = JsonContent.Create(new { Street = street, City = city, State = state, ZipCode = zipCode });
+        using var response = await httpClient.SendAsync(message, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
     private async Task<TResponse> PostAsync<TRequest, TResponse>(string path, TRequest request, CancellationToken cancellationToken)
     {
         using var response = await httpClient.PostAsJsonAsync(path, request, cancellationToken);

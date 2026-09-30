@@ -89,6 +89,12 @@ public sealed class CommandHandlers(IIdentityStore store, IPasswordService passw
         user.ChangePassword(passwords.Hash(r.NewPassword), clock.UtcNow);
         await store.RevokeSessions(user.Id, clock.UtcNow, ct); await store.Save(ct);
     }
+    public async Task Handle(UpdateShippingAddressCommand command, CancellationToken ct)
+    {
+        var user = await RequireUser(command.UserId, ct);
+        user.Profile.UpdateShippingAddress(command.Street, command.City, command.State, command.ZipCode, clock.UtcNow);
+        await store.Save(ct);
+    }
     private async Task<User> RequireUser(Guid id, CancellationToken ct) => await store.FindUser(id, ct) ?? throw new NotFoundException("User not found.");
     private static void CheckVersion(User user, Guid version)
     {
