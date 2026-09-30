@@ -25,6 +25,16 @@ docker tag vaulta-api:test 142767402064.dkr.ecr.us-east-1.amazonaws.com/vaulta-a
 "${compose[@]}" up -d --wait --wait-timeout 120 postgres
 # Automatic migrations are disabled; migrate before starting the API.
 "${compose[@]}" run --rm --no-deps vaulta-api --migrate
+# Exercise the actual CLI twice and require tables from every previously omitted module.
+"${compose[@]}" run --rm --no-deps vaulta-api --migrate
+module_tables=$("${compose[@]}" exec -T postgres sh -c 'exec psql -X -At -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
+SELECT count(*) FROM (VALUES
+    ('marketplace.listings'), ('orders.orders'), ('payments.payment_transactions'),
+    ('wallets.wallets'), ('wallets.wallet_ledger_entries'), ('shipping.shipments'), ('reviews.reviews')
+) AS expected(name) WHERE to_regclass(name) IS NOT NULL;
+SQL
+)
+[[ "$module_tables" == 7 ]]
 "${compose[@]}" up -d --no-deps vaulta-api
 wait_ready() {
     for ((i=0; i<60; i++)); do

@@ -113,7 +113,44 @@ O bloco de geração é **somente para o primeiro provisionamento do arquivo**; 
 
 O deploy valida secrets sem exibi-los, adquire lock local, autentica no ECR via role, faz pull, inicia/aguarda o banco sem recriá-lo, executa `compose run --rm --no-deps vaulta-api --migrate`, e só então recria a API e aguarda readiness. Login Docker fica em diretório temporário privado, removido no fim. Em erro são mostrados estágio, status e últimas 60 linhas dos logs.
 
-**Se migration falhar, a API anterior não é substituída.** As migrations de quatro DbContexts não são uma única transação global; um módulo já aplicado pode permanecer atualizado se outro falhar. Novas migrations devem ser compatíveis com a versão anterior (expand/contract). Não basta preservar o container para garantir compatibilidade de schema. Antes de migrations com dados reais, faça backup e revise compatibilidade.
+O comando `--migrate` atualiza os dez módulos sequencialmente: Identity, Catalog, Assets, Collection, Marketplace, Orders, Payments, Wallets, Shipping e Reviews. Identity cria a tabela compartilhada de Outbox primeiro; os demais módulos não a recriam. Cada contexto usa a mesma conexão `ConnectionStrings:Vaulta` e o histórico de migrations existente. Wallets inclui sua migration inicial e snapshot.
+
+**Se migration falhar, a API anterior não é substituída.** As migrations dos dez DbContexts não são uma única transação global; um módulo já aplicado pode permanecer atualizado se outro falhar. Novas migrations devem ser compatíveis com a versão anterior (expand/contract). Não basta preservar o container para garantir compatibilidade de schema. Antes de migrations com dados reais, faça backup e revise compatibilidade.
+
+### Atualizar um banco que contém apenas os quatro primeiros módulos
+
+Publique uma nova tag imutável da imagem contendo esta correção, seguindo o procedimento de build/teste/push acima. Atualizar somente os arquivos da EC2 não altera o código nem as migrations dentro da imagem antiga. Após integrar e revisar a correção, atualize o checkout da EC2 e execute como `ec2-user`:
+
+```bash
+cd /opt/vaulta
+git pull --ff-only
+./scripts/backup-postgres.sh
+# Execute somente se o backup terminou com sucesso. Use a nova tag publicada.
+./scripts/deploy-production.sh <NOVA_TAG_PUBLICADA_NO_ECR>
+```
+
+O deploy aplica somente migrations ainda não registradas; não exige seed de administrador nem remoção de volumes. Os testes `DatabaseMigrationTests` cobrem banco vazio e atualização de um banco com as 11 migrations de Identity/Catalog/Assets/Collection, preservando usuário, Outbox e saldo/lançamento de Wallets após uma segunda execução.
+
+Confira o histórico e os novos módulos com consultas de leitura:
+
+```bash
+./scripts/production-compose.sh exec -T postgres sh -c \
+  'exec psql -X -w -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' <<'SQL'
+BEGIN READ ONLY;
+SELECT current_database(), current_user;
+SELECT "MigrationId" FROM public."__EFMigrationsHistory" ORDER BY "MigrationId";
+SELECT to_regclass('marketplace.listings') AS marketplace,
+       to_regclass('orders.orders') AS orders,
+       to_regclass('payments.payment_transactions') AS payments,
+       to_regclass('wallets.wallets') AS wallets,
+       to_regclass('wallets.wallet_ledger_entries') AS wallet_ledger,
+       to_regclass('shipping.shipments') AS shipping,
+       to_regclass('reviews.reviews') AS reviews;
+ROLLBACK;
+SQL
+```
+
+Todos os campos da consulta `to_regclass` devem estar preenchidos. Readiness confirma conexão ao banco, mas não substitui essa verificação de esquema. Não execute `EnsureCreated`, `down -v` ou apague o histórico para contornar falha de migration.
 
 ## Nginx, TLS, forwarded headers e CORS
 
