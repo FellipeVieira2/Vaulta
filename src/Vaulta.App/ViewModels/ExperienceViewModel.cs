@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Vaulta.App.Core.Address;
@@ -62,15 +62,16 @@ public static class ScreenCatalog
         new("onboarding-2", "Descubra quanto ela vale", "Acompanhe valores, veja tendências e mantenha seu portfólio sempre à vista.", "VALOR DA COLEÇÃO · R$ 24.850,00", Actions: [new("Criar minha conta", "signup", true), new("Entrar", "login")]),
         new("login", "Bem-vindo de volta", "Acesse sua coleção e continue de onde parou.", "ENTRAR NA VAULTA", Actions: [new("Esqueci minha senha", "unsupported"), new("Entrar", "login-submit", true), new("Continuar com Google", "unsupported"), new("Criar conta", "signup")]),
         new("signup", "Sua coleção começa aqui", "Crie sua conta para organizar e acompanhar seus TCGs.", "CRIAR CONTA", Actions: [new("Criar conta", "signup-submit", true), new("Continuar com Google", "unsupported"), new("Já tenho uma conta · Entrar", "login")]),
-        new("home", "Olá, colecionador", "Sua coleção, oportunidades e cartas favoritas em um só lugar.", "BEM-VINDO À VAULTA", Notice: "Prévia de interface · os dados de mercado e portfólio ainda são demonstrativos.", Metrics: [new("ESTIMATIVA TOTAL", "Indisponível", "Pricing ainda não integrado"), new("CARTAS", "0", "na coleção")]),
-        new("collection", "Minha coleção", "Suas cartas e o valor estimado do seu acervo.", "MEU VAULT", Metrics: [new("CARTAS", "0"), new("VALOR ESTIMADO", "Indisponível")], Actions: [new("Adicionar carta", "catalog", true)]),
+        new("home", "Olá, colecionador", "Sua coleção, oportunidades e cartas favoritas em um só lugar.", "BEM-VINDO À VAULTA", Notice: "Prévia de interface · os dados de mercado e portfólio ainda são demonstrativos.", Metrics: [new("ESTIMATIVA TOTAL", "Indisponível", "Pricing ainda não integrado"), new("CARTAS", "0", "na coleção")], Actions: [new("Escanear carta", "scanner", true), new("Buscar carta", "catalog")]),
+        new("collection", "Minha coleção", "Suas cartas e o valor estimado do seu acervo.", "MEU VAULT", Metrics: [new("CARTAS", "0"), new("VALOR ESTIMADO", "Indisponível")], Actions: [new("Escanear carta", "scanner", true), new("Adicionar carta", "catalog")]),
         new("empty-collection", "Sua coleção começa aqui", "Escaneie ou busque sua primeira carta para acompanhar seu acervo.", "MEU VAULT", Actions: [new("Escanear carta", "scanner", true), new("Buscar manualmente", "catalog"), new("Adicionar anúncio", "market")]),
         new("catalog", "Encontre sua próxima carta", "Busque cartas, sets e expansões de diferentes TCGs.", "CATÁLOGO", InputHint: "Buscar carta, set ou expansão...", Options: ["Pokémon", "Magic", "Yu-Gi-Oh!", "One Piece"], Actions: [new("Abrir detalhes", "card-detail", true)]),
         new("search-results", "Resultados da busca", "Cartas encontradas no catálogo Vaulta.", "CATÁLOGO", InputHint: "Buscar carta, set ou expansão...", Actions: [new("Ver carta", "card-detail", true)]),
-        new("card-detail", "Carregando carta...", "Selecione uma carta no catálogo para ver os detalhes.", "DETALHES DA CARTA", Metrics: [new("PREÇO DE MERCADO", "Indisponível", "Pricing ainda não integrado")], Actions: [new("Adicionar à coleção", "add-to-collection", true), new("Adicionar à wishlist", "wishlist")]),
-        new("add-to-collection", "Adicionar à coleção", "Registre condição, quantidade e custo de aquisição.", "NOVO ITEM", Metrics: [new("PREÇO DE MERCADO", "Indisponível", "Pricing ainda não integrado")], Options: ["Mint", "Near Mint", "Lightly Played", "Moderately Played", "Heavily Played", "Damaged"], Actions: [new("Adicionar à coleção", "add-to-collection-submit", true)]),
+        new("card-detail", "Carregando carta...", "Selecione uma carta no catálogo para ver os detalhes.", "DETALHES DA CARTA", Actions: [new("Adicionar à coleção", "add-to-collection", true), new("Adicionar à wishlist", "wishlist")]),
+        new("add-to-collection", "Adicionar à coleção", "Registre condição, quantidade e custo de aquisição.", "NOVO ITEM", Options: ["Mint", "Near Mint", "Lightly Played", "Moderately Played", "Heavily Played", "Damaged"], Actions: [new("Adicionar à coleção", "add-to-collection-submit", true)]),
         new("collection-item", "Detalhes do card", "Charizard ex · Obsidian Flames · 125/197", "SUA COLEÇÃO", Metrics: [new("PAGO INICIAL", "R$ 65,00"), new("PREÇO DE MERCADO", "R$ 89,90"), new("LUCRO ESTIMADO", "+ R$ 24,90")], Actions: [new("Editar anúncio", "sell", true), new("Vender item", "sell"), new("Remover da coleção", "collection")]),
-        new("scanner", "Centralize o card", "Enquadre a carta inteira e evite reflexos para obter uma identificação melhor.", "SCANNER", Actions: [new("Identificar carta", "scanner-analyzing", true), new("Buscar manualmente", "catalog")]),
+        new("scanner", "Centralize o card", "Enquadre a carta inteira e evite reflexos para obter uma identificação melhor.", "SCANNER", Actions: [new("Buscar manualmente", "catalog")]),
+        new("scanner-card-detail", "Informações da carta", "Confira a edição, a variante e os valores antes de adicionar.", "CARTA IDENTIFICADA", Actions: [new("Adicionar à coleção", "add-to-collection", true)]),
         new("scanner-analyzing", "Identificando carta...", "Analisando imagem e detalhes da carta. Esta é uma prévia do fluxo do scanner.", "SCANNER · DEMONSTRAÇÃO", Actions: [new("Ver resultado de exemplo", "scan-result", true)]),
         new("scan-result", "Pikachu VMAX", "Lost Origin · 029/196 · Full Art · Ultra Rare", "RESULTADO DO SCAN · 98%", Actions: [new("Confirmar seleção", "scan-candidates", true), new("Não é essa carta?", "scan-candidates")]),
         new("scan-candidates", "Selecione o card", "Vários resultados podem corresponder. Escolha a impressão correta.", "VÁRIOS MATCHES", Cards: [new("LOST ORIGIN", "Pikachu VMAX", "029/196 · Full Art", "98%"), new("SWSH PROMO", "Pikachu VMAX", "SWSH286 · Promo", "82%"), new("LOST ORIGIN", "Pikachu V", "120/196 · Standard", "68%")], Actions: [new("Confirmar seleção", "scan-confirmed", true)]),
@@ -100,6 +101,7 @@ public partial class ExperienceViewModel : ObservableObject
     private readonly ICollectionClient _collectionClient;
     private readonly IVaultaApiClient _apiClient;
     private readonly ICameraService _cameraService;
+    private readonly IScannerClient _scannerClient;
     private readonly IMarketplaceClient _marketplaceClient;
     private readonly IOrdersClient _ordersClient;
     private readonly IPaymentsClient _paymentsClient;
@@ -125,6 +127,7 @@ public partial class ExperienceViewModel : ObservableObject
         ICollectionClient collectionClient,
         IVaultaApiClient apiClient,
         ICameraService cameraService,
+        IScannerClient scannerClient,
         IMarketplaceClient marketplaceClient,
         IOrdersClient ordersClient,
         IPaymentsClient paymentsClient,
@@ -140,6 +143,7 @@ public partial class ExperienceViewModel : ObservableObject
         _collectionClient = collectionClient;
         _apiClient = apiClient;
         _cameraService = cameraService;
+        _scannerClient = scannerClient;
         _marketplaceClient = marketplaceClient;
         _ordersClient = ordersClient;
         _paymentsClient = paymentsClient;
@@ -169,6 +173,7 @@ public partial class ExperienceViewModel : ObservableObject
     [ObservableProperty] private CollectibleItemDto? selectedItem;
     [ObservableProperty] private CollectionSummaryDto? collectionSummary;
     [ObservableProperty] private CardScanResultDto? scanResult;
+    [ObservableProperty] private ScannerCardDetailsDto? scannerCardDetails;
     [ObservableProperty] private byte[]? capturedImageBytes;
     [ObservableProperty] private ListingPageDto? marketplaceListings;
     [ObservableProperty] private OrderDto? currentOrder;
@@ -282,6 +287,8 @@ public partial class ExperienceViewModel : ObservableObject
 
     public void RefreshGreeting() => OnPropertyChanged(nameof(DisplayGreeting));
 
+    public void SelectPrinting(Guid printingId) => SelectedPrintingId = printingId;
+
     public IReadOnlyList<Vaulta.App.Views.Components.ChartPoint> GetPortfolioChartData()
     {
         var history = _priceHistoryProvider.GetPortfolioHistory(days: 7);
@@ -321,7 +328,7 @@ public partial class ExperienceViewModel : ObservableObject
         StatusMessage = null;
         switch (value)
         {
-            case "card-detail" when SelectedPrintingId is { } printingId:
+            case "card-detail" or "scanner-card-detail" or "add-to-collection" when SelectedPrintingId is { } printingId:
                 _ = LoadCardDetailAsync(printingId);
                 break;
             case "collection-item" when SelectedEntryId is { } entryId:
@@ -391,8 +398,10 @@ public partial class ExperienceViewModel : ObservableObject
             }
 
             CapturedImageBytes = imageData;
-            var gameCode = SelectedTcgs.Count > 0 ? SelectedTcgs[0]?.ToLowerInvariant() : "pokemon";
-            var result = await _apiClient.ScanCardAsync(imageData, gameCode, cancellationToken);
+            ScanResult = null;
+            OnPropertyChanged(nameof(Screen));
+            const string gameCode = "pokemon";
+            var result = await _scannerClient.ScanCardAsync(imageData, gameCode, cancellationToken);
             ScanResult = result;
 
             if (result.Candidates.Count == 0)
@@ -422,56 +431,15 @@ public partial class ExperienceViewModel : ObservableObject
     [RelayCommand]
     private async Task AddScannedCardToCollectionAsync(CardScanCandidateDto? candidate, CancellationToken cancellationToken)
     {
-        if (candidate is null)
+        if (IsBusy) return;
+        if (candidate is null || candidate.PrintingId == Guid.Empty)
         {
-            StatusMessage = "Nenhuma carta selecionada para adicionar.";
+            StatusMessage = "Esta carta ainda não está disponível no catálogo. Tente buscar manualmente.";
             return;
         }
-
-        // Use ExternalPrintingId as fallback when PrintingId was not resolved to a Vaulta GUID
-        var printingId = candidate.PrintingId != Guid.Empty
-            ? candidate.PrintingId
-            : (Guid.TryParse(candidate.ExternalPrintingId, out var parsed) ? parsed : Guid.Empty);
-
-        if (printingId == Guid.Empty)
-        {
-            StatusMessage = "Não foi possível identificar esta carta no catálogo. Tente buscar manualmente.";
-            return;
-        }
-
-        IsBusy = true;
-        StatusMessage = null;
-        try
-        {
-            var intent = _addToCollectionIntent ??= new AddToCollectionIntent();
-            var request = new AddCollectibleItemsRequest(
-                PrintingId: printingId,
-                VariantId: null,
-                Quantity: 1,
-                Condition: "Near Mint",
-                AcquisitionPrice: candidate.EstimatedMarketValueBrl.HasValue
-                    ? new AcquisitionPrice(candidate.EstimatedMarketValueBrl.Value, "BRL")
-                    : null,
-                AcquisitionDate: DateOnly.FromDateTime(DateTime.Today),
-                Notes: $"Adicionado via scanner ({candidate.ConfidenceScore:P0} confiança)");
-
-            var response = await _collectionClient.AddItemsAsync(request, intent.IdempotencyKey, cancellationToken);
-            StatusMessage = $"Carta adicionada à coleção! ({response.Quantity} item(ns))";
-            _addToCollectionIntent = null;
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception exception)
-        {
-            StatusMessage = ApiErrorMessage(exception);
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        cancellationToken.ThrowIfCancellationRequested();
+        await Shell.Current.GoToAsync($"experience?screen=scanner-card-detail&printingId={candidate.PrintingId}");
     }
-
     [RelayCommand]
     private async Task LoadMarketplaceListingsAsync(CancellationToken cancellationToken)
     {
@@ -626,7 +594,9 @@ public partial class ExperienceViewModel : ObservableObject
         IsBusy = true;
         try
         {
-            var details = await _catalogClient.GetPrintingAsync(printingId, CancellationToken.None);
+            var scannerDetails = await _scannerClient.GetCardDetailsAsync(printingId, CancellationToken.None);
+            ScannerCardDetails = scannerDetails;
+            var details = scannerDetails.Printing;
             SelectedPrinting = details;
             _loadedPrintingId = printingId;
             VariantLabels.Clear();
@@ -636,7 +606,9 @@ public partial class ExperienceViewModel : ObservableObject
                 VariantLabels.Add(variant.Name);
                 _variantIdsByLabel[variant.Name] = variant.Id;
             }
-            SelectedVariantLabel = VariantLabels.FirstOrDefault();
+            SelectedVariantLabel = details.Variants.FirstOrDefault(x => x.Code == "normal")?.Name
+                ?? details.Variants.FirstOrDefault(x => x.Code == "holo")?.Name
+                ?? VariantLabels.FirstOrDefault();
             SelectedVariantId = SelectedVariantLabel is not null ? _variantIdsByLabel[SelectedVariantLabel] : null;
             OnPropertyChanged(nameof(Screen));
         }
@@ -728,12 +700,32 @@ public partial class ExperienceViewModel : ObservableObject
             StatusMessage = "Selecione uma carta no catálogo antes de adicionar.";
             return;
         }
+        if (SelectedPrinting is null || SelectedPrinting.PrintingId != printingId)
+        {
+            StatusMessage = "Aguarde o carregamento da carta antes de adicionar.";
+            return;
+        }
+        if (SelectedPrinting.Variants.Count > 0 && SelectedVariantId is null)
+        {
+            StatusMessage = "Selecione a variante da carta.";
+            return;
+        }
         if (!int.TryParse(Quantity, out var quantity) || quantity < 1)
         {
             StatusMessage = "Informe uma quantidade válida.";
             return;
         }
 
+        AcquisitionPrice? acquisitionPrice = null;
+        if (!string.IsNullOrWhiteSpace(AcquisitionCost))
+        {
+            if (!decimal.TryParse(AcquisitionCost, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.GetCultureInfo("pt-BR"), out var cost) || cost < 0)
+            {
+                StatusMessage = "Informe um custo de aquisição válido em reais.";
+                return;
+            }
+            acquisitionPrice = new AcquisitionPrice(cost, "BRL");
+        }
         _addToCollectionIntent ??= new AddToCollectionIntent();
         var conditionCode = ConditionMapper.ToCanonicalCode(SelectedCondition);
         IsBusy = true;
@@ -745,7 +737,7 @@ public partial class ExperienceViewModel : ObservableObject
                 SelectedVariantId,
                 quantity,
                 conditionCode,
-                AcquisitionPrice: null,
+                AcquisitionPrice: acquisitionPrice,
                 AcquisitionDate: null,
                 Notes: string.IsNullOrWhiteSpace(ItemNotes) ? null : ItemNotes);
             await _collectionClient.AddItemsAsync(request, _addToCollectionIntent.IdempotencyKey);
@@ -825,7 +817,7 @@ public partial class ExperienceViewModel : ObservableObject
     private ScreenDefinition MergeDynamicData(ScreenDefinition baseScreen) => baseScreen.Id switch
     {
         "catalog" or "search-results" => CatalogResults.Count > 0 ? baseScreen with { Cards = CatalogResults.ToArray() } : baseScreen,
-        "card-detail" => MergeCardDetail(baseScreen),
+        "card-detail" or "scanner-card-detail" or "add-to-collection" => MergeCardDetail(baseScreen),
         "collection" => MergeCollection(baseScreen),
         "collection-item" => MergeCollectionItem(baseScreen),
         "home" => MergeHome(baseScreen),
@@ -919,7 +911,7 @@ public partial class ExperienceViewModel : ObservableObject
         {
             Title = printing.CardName,
             Subtitle = $"{printing.SetName} · {printing.CollectorNumber} · {FormatGame(printing.GameCode)}",
-            Options = VariantLabels.Count > 0 ? VariantLabels.ToArray() : null
+            Options = baseScreen.Id == "add-to-collection" ? baseScreen.Options : (VariantLabels.Count > 0 ? VariantLabels.ToArray() : null)
         };
     }
 
@@ -1043,7 +1035,10 @@ public partial class ExperienceViewModel : ObservableObject
             return;
         }
 
-        await Shell.Current.GoToAsync($"experience?screen={Uri.EscapeDataString(route)}");
+        var printingQuery = route is "card-detail" or "scanner-card-detail" or "add-to-collection" && SelectedPrintingId is { } selectedId
+            ? $"&printingId={selectedId}"
+            : string.Empty;
+        await Shell.Current.GoToAsync($"experience?screen={Uri.EscapeDataString(route)}{printingQuery}");
     }
 
     [RelayCommand]
@@ -1152,7 +1147,7 @@ public partial class ExperienceViewModel : ObservableObject
             var contentType = photo.ContentType ?? "image/jpeg";
 
             var upload = await _assetClient.CreateUploadAsync(
-                new CreateAssetUploadRequest("LISTING_PHOTO", contentType, length, null));
+                new CreateAssetUploadRequest("collection-item", contentType, length, null));
 
             stream.Position = 0;
             await _assetClient.UploadToPresignedUrlAsync(upload.UploadUrl, stream, contentType);
@@ -1228,3 +1223,4 @@ public partial class ExperienceViewModel : ObservableObject
         }
     }
 }
+
