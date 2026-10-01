@@ -2,6 +2,8 @@
 
 # Esta fase é usada durante a execução no VS no modo rápido (Padrão para a configuração de Depuração)
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng tesseract-ocr-por && rm -rf /var/lib/apt/lists/*
 USER $APP_UID
 WORKDIR /app
 EXPOSE 8080
@@ -59,6 +61,11 @@ RUN dotnet restore "./src/Vaulta.Web.Api/Vaulta.Web.Api.csproj"
 COPY . .
 WORKDIR "/src/src/Vaulta.Web.Api"
 RUN dotnet build "./Vaulta.Web.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build
+
+FROM build AS scanner-tests
+WORKDIR /src
+RUN dotnet test tests/Vaulta.App.Core.UnitTests/Vaulta.App.Core.UnitTests.csproj -c Release --filter FullyQualifiedName~ScannerClientTests --verbosity minimal
+RUN dotnet test tests/Vaulta.Identity.UnitTests/Vaulta.Identity.UnitTests.csproj -c Release --filter "FullyQualifiedName~TesseractOcrTests|FullyQualifiedName~ScannerPricingTests|FullyQualifiedName~FuzzyCardRecognitionTests" --verbosity minimal
 
 # Esta fase é usada para publicar o projeto de serviço a ser copiado para a fase final
 FROM build AS publish

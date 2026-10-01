@@ -12,6 +12,7 @@ public interface IReviewStore
 public interface IReviewQueries
 {
     Task<Contracts.SellerRatingDto> GetSellerRating(Guid userId, CancellationToken cancellationToken);
+    Task<IReadOnlyDictionary<Guid, Contracts.SellerRatingDto>> GetSellerRatings(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken);
 }
 
 public interface IReviewOrders

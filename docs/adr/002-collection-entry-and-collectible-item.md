@@ -8,7 +8,7 @@
 ### Modelo e identidade
 
 - `CollectionEntry` é o agrupamento lógico de um usuário para `(PrintingId, VariantId?)`. Não armazena quantidade, condição, preço, data de aquisição nem fotos.
-- `CollectibleItem` é uma unidade física, com lifecycle próprio. É sempre uma unidade (não tem `Quantity`) e carrega estado, condição raw, preço/data de aquisição opcionais, observações e timestamps.
+- `CollectibleItem` é uma unidade física, com lifecycle próprio. É sempre uma unidade (não tem `Quantity`) e carrega estado, condição física normalizada, preço/data de aquisição opcionais, observações e timestamps.
 - Idioma pertence a `Printing` no Catalog atual; Collection não duplica esse atributo.
 - `UserId` aparece no item para filtrar e autorizar eficientemente. Uma FK composta para `(CollectionEntryId, UserId)` mantém consistência com o dono do Entry.
 - `quantity` no comando de adição é apenas conveniência para criar N linhas `CollectibleItem`, limitada a 100. A quantidade de leitura é contagem de unidades `ACTIVE` no PostgreSQL.
@@ -18,7 +18,7 @@
 
 - `CollectionEntry` e `CollectibleItem` são Aggregate Roots separados. Alterar uma unidade não carrega todos os itens do agrupamento. A consistência local entre item e dono do Entry é reforçada no banco, e as regras cross-context são verificadas por ports públicos.
 - Remover unidade é soft delete (`REMOVED`, `RemovedAt`); itens removidos ficam fora das queries normais. Entries sem unidades ativas são mantidos para possível reuso, mas não aparecem na coleção normal.
-- Condição descreve condição raw do item, não grading/certificação profissional. Códigos permanecem extensíveis sem enum de estados futuros.
+- Condição descreve o estado físico do item, sem grading/certificação profissional. A implementação valida uma lista fechada de sete códigos: MINT, NEAR_MINT, LIGHTLY_PLAYED, MODERATELY_PLAYED, HEAVILY_PLAYED, DAMAGED e UNKNOWN. Aliases conhecidos são normalizados; texto desconhecido é recusado. Novos códigos exigem revisão de regras e contratos.
 - `Money` do SharedKernel representa aquisição opcional com decimal e currency; não há cálculo de portfolio nesta etapa.
 
 ### Fotos e fronteiras
@@ -37,5 +37,5 @@
 
 - Duas ou mais unidades iguais reutilizam o mesmo Entry e permanecem individualmente editáveis/removíveis.
 - Marketplace, Trade, Condition Check, Grading e Portfolio poderão referenciar `CollectibleItemId`; esses contextos não são criados por este ADR.
-- A grade da coleção agrega no banco e pagina Entries/itens, sem carregar a coleção inteira em memória.
-- Adicionar uma nova condição, status ou tipo de foto é extensão de códigos validados; não autoriza implementar lifecycle de marketplace nem grading profissional.
+- A grade agrega no banco. Ordenações recent/quantity e páginas de itens são paginadas no banco. `sort=name` ainda carrega as entradas filtradas, busca os nomes no Catalog e ordena globalmente em memória antes de paginar; é uma limitação de escala que requer uma projeção de leitura adequada, não um comportamento garantido de paginação SQL.
+- Adicionar uma nova condição, status ou tipo de foto exige extensão explícita dos códigos validados; não autoriza implementar grading profissional.

@@ -8,6 +8,7 @@ public interface ICollectionClient
 {
     Task<CollectionPageDto> GetCollectionAsync(CollectionQuery query, CancellationToken cancellationToken = default);
     Task<CollectionSummaryDto> GetSummaryAsync(CancellationToken cancellationToken = default);
+    Task<CollectionValuationDto> GetValuationAsync(Guid? entryId = null, CancellationToken cancellationToken = default);
     Task<AddCollectibleItemsResponse> AddItemsAsync(AddCollectibleItemsRequest request, string idempotencyKey, CancellationToken cancellationToken = default);
     Task<CollectionEntryDetailsDto> GetEntryAsync(Guid entryId, int page, int pageSize, CancellationToken cancellationToken = default);
     Task<CollectibleItemDto> GetItemAsync(Guid itemId, CancellationToken cancellationToken = default);
@@ -31,6 +32,13 @@ public sealed class CollectionClient(HttpClient httpClient) : ICollectionClient
     {
         using var response = await httpClient.GetAsync("api/v1/me/collection/summary", cancellationToken);
         return await response.ReadApiJsonAsync<CollectionSummaryDto>(cancellationToken);
+    }
+
+    public async Task<CollectionValuationDto> GetValuationAsync(Guid? entryId = null, CancellationToken cancellationToken = default)
+    {
+        var query = entryId.HasValue ? $"?entryId={entryId.Value:D}" : "";
+        using var response = await httpClient.GetAsync("api/v1/me/collection/valuation" + query, cancellationToken);
+        return await response.ReadApiJsonAsync<CollectionValuationDto>(cancellationToken);
     }
 
     public async Task<AddCollectibleItemsResponse> AddItemsAsync(AddCollectibleItemsRequest request, string idempotencyKey, CancellationToken cancellationToken = default)

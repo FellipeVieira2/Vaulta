@@ -1,6 +1,5 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using Vaulta.Catalog.Contracts;
 using Vaulta.Identity.Contracts;
 
 namespace Vaulta.App.Services.Api;
@@ -37,38 +36,11 @@ public sealed class VaultaApiClient(HttpClient httpClient) : IVaultaApiClient
             ?? throw new InvalidDataException("The API returned an empty profile response.");
     }
 
-    public async Task<CardScanResultDto> ScanCardAsync(byte[] imageData, string? gameCode, CancellationToken cancellationToken = default)
-    {
-        using var content = new MultipartFormDataContent();
-        var imageContent = new ByteArrayContent(imageData);
-        imageContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
-        content.Add(imageContent, "image", "card.jpg");
-        if (gameCode is not null)
-            content.Add(new StringContent(gameCode), "gameCode");
-
-        using var response = await httpClient.PostAsync("api/v1/scanner/identify", content, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<CardScanResultDto>(cancellationToken)
-            ?? throw new InvalidDataException("The scanner API returned an empty response.");
-    }
-
-    public async Task<CardScanResultDto> SearchCardsAsync(string query, string? gameCode, CancellationToken cancellationToken = default)
-    {
-        var url = $"api/v1/scanner/search?query={Uri.EscapeDataString(query)}";
-        if (gameCode is not null)
-            url += $"&gameCode={Uri.EscapeDataString(gameCode)}";
-
-        using var response = await httpClient.GetAsync(url, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<CardScanResultDto>(cancellationToken)
-            ?? throw new InvalidDataException("The search API returned an empty response.");
-    }
-
-    public async Task UpdateShippingAddressAsync(string accessToken, string? street, string? city, string? state, string? zipCode, CancellationToken cancellationToken = default)
+    public async Task UpdateShippingAddressAsync(string accessToken, string? street, string? number, string? complement, string? neighborhood, string? city, string? state, string? zipCode, string? recipient, CancellationToken cancellationToken = default)
     {
         using var message = new HttpRequestMessage(HttpMethod.Put, "api/v1/me/shipping-address");
         message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        message.Content = JsonContent.Create(new { Street = street, City = city, State = state, ZipCode = zipCode });
+        message.Content = JsonContent.Create(new { Street = street, Number = number, Complement = complement, Neighborhood = neighborhood, City = city, State = state, ZipCode = zipCode, Recipient = recipient });
         using var response = await httpClient.SendAsync(message, cancellationToken);
         response.EnsureSuccessStatusCode();
     }

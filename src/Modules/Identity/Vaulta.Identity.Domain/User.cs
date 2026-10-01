@@ -88,9 +88,13 @@ public sealed class UserProfile
     public string? State { get; private set; }
     public string? City { get; private set; }
     public string? ShippingStreet { get; private set; }
+    public string? ShippingNumber { get; private set; }
+    public string? ShippingComplement { get; private set; }
+    public string? ShippingNeighborhood { get; private set; }
     public string? ShippingCity { get; private set; }
     public string? ShippingState { get; private set; }
     public string? ShippingZipCode { get; private set; }
+    public string? ShippingRecipient { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
     internal void Update(string name, string? bio, string? avatar, string? country, string? state, string? city, DateTimeOffset now)
@@ -99,12 +103,16 @@ public sealed class UserProfile
         AvatarUrl = IdentityRules.Avatar(avatar); CountryCode = IdentityRules.Country(country);
         State = IdentityRules.Optional(state, 100, "state"); City = IdentityRules.Optional(city, 100, "city"); UpdatedAt = now;
     }
-    public void UpdateShippingAddress(string? street, string? city, string? state, string? zipCode, DateTimeOffset now)
+    public void UpdateShippingAddress(string? street, string? number, string? complement, string? neighborhood, string? city, string? state, string? zipCode, string? recipient, DateTimeOffset now)
     {
         ShippingStreet = IdentityRules.Optional(street, 200, "shippingStreet");
-        ShippingCity = IdentityRules.Optional(city, 100, "shippingCity");
+        ShippingNumber = IdentityRules.Optional(number, 20, "shippingNumber");
+        ShippingComplement = IdentityRules.Optional(complement, 100, "shippingComplement");
+        ShippingNeighborhood = IdentityRules.Optional(neighborhood, 100, "shippingNeighborhood");
+        ShippingCity = IdentityRules.Optional(city, 200, "shippingCity");
         ShippingState = IdentityRules.Optional(state, 100, "shippingState");
-        ShippingZipCode = IdentityRules.Optional(zipCode, 9, "shippingZipCode");
+        ShippingZipCode = IdentityRules.ZipCode(zipCode);
+        ShippingRecipient = IdentityRules.Optional(recipient, 100, "shippingRecipient");
         UpdatedAt = now;
     }
 }

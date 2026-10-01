@@ -25,11 +25,21 @@ public sealed class PaymentTransaction : AggregateRoot
     public string? AsaasCustomerId { get; private set; }
     public string? CheckoutUrl { get; private set; }
     public string? PixQrCode { get; private set; }
+    public string? PixExpirationDate { get; private set; }
     public string? BankSlipUrl { get; private set; }
     public string? FailureReason { get; private set; }
+    public string? PayoutHoldReason { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
     public DateTimeOffset? ConfirmedAt { get; private set; }
+    public DateTimeOffset? ReceivedAt { get; private set; }
+    public DateTimeOffset? RefundRequestedAt { get; private set; }
+    public DateTimeOffset? RefundSubmittedAt { get; private set; }
+    public DateTimeOffset? RefundNextCheckAt { get; private set; }
+    public Guid? RefundRequestedBy { get; private set; }
+    public string? RefundReason { get; private set; }
+    public string? RefundStatus { get; private set; }
+    public string? RefundRequestUrl { get; private set; }
     public Guid Version { get; private set; }
     public IReadOnlyCollection<PaymentSplit> Splits => _splits.AsReadOnly();
 
@@ -83,7 +93,7 @@ public sealed class PaymentTransaction : AggregateRoot
 
     public void Confirm(string asaasPaymentId, decimal netAmount, DateTimeOffset now)
     {
-        if (Status != PaymentRules.PendingStatus)
+        if (Status is not (PaymentRules.PendingStatus or PaymentRules.OverdueStatus))
             throw new DomainException($"Payment cannot be confirmed from status '{Status}'.");
         if (string.IsNullOrWhiteSpace(asaasPaymentId))
             throw new DomainException("Asaas payment identifier is required.");
@@ -92,6 +102,7 @@ public sealed class PaymentTransaction : AggregateRoot
         NetAmount = Math.Round(netAmount, 2);
         Status = PaymentRules.ConfirmedStatus;
         ConfirmedAt = now;
+        FailureReason = null;
         Touch(now);
         Raise(new PaymentConfirmedDomainEvent(Guid.NewGuid(), Id, OrderId, asaasPaymentId, now));
     }
@@ -106,20 +117,132 @@ public sealed class PaymentTransaction : AggregateRoot
         Raise(new PaymentFailedDomainEvent(Guid.NewGuid(), Id, OrderId, reason, now));
     }
 
+    public void RecordSettlement(decimal netAmount, DateTimeOffset now)
+    {
+        if (Status != PaymentRules.ConfirmedStatus || netAmount < 0 || netAmount > Amount)
+            throw new DomainException("Only a confirmed payment with a valid settled amount can be received.");
+        if (ReceivedAt.HasValue) return;
+        NetAmount = Math.Round(netAmount, 2);
+        ReceivedAt = now;
+        Touch(now);
+    }
+
+    public void HoldPayout(string reason, DateTimeOffset now)
+    {
+        if (string.IsNullOrWhiteSpace(reason) || reason.Length > 100)
+            throw new DomainException("Payout hold reason is required.");
+        PayoutHoldReason = reason;
+        Touch(now);
+    }
+
+    public void MarkOverdue(DateTimeOffset now)
+    {
+        // A delayed overdue event must not undo a received/refunded payment.
+        if (Status is not (PaymentRules.PendingStatus or PaymentRules.OverdueStatus)) return;
+        Status = PaymentRules.OverdueStatus;
+        Touch(now);
+    }
+
     public void Refund(DateTimeOffset now)
     {
+        if (Status == PaymentRules.RefundedStatus) return;
         if (Status != PaymentRules.ConfirmedStatus)
             throw new DomainException($"Only confirmed payments can be refunded.");
         Status = PaymentRules.RefundedStatus;
+        RefundStatus = "DONE";
+        PayoutHoldReason = "REFUNDED";
         Touch(now);
         Raise(new PaymentRefundedDomainEvent(Guid.NewGuid(), Id, OrderId, now));
     }
 
-    public void SetCheckoutInfo(string? checkoutUrl, string? pixQrCode, string? bankSlipUrl)
+    public void RequestRefund(Guid userId, string reason, DateTimeOffset now)
     {
+        if (Status != PaymentRules.ConfirmedStatus || string.IsNullOrWhiteSpace(AsaasPaymentId))
+            throw new ConflictException("Pagamento ainda não confirmado para reembolso.");
+        if (userId != BuyerId && userId != SellerId) throw new ForbiddenException("Pedido de outro usuário.");
+        if (string.IsNullOrWhiteSpace(reason) || reason.Trim().Length > 500)
+            throw new DomainException("Informe o motivo do cancelamento, com até 500 caracteres.");
+        if (RefundRequestedAt.HasValue) return;
+        if (PayoutHoldReason is not null || Splits.Count != 0)
+            throw new ConflictException("Este pagamento precisa de atendimento para cancelar.");
+        RefundRequestedAt = now;
+        RefundRequestedBy = userId;
+        RefundReason = reason.Trim();
+        RefundStatus = "REQUESTED";
+        RefundNextCheckAt = now;
+        HoldPayout("REFUND_REQUESTED", now);
+    }
+
+    public void ClaimRefund(DateTimeOffset now, Guid version)
+    {
+        if (RefundStatus != "REQUESTED" || RefundSubmittedAt.HasValue)
+            throw new ConflictException("Reembolso já solicitado ao provedor.");
+        RefundSubmittedAt = now;
+        RefundStatus = "SUBMITTING";
+        RefundNextCheckAt = now.AddMinutes(1);
+        UpdatedAt = now;
+        Version = version;
+    }
+
+    public void RefundLateCancelledPayment(string reason, DateTimeOffset now)
+    {
+        if (RefundRequestedAt.HasValue) return;
+        RequestRefund(BuyerId, reason, now);
+        RefundRequestedBy = null; // Provider-triggered recovery, not a new user request.
+    }
+
+    public void TrackRefund(string status, DateTimeOffset now, string? requestUrl = null)
+    {
+        if (RefundStatus == "DONE") return;
+        if (status is not ("PROCESSING" or "RECONCILIATION_REQUIRED"))
+            throw new DomainException("Invalid refund tracking status.");
+        RefundStatus = status;
+        if (requestUrl is not null) RefundRequestUrl = requestUrl;
+        RefundNextCheckAt = now.AddMinutes(1);
+        Touch(now);
+    }
+
+    public void RetryRefundCheck(DateTimeOffset now)
+    {
+        RefundNextCheckAt = now.AddMinutes(1);
+        Touch(now);
+    }
+
+    public void SetCheckoutInfo(string asaasPaymentId, string? checkoutUrl, string? pixQrCode, string? bankSlipUrl)
+    {
+        if (string.IsNullOrWhiteSpace(asaasPaymentId))
+            throw new DomainException("Asaas payment identifier is required.");
+
+        AsaasPaymentId = asaasPaymentId;
         CheckoutUrl = checkoutUrl;
         PixQrCode = pixQrCode;
         BankSlipUrl = bankSlipUrl;
+    }
+
+    public void UpdatePixPayload(string? payload, string? expirationDate, DateTimeOffset now)
+    {
+        if (BillingType != "PIX" || AsaasPaymentId is null
+            || Status is not (PaymentRules.PendingStatus or PaymentRules.OverdueStatus))
+            throw new ConflictException("O código Pix só pode ser atualizado em uma cobrança pendente.");
+        if (expirationDate is { Length: > 64 } || payload is not null && string.IsNullOrWhiteSpace(payload))
+            throw new DomainException("Código Pix inválido.");
+        if (PixQrCode == payload && PixExpirationDate == expirationDate) return;
+        PixQrCode = payload;
+        // Asaas may return a date without an offset. Preserve its value instead
+        // of inventing UTC or a device-local timezone for the provider's deadline.
+        PixExpirationDate = payload is null ? null : expirationDate;
+        Touch(now);
+    }
+
+    public void BindBuyerCustomer(string customerId, DateTimeOffset now)
+    {
+        if (string.IsNullOrWhiteSpace(customerId) || customerId.Length > 200
+            || AsaasCustomerId is not null && AsaasCustomerId != customerId
+            || AsaasCustomerId is null && AsaasPaymentId is not null)
+            throw new ConflictException("Pagamento antigo exige conciliação do cliente.");
+        if (AsaasCustomerId == customerId) return;
+        AsaasCustomerId = customerId;
+        Touch(now);
     }
 
     private void Touch(DateTimeOffset now)

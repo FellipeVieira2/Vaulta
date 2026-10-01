@@ -13,7 +13,7 @@ public sealed class ShippingOrdersAdapter(IOrderStore orderStore) : IShippingOrd
             order.Id, order.BuyerId, order.SellerId, order.ListingId, order.CollectibleItemId,
             order.PrintingId, order.VariantId,
             new Orders.Contracts.OrderSnapshotDto(order.Condition, order.ItemPriceBrl, order.PlatformFeeBrl, order.TotalAmountBrl, order.Currency),
-            new Orders.Contracts.OrderShippingDto(order.ShippingStreet, order.ShippingCity, order.ShippingState, order.ShippingZipCode),
+            new Orders.Contracts.OrderShippingDto(order.ShippingStreet, order.ShippingNumber, order.ShippingComplement, order.ShippingNeighborhood, order.ShippingCity, order.ShippingState, order.ShippingZipCode, order.ShippingRecipient),
             order.Status, order.PaymentId, order.TrackingCode, order.CancellationReason,
             order.CreatedAt, order.UpdatedAt, order.PaidAt, order.ShippedAt, order.DeliveredAt, order.CancelledAt, order.Version);
     }
@@ -25,10 +25,4 @@ public sealed class ShippingOrdersAdapter(IOrderStore orderStore) : IShippingOrd
         if (order is not null) await orderStore.Save(cancellationToken);
     }
 
-    public async Task MarkOrderAsDelivered(Guid orderId, CancellationToken cancellationToken)
-    {
-        var order = await orderStore.FindOrder(orderId, cancellationToken);
-        order?.MarkAsDelivered(DateTimeOffset.UtcNow);
-        if (order is not null) await orderStore.Save(cancellationToken);
-    }
 }

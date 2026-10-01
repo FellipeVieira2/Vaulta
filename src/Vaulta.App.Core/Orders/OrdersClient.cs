@@ -11,7 +11,9 @@ public interface IOrdersClient
     Task<OrderPageDto> GetUserOrdersAsync(string? status = null, int page = 1, int pageSize = 20, CancellationToken cancellationToken = default);
     Task ConfirmPaymentAsync(Guid orderId, string paymentId, CancellationToken cancellationToken = default);
     Task MarkShippedAsync(Guid orderId, string trackingCode, CancellationToken cancellationToken = default);
+    Task ConfirmReceiptAsync(Guid orderId, CancellationToken cancellationToken = default);
     Task CancelOrderAsync(Guid orderId, string reason, CancellationToken cancellationToken = default);
+    Task<Vaulta.Payments.Contracts.OrderRefundDto?> GetRefundAsync(Guid orderId, CancellationToken cancellationToken = default);
 }
 
 public sealed class OrdersClient(HttpClient httpClient) : IOrdersClient
@@ -57,5 +59,18 @@ public sealed class OrdersClient(HttpClient httpClient) : IOrdersClient
         using var response = await httpClient.PostAsJsonAsync($"api/v1/orders/{orderId}/cancel",
             new CancelOrderRequest(reason), cancellationToken);
         await response.EnsureApiSuccessAsync(cancellationToken);
+    }
+
+    public async Task ConfirmReceiptAsync(Guid orderId, CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsync($"api/v1/orders/{orderId}/deliver", null, cancellationToken);
+        await response.EnsureApiSuccessAsync(cancellationToken);
+    }
+
+    public async Task<Vaulta.Payments.Contracts.OrderRefundDto?> GetRefundAsync(Guid orderId, CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync($"api/v1/orders/{orderId}/refund", cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NoContent) return null;
+        return await response.ReadApiJsonAsync<Vaulta.Payments.Contracts.OrderRefundDto>(cancellationToken);
     }
 }

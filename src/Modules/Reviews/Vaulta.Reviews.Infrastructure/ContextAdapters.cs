@@ -13,7 +13,7 @@ public sealed class ReviewOrdersAdapter(IOrderStore orderStore) : IReviewOrders
             order.Id, order.BuyerId, order.SellerId, order.ListingId, order.CollectibleItemId,
             order.PrintingId, order.VariantId,
             new Orders.Contracts.OrderSnapshotDto(order.Condition, order.ItemPriceBrl, order.PlatformFeeBrl, order.TotalAmountBrl, order.Currency),
-            new Orders.Contracts.OrderShippingDto(order.ShippingStreet, order.ShippingCity, order.ShippingState, order.ShippingZipCode),
+            new Orders.Contracts.OrderShippingDto(order.ShippingStreet, order.ShippingNumber, order.ShippingComplement, order.ShippingNeighborhood, order.ShippingCity, order.ShippingState, order.ShippingZipCode, order.ShippingRecipient),
             order.Status, order.PaymentId, order.TrackingCode, order.CancellationReason,
             order.CreatedAt, order.UpdatedAt, order.PaidAt, order.ShippedAt, order.DeliveredAt, order.CancelledAt, order.Version);
     }

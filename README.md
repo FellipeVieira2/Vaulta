@@ -1,15 +1,19 @@
 # Vaulta
 
-Backend brasileiro para colecionadores de TCGs em .NET 10, ASP.NET Core, EF Core e PostgreSQL. Os bounded contexts implementados nesta entrega são **Identity / Users / Profile**, **Catalog** e uma fundação de **Assets** para upload S3 compatível.
+Plataforma brasileira para colecionadores de TCGs, com app .NET MAUI e API .NET 10, ASP.NET Core, EF Core e PostgreSQL. A solution contém os módulos **Identity, Catalog, Collection, Assets, Marketplace, Orders, Payments, Wallets, Shipping e Reviews**. A existência dos módulos não significa que todos os fluxos comerciais estejam completos; o acompanhamento está em [Lacunas e validação](docs/business-gap-audit.md).
 
 ## Arquitetura e estrutura
 
-Monólito modular com DDD e CQRS seletivo: comandos usam o aggregate `User`; queries projetam DTOs diretamente no PostgreSQL, sem tracking. Um banco, um processo de API, sem MediatR e sem generic repository. O projeto original **Vaulta.Web.Api** foi preservado e movido para `src`.
+Monólito modular com DDD e CQRS seletivo: comandos usam aggregates de cada módulo e queries projetam DTOs sem tracking quando apropriado. Um banco, um processo de API, sem MediatR e sem generic repository. A ordenação da Collection por nome ainda carrega as entradas filtradas antes de paginar; veja ADR 002.
+
+Anúncios vinculam e protegem a unidade da coleção; o recebimento confirmado pelo comprador registra uma nova posse sem copiar dados privados do vendedor. Recuperação e limites operacionais estão em [Unidade, anúncio e recebimento](docs/collection-listing-lifecycle.md).
 
 ```text
 src/
   Vaulta.Web.Api/                       HTTP, JWT, erros, OpenAPI, composição
   Vaulta.SharedKernel/                  AggregateRoot, eventos, IClock, Money
+  Vaulta.App/                           App MAUI, telas, sessão e captura de fotos
+  Vaulta.App.Core/                      Clientes HTTP e serviços testáveis sem MAUI
   Modules/Identity/
     Vaulta.Identity.Domain/             Aggregate, entidades, regras e eventos
     Vaulta.Identity.Application/        Commands, Queries, Handlers, validators, ports
@@ -24,10 +28,20 @@ src/
     Vaulta.Assets.Domain/                Regras de upload e metadados
     Vaulta.Assets.Application/           Ports de armazenamento e casos de uso
     Vaulta.Assets.Infrastructure/        PostgreSQL e adapter S3/MinIO
+    Vaulta.Assets.Contracts/             Contratos de uploads
+  Modules/Collection/                   Entries e unidades físicas com fotos
+  Modules/Marketplace/                  Vendedores e anúncios
+  Modules/Orders/                       Pedidos e reservas
+  Modules/Payments/                     Cobranças e webhook Asaas
+  Modules/Wallets/                      Preservação de carteiras/extratos históricos
+  Modules/Shipping/                     Remessas e rastreio
+  Modules/Reviews/                      Avaliações
 tests/
   Vaulta.Identity.UnitTests/
   Vaulta.Identity.IntegrationTests/
   Vaulta.ArchitectureTests/
+  Vaulta.App.Core.UnitTests/
+  Vaulta.Commerce.UnitTests/
 ```
 
 ```text
@@ -94,14 +108,40 @@ docker compose down -v
 | GET | `/api/v1/me` | Bearer | DTO privado + ETag |
 | PATCH | `/api/v1/me/profile` | Bearer + If-Match | 204 + novo ETag |
 | PATCH | `/api/v1/me/preferences` | Bearer + If-Match | 204 + novo ETag |
+| PUT | `/api/v1/me/shipping-address` | Bearer | Atualiza endereço de entrega |
 | POST | `/api/v1/me/change-password` | Bearer | 204, invalida todas as sessões |
 | GET | `/api/v1/users/{username}` | Não | DTO público |
 | GET | `/api/v1/catalog/search?q=...&game=pokemon&page=1&pageSize=20` | Não | Printings paginadas por nome |
 | GET | `/api/v1/catalog/printings/{id}` | Não | Detalhe de printing e variants |
 | POST | `/api/v1/assets/uploads` | Bearer | Emite URL S3 pré-assinada para imagem |
 | POST | `/api/v1/assets/{assetId}/confirm` | Bearer | Confirma objeto enviado e valida tamanho/tipo/checksum |
+| GET/POST | `/api/v1/me/collection`, `/api/v1/me/collection/items` | Bearer | Consulta entradas / adiciona unidades |
+| POST | `/api/v1/scanner/identify?gameCode=pokemon` | Bearer | Identifica foto enviada como multipart |
+| GET | `/api/v1/scanner/search`, `/api/v1/scanner/printings/{printingId}` | Bearer | Busca manual / imagem e valores em BRL |
+| GET | `/api/v1/marketplace/listings`, `/api/v1/marketplace/listings/{listingId}` | Não | Vitrine / detalhe com URLs temporárias de fotos |
+| POST | `/api/v1/me/seller`, `/api/v1/me/seller/listings` | Bearer | Habilita vendedor / cria anúncio |
+| POST | `/api/v1/me/seller/listings/{listingId}/photos` | Bearer | Vincula imagem já confirmada do vendedor |
+| GET/POST | `/api/v1/orders` | Bearer | Consulta / cria pedido |
+| POST | `/api/v1/orders/{orderId}/deliver` | Bearer, comprador | Confirma recebimento |
+| POST | `/api/v1/orders/{orderId}/cancel` | Bearer, comprador/vendedor | Antes do envio: 202 para reembolso de pago, 204 para cancelamento sem pagamento; depois do envio: atendimento |
+| GET | `/api/v1/orders/{orderId}/refund` | Bearer, participante | Estado do reembolso; URL de preenchimento de boleto somente para comprador |
+| POST | `/api/v1/orders/{orderId}/confirm-payment` | Bearer | 403; confirmação manual desabilitada |
+| GET/PUT | `/api/v1/payments/customer` | Bearer | Cadastro privado do pagador; cliente Asaas vinculado pelo servidor |
+| GET | `/api/v1/payments/orders/{orderId}` | Bearer, comprador | Retoma cobrança e consulta código Pix/validade |
+| POST | `/api/v1/payments` | Bearer, comprador | Inicia/retoma a mesma cobrança; atualiza código Pix sem criar outra |
+| POST | `/api/v1/webhooks/asaas` | `asaas-access-token` | Processa eventos autenticados do provedor |
+| GET | `/api/v1/wallets`, `/api/v1/wallets/transactions` | Bearer | Dados históricos de carteira / extrato |
+| POST | `/api/v1/wallets/withdraw` | Bearer | 410; saque descontinuado, sem débito |
+| GET | `/api/v1/payouts` | Bearer, vendedor | Repasses por pedido em BRL |
+| GET/PUT | `/api/v1/payouts/pix` | Bearer | Consulta / cadastro privado de chave Pix; cadastro não verifica identidade |
+| GET/POST | `/api/v1/payouts/pix/reviews/{sellerId}` e `/verify` | Bearer, revisor configurado | Revisão de titularidade com evidência de identidade |
+| POST/GET | `/api/v1/shipping`, `/api/v1/shipping/{shipmentId}` | Bearer, participante | Cria / consulta remessa |
+| POST | `/api/v1/reviews` | Bearer, participante | Avalia pedido entregue |
+| GET | `/api/v1/reviews/seller/{userId}/rating` | Bearer | Nota e quantidade de avaliações recebidas como vendedor |
 
-Assets aceita `image/jpeg`, `image/png` e `image/webp` até 15 MB. Propósitos iniciais: `collection-item` (privado) e `profile-avatar` (metadado público; o bucket continua privado). O cliente envia PUT para a URL pré-assinada com o `Content-Type` declarado e depois chama confirm. A confirmação calcula SHA-256 lendo o objeto quando um checksum foi informado. A URL de upload expira em 10 minutos. A API não fornece URL pública de leitura nesta entrega.
+Assets aceita `image/jpeg`, `image/png` e `image/webp` até 15 MB. Propósitos: `collection-item` (privado, usado também para fotos de anúncios) e `profile-avatar` (metadado público; o bucket continua privado). `LISTING_PHOTO` é recusado. O cliente envia PUT para a URL pré-assinada com o `Content-Type` declarado e depois chama confirm. A confirmação sempre lê o objeto e calcula SHA-256; quando um checksum foi informado, também compara o resultado. A URL de upload expira em 10 minutos. Fotos de itens e anúncios são lidas por URLs assinadas com duração de 5 minutos.
+
+Para storage com endereço interno diferente daquele acessível ao cliente, configure `Assets:S3:PublicServiceUrl`; a API assina a URL usando esse endereço e conserva `ServiceUrl` para validar o objeto internamente. O protocolo da URL assinada acompanha o endpoint configurado; S3 AWS sem endpoint customizado usa HTTPS. No Compose, `ASSETS_PUBLIC_SERVICE_URL` tem padrão `http://localhost:9000` para clientes no host. Para Android Emulator, use `http://10.0.2.2:9000`; ajuste também a porta quando `MINIO_API_PORT` mudar. Um celular físico exige endereço de rede e publicação da porta acessíveis a ele; `localhost` e `minio` não apontam ao servidor nesse dispositivo. Não reescreva o host de uma URL já assinada.
 
 Catalog usa IDs internos estáveis e `CatalogExternalId` para mapear TCGdex. O primeiro provider disponibiliza sincronização por interface de Application, ainda sem endpoint administrativo público; o jogo Pokémon é semeado por migration. Pesquisa e detalhes são públicos. Nomes/rarity/variants preservam valores de exibição e códigos normalizados, conforme ADR [001](docs/adr/001-canonical-catalog-identity.md). Imagens do provider ainda são referências externas; não há download/cache de artwork, pois uso depende de licença/termos.
 
@@ -138,6 +178,8 @@ Erros usam ProblemDetails: 400 validação/domínio, 401 credenciais/sessão, 40
 
 O `dotnet run` não lê `.env` automaticamente. Defina `ConnectionStrings__Vaulta`, `Jwt__Secret`, `Jwt__Issuer` e `Jwt__Audience` no ambiente ou use user-secrets do projeto. Use os mesmos valores do banco local. `Database__ApplyMigrations=true` é uma conveniência de desenvolvimento; o padrão fora do Compose é não migrar automaticamente.
 
+O comando `--seed-admin` exige `Admin__SeedPassword` configurado de forma segura para uma conta nova. A senha não tem padrão nem é impressa. Uma conta já existente não é alterada pelo seed; credenciais antigas precisam ser trocadas pelo fluxo de mudança de senha. JWT usa `Jwt:AccessTokenMinutes` (15) e `Jwt:RefreshTokenDays` (30).
+
 ```powershell
 dotnet restore Vaulta.slnx
 dotnet build Vaulta.slnx
@@ -169,7 +211,7 @@ Integração usa PostgreSQL 17 real, criado e removido pelo Testcontainers, com 
 
 ## Banco, eventos e operação
 
-Schemas: `identity` mantém users, profiles, tokens e a única tabela `outbox_messages`; `catalog` contém games/series/sets/cards/printings/variants, external IDs e sync runs; `assets` contém metadados e lifecycle de uploads. Todos usam UUID e datas UTC. Catalog mapeia Outbox para a tabela física Identity excluindo-a de suas próprias migrations; o dispatcher atual continua único.
+Schemas: `identity`, `catalog`, `collection`, `assets`, `marketplace`, `orders`, `payments`, `wallets`, `shipping` e `reviews`. Cada módulo mantém suas migrations. `identity.outbox_messages` é compartilhada pelos módulos que emitem eventos e excluída das migrations desses outros módulos. IDs são UUID e datas são UTC. Não são criadas carteiras nem créditos automáticos: o vendedor recebe por Pix verificado após confirmação do comprador e liquidação, descontados os 8% da Vaulta e as tarifas efetivas do Asaas. Cancelamento por comprador/vendedor antes do envio aguarda reembolso integral confirmado; depois do envio, atendimento. Execução financeira permanece desabilitada por padrão, sujeita à configuração e validação operacional. A implantação e a conciliação estão documentadas em [Repasse direto](docs/seller-payouts.md). Dados históricos de Wallets são preservados.
 
 ```powershell
 docker compose exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT id, type, processed_at, retry_count, error FROM identity.outbox_messages ORDER BY occurred_at DESC LIMIT 20;"'
@@ -185,7 +227,7 @@ Compose é para desenvolvimento e publica portas somente no loopback. Produção
 
 O app MAUI está em `src/Vaulta.App`. O target padrão é Android (`net10.0-android`); iOS é habilitado explicitamente em um Mac com `BuildIos=true`. O projeto usa MVVM com CommunityToolkit.Mvvm e consome apenas os assemblies de contratos HTTP (Identity, Catalog, Collection, Assets), não a infraestrutura do servidor.
 
-`src/Vaulta.App.Core` é uma class library .NET puro (sem dependência de MAUI) que concentra a fundação HTTP reutilizável pelo app: `AuthorizingHttpMessageHandler` (Bearer token, retry único em 401 com refresh single-flight), `ApiErrorTranslator`/`ApiException`, e os clients `CatalogClient`, `CollectionClient` e `AssetClient`. Ela é coberta por `tests/Vaulta.App.Core.UnitTests` (client parsing, paginação, idempotency key, mapping de condition, fluxo de refresh/retry) usando `HttpMessageHandler` fake, sem chamadas de rede reais. Auth real (login/registro/refresh/logout com restauração de sessão), busca de Catálogo (com debounce e cancelamento), detalhe de Printing/Variant, adicionar/editar/remover item da Coleção (com `Idempotency-Key` e controle de concorrência otimista) já funcionam fim a fim contra o backend — as telas de Scanner, Pricing, Portfolio, Marketplace e Wishlist continuam demonstrativas nesta entrega.
+`src/Vaulta.App.Core` é uma class library .NET puro (sem dependência de MAUI) que concentra a fundação HTTP reutilizável pelo app: `AuthorizingHttpMessageHandler` (Bearer token, retry único em 401 com refresh single-flight), `ApiErrorTranslator`/`ApiException`, e os clients `CatalogClient`, `CollectionClient` e `AssetClient`. Ela é coberta por `tests/Vaulta.App.Core.UnitTests` (client parsing, paginação, idempotency key, mapping de condition, fluxo de refresh/retry) usando `HttpMessageHandler` fake, sem chamadas de rede reais. Auth real (login/registro/refresh/logout com restauração de sessão), busca de Catálogo (com debounce e cancelamento), detalhe de Printing/Variant, adicionar/editar/remover item da Coleção (com `Idempotency-Key` e controle de concorrência otimista) já funcionam fim a fim contra o backend — o Scanner agora tem captura autenticada, reconhecimento por OCR e detalhes com imagem e preços convertidos para BRL (veja docs/scanner.md). Pricing e Portfolio fora do scanner ainda usam dados demonstrativos.
 
 ```powershell
 dotnet restore Vaulta.slnx

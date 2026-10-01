@@ -1,0 +1,11 @@
+# Avaliações de vendedores
+
+Avaliações são permitidas somente aos participantes de pedidos com recebimento confirmado pelo comprador. O usuário informa pedido, nota de 1 a 5 e comentário opcional; não define a pessoa avaliada nem o papel. O servidor deriva `SELLER` quando o comprador avalia o vendedor e `BUYER` na situação inversa. Cada participante pode avaliar uma única vez por pedido; o índice PostgreSQL protege também requisições concorrentes.
+
+`GET /api/v1/reviews/seller/{userId}/rating` agrega somente avaliações recebidas como `SELLER`, com média arredondada a duas casas e quantidade. As notas como comprador não entram nessa média. Perfil de vendedor, vitrine e detalhe consultam essa mesma projeção; vitrine consulta os vendedores da página em lote. O antigo campo `SellerProfile.AverageRating` é preservado no banco, mas deixa de ser a fonte da resposta. Quantidade de avaliações é separada de quantidade de vendas.
+
+Aplicar a migration incremental `20261001172443_SeparateReviewRoles` depois das migrations de Orders. Ela classifica avaliações antigas usando o pedido entregue e seus participantes. Avaliações sem correspondência comprovável permanecem `UNKNOWN`, preservadas e excluídas da reputação. Não inferir papel pelo perfil atual da pessoa. Rollback remove o novo papel e seu índice; não executar automaticamente.
+
+O detalhe do anúncio no Android carrega preço em BRL, condição, descrição, fotos e nota reais, sem nome/localização ou preços de exemplo atribuídos ao vendedor. Quem ainda não recebeu avaliações como vendedor aparece como “Sem avaliações como vendedor”. Não foi adicionada certificação de identidade ou promessa de reputação garantida.
+
+Três testes HTTP/PostgreSQL comprovaram os dois papéis para a mesma pessoa, perfil/vitrine/detalhe, rejeição de terceiros, pedido não entregue, papel enviado pelo cliente, repetição e classificação de dados antigos. O teste concorrente sincroniza os dois reads antes dos INSERTs: ambos tentam salvar no PostgreSQL e recebem 201/409, com uma única avaliação. Esses testes passaram na rodada conjunta de 17 testes e novamente com a sincronização determinística. Build Android passou sem avisos/erros. Ainda falta validar a interface no dispositivo físico.

@@ -13,7 +13,7 @@ public static class DependencyInjection
         services.AddScoped<IWalletStore, WalletStore>();
         services.AddScoped<IWalletLedgerQueries, WalletLedgerQueries>();
         services.AddScoped<WalletCommandHandlers>();
-        services.AddScoped<Vaulta.Identity.Application.IEventConsumer, UserRegisteredWalletConsumer>();
+        // Legacy wallets remain available for historical reads. New sellers use direct Pix payouts.
         return services;
     }
 }

@@ -99,7 +99,7 @@ namespace Vaulta.Marketplace.Infrastructure.Migrations
                     b.HasIndex("CollectibleItemId")
                         .IsUnique()
                         .HasDatabaseName("ux_marketplace_listings_active_item")
-                        .HasFilter("status = 'active'");
+                        .HasFilter("status IN ('active', 'publishing')");
 
                     b.HasIndex("PrintingId", "Status")
                         .HasDatabaseName("ix_marketplace_listings_printing_status");

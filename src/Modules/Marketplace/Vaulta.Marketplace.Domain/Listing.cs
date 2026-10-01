@@ -81,11 +81,27 @@ public sealed class Listing : AggregateRoot
 
     public void Cancel(Guid expectedVersion, DateTimeOffset now)
     {
-        EnsureActive();
+        if (Status is not (MarketplaceRules.ActiveStatus or MarketplaceRules.PublishingStatus))
+            throw new ConflictException("Somente anúncios disponíveis ou em publicação podem ser cancelados.");
         EnsureVersion(expectedVersion);
         Status = MarketplaceRules.CancelledStatus;
         Touch(now);
         Raise(new ListingCancelledDomainEvent(Guid.NewGuid(), Id, now));
+    }
+
+    public void PreparePublication(DateTimeOffset now)
+    {
+        EnsureActive();
+        Status = MarketplaceRules.PublishingStatus;
+        Touch(now);
+    }
+
+    public void Publish(DateTimeOffset now)
+    {
+        if (Status != MarketplaceRules.PublishingStatus) throw new ConflictException("Anúncio não está aguardando publicação.");
+        Status = MarketplaceRules.ActiveStatus;
+        Touch(now);
+        Raise(new ListingUpdatedDomainEvent(Guid.NewGuid(), Id, PriceBrl, Condition, now));
     }
 
     public void MarkAsSold(Guid orderId, DateTimeOffset now)
@@ -107,6 +123,18 @@ public sealed class Listing : AggregateRoot
         if (_photos.Any(x => x.AssetId == assetId)) throw new DomainException("Photo is already attached to this listing.");
         _photos.Add(new ListingPhoto(Id, assetId, normalizedType, sortOrder, _photos.Count == 0, now));
         Touch(now);
+    }
+
+    public bool ReleaseCancelledOrder(Guid orderId, DateTimeOffset now)
+    {
+        // A retry for an old order must never reactivate a later sale.
+        if (Status != MarketplaceRules.SoldStatus || SoldToOrderId != orderId) return false;
+        Status = MarketplaceRules.ActiveStatus;
+        SoldAt = null;
+        SoldToOrderId = null;
+        Touch(now);
+        Raise(new ListingUpdatedDomainEvent(Guid.NewGuid(), Id, PriceBrl, Condition, now));
+        return true;
     }
 
     public void RemovePhoto(Guid assetId, DateTimeOffset now)

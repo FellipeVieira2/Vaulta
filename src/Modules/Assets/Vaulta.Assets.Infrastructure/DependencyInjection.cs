@@ -14,12 +14,18 @@ public static class DependencyInjection
         services.AddOptions<S3StorageOptions>().Bind(configuration.GetSection("Assets:S3"))
             .Validate(o => string.IsNullOrWhiteSpace(o.AccessKey) == string.IsNullOrWhiteSpace(o.SecretKey),
                 "Assets:S3:AccessKey and Assets:S3:SecretKey must both be configured or both be absent.")
+            .Validate(o => IsEndpoint(o.ServiceUrl) && IsEndpoint(o.PublicServiceUrl),
+                "Assets:S3 endpoints must be absolute HTTP or HTTPS URLs.")
             .ValidateOnStart();
         services.AddSingleton<IAmazonS3>(provider =>
             S3ClientFactory.Create(provider.GetRequiredService<IOptions<S3StorageOptions>>().Value));
+        services.AddSingleton<S3PresigningClient>();
         services.AddDbContext<AssetsDbContext>(options => options.UseNpgsql(configuration.GetConnectionString("Vaulta")));
         services.AddScoped<IObjectStorage, S3ObjectStorage>();
         services.AddScoped<IAssetService, AssetService>();
         return services;
     }
+
+    private static bool IsEndpoint(string? value) => string.IsNullOrWhiteSpace(value)
+        || (Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https");
 }

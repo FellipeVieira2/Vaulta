@@ -21,9 +21,9 @@ Visão futura inclui scanner/Vision, catálogo, coleção, portfolio, preços, w
 ### Implementado hoje
 
 - Solution `Vaulta.slnx` em .NET 10; `Directory.Build.props` define `net10.0`, nullable, implicit usings e warnings como errors.
-- Backend de monólito modular: uma API ASP.NET Core, um PostgreSQL e módulo funcional Identity / Users / Profile.
+- Backend de monólito modular: uma API ASP.NET Core, um PostgreSQL e dez módulos: Identity, Catalog, Collection, Assets, Marketplace, Orders, Payments, Wallets, Shipping e Reviews.
 - API em `src/Vaulta.Web.Api`, com Minimal APIs versionadas em `/api/v1`, ProblemDetails, JWT, Swagger em Development, health checks, rate limiting básico, CORS configurável, headers de segurança, CorrelationId e instrumentação OpenTelemetry ASP.NET Core.
-- Módulo Identity dividido em Domain, Application, Infrastructure e Contracts. SharedKernel pequeno.
+- Módulos divididos em Domain, Application, Infrastructure e Contracts. SharedKernel pequeno. App MAUI em `src/Vaulta.App` e clientes/serviços sem MAUI em `src/Vaulta.App.Core`.
 - EF Core/PostgreSQL e migration inicial em `src/Modules/Identity/Vaulta.Identity.Infrastructure/Persistence/Migrations`.
 - Outbox transacional com worker e bus em memória. A entrega é at-least-once; não há broker externo nem tabela Inbox nesta versão.
 - Testes unitários, integração com PostgreSQL real via Testcontainers e testes arquiteturais.
@@ -31,11 +31,12 @@ Visão futura inclui scanner/Vision, catálogo, coleção, portfolio, preços, w
 
 ### Ainda não implementado
 
-- Não existe aplicativo/projeto .NET MAUI nesta solution. MAUI é a direção aprovada para o aplicativo futuro; não crie nem presuma telas, navegação ou infraestrutura de app numa tarefa apenas de backend.
-- Não existem ainda módulos de Catalog, Collection, Portfolio, Pricing, Marketplace, Orders, Payments, Ledger, Logistics, Trust, Sellers ou Notifications.
+- Home/portfolio/detalhe têm avaliação real implementada por quantidade/variante de unidades ativas, com cobertura parcial e diferenças em BRL; cálculos e teste HTTP/PostgreSQL passaram, validação no dispositivo ainda pendente. Histórico temporal do acervo ainda não foi entregue. O scanner tem OCR, captura autenticada e consulta de valores convertidos para BRL. Não apresente demonstrações como dados reais de mercado.
+- Itens anunciados ficam bloqueados; a confirmação de recebimento pelo comprador transfere a unidade, preservando o histórico privado do vendedor. Publicação e transferência interrompidas têm recuperação idempotente; veja `docs/collection-listing-lifecycle.md`. Reservas com expiração e onboarding/KYC completo ainda estão incompletos. Sem saldo/saque: repasse direto por Pix verificado após recebimento confirmado pelo comprador e liquidação, descontados 8% e tarifas reais do Asaas do vendedor. Cancelamento antes do envio por comprador/vendedor aguarda reembolso integral confirmado; após envio exige atendimento. Claims financeiros são persistidos antes do único POST; respostas incertas só são conciliadas por consulta, sem reenvio automático. Execução real permanece desabilitada por padrão. Acompanhe limitações e evidências em `docs/business-gap-audit.md` e `docs/seller-payouts.md`.
+- O scanner por sessão implementa custo opcional, estimativas em BRL por variante, persistência local e importação retomável. Gravação é **opcional e iniciada somente por um toque explícito**, com microfone solicitado nesse momento. A leitura contínua usa estabilidade/mudança da prévia, mensagem discreta e proteção contra repetição; soma automaticamente somente com nome/número fortes e variante definida, confirmando casos incertos e outra cópia da última carta. CameraView/Media3 exportaram um MP4 vertical com áudio no emulador; depois de corrigir o atraso do encoder, os frames das revelações comum/dourada e do total final foram inspecionados. Compilação Android e 25 testes de sessão/leitura/reconhecimento/preço passaram. Voz inteligível, reflexos/montinhos reais, gravações longas e compartilhamento ainda exigem aparelho físico. Novas rotas de preço/avaliação ainda retornam 404 na API pública em 01/10/2026; o usuário confirmou que não fez deploy. Não confundir código local com publicação. Consulte `docs/scanner-sessions.md` e `docs/scanner-phone-test.md` antes de afirmar que o diferencial está pronto.
 - A lista de TCGs, moedas e idiomas permitidos no Identity é validação atual, não um catálogo global.
 - Domain Events são persistidos no Outbox com nomes versionados; o bus atual apenas executa consumers locais registrados e registra dispatch. Isso não equivale a integração externa já entregue.
-- Inbox, RabbitMQ/Kafka, Redis, object storage, exportação de telemetria, busca dedicada, feature flags e ledger financeiro não estão implantados.
+- Não há broker externo, Inbox geral, Redis, busca dedicada ou exportação de telemetria configurada. Assets usa object storage S3/MinIO. Wallets preserva dados históricos; não criar novas carteiras/backfill nem registrar crédito automático de novos pagamentos.
 
 ### Evolução esperada
 
@@ -55,7 +56,7 @@ Use os caminhos físicos abaixo; os nomes de pastas lógicas em `Vaulta.slnx` n�
 - `tests/Vaulta.Identity.IntegrationTests` — fluxos HTTP e PostgreSQL via Testcontainers.
 - `tests/Vaulta.ArchitectureTests` — regras de dependência entre assemblies.
 
-A solution contém nove projetos, todos do backend ou testes. Preserve a direção atual de dependências: API → Infrastructure/composição; Infrastructure → Application; Application → Domain e Contracts; Domain → SharedKernel. Contracts e SharedKernel permanecem independentes de Infrastructure/API. Não introduza referências circulares entre módulos.
+A solution contém os dez módulos, API, SharedKernel, App, App.Core e projetos de testes, incluindo `Vaulta.Commerce.UnitTests`. Preserve a direção atual de dependências: API → Infrastructure/composição; Infrastructure → Application; Application → Domain e Contracts; Domain → SharedKernel. Contracts e SharedKernel permanecem independentes de Infrastructure/API. App consome contratos e App.Core; não referencia Infrastructure. Não introduza referências circulares entre módulos.
 
 ## 4. Arquitetura e padrões do backend
 
@@ -90,14 +91,14 @@ A solution contém nove projetos, todos do backend ou testes. Preserve a direç�
 - `IdentityDbContext.SaveChanges` persiste alterações do aggregate e mensagens do Outbox na mesma transação. Não publique efeitos externos antes do commit.
 - Outbox atual usa JSONB, nomes versionados, processamento em lotes e `FOR UPDATE SKIP LOCKED`. Assume at-least-once; consumidores externos futuros precisam ser idempotentes.
 - Hoje o bus é in-memory, não há broker nem Inbox persistente. Ao introduzir consumidor durável ou efeitos externos, desenhe Inbox/idempotência com chave estável (por exemplo, mensagem + consumer) e transação apropriada; não alegue exactly-once.
-- Não há consumers de negócio registrados nesta entrega; o dispatcher atual registra o dispatch e marca as mensagens como processadas quando o bus local conclui sem erro. Isso não deve ser descrito como integração externa entregue.
+- O dispatcher marca mensagens processadas quando todos os consumers locais registrados concluem sem erro. `UserRegisteredWalletConsumer` e `PaymentConfirmedWalletConsumer` não são registrados: o produto não oferece carteira. Repasses ficam em Payments e usam worker/claim durável, sem split antecipado. `externalReference` correlaciona uma transferência Asaas; não presumir que seja chave de idempotência. Após timeout/crash, conciliar e nunca reenviar cegamente.
 - Ao evoluir envelopes, considere `EventId`, `CorrelationId`, `CausationId`, `OccurredAt` e identificadores de contexto, sem incluir senha, token ou dados pessoais desnecessários. Não adicione campos/protocolo até existir consumidor ou caso de uso.
 - Use transação PostgreSQL local para invariantes fortes dentro do bounded context. Entre contextos, prefira integração assíncrona/eventual consistency e compensação quando adequada; não introduza distributed transactions.
 - Reservas, estoque, pedidos e pagamentos futuros precisam tratar concorrência e idempotência como invariantes, não como detalhes posteriores.
 
 ### PostgreSQL e migrations
 
-- Schema corrente é `identity`; tabelas iniciais: `users`, `user_profiles`, `user_preferences`, `user_tcg_interests`, `refresh_tokens`, `outbox_messages`.
+- Schemas correntes: `identity`, `catalog`, `collection`, `assets`, `marketplace`, `orders`, `payments`, `wallets`, `shipping` e `reviews`. Outbox fica em `identity`; outros módulos excluem essa tabela de suas próprias migrations.
 - EF Core e migrations são a fonte de evolução do schema. Nunca use `EnsureCreated` como alternativa a migrations.
 - Para alteração de schema, crie migration incremental, revise SQL/operações/constraints e sincronize snapshot. Nunca edite uma migration já aplicada para corrigir ambientes existentes; use migration nova.
 - Defina PKs, FKs, unique constraints, índices, comprimentos e delete behavior explicitamente. Considere consultas reais ao desenhar índices.
@@ -121,8 +122,8 @@ Os testes de integração requerem Docker. O desenho de testes atual usa Postgre
 ## 5. API e segurança implementadas
 
 - Rotas públicas começam em `/api/v1`; preserve compatibilidade e não renomeie contratos publicados sem necessidade. Mudança incompatível pede versão/estratégia explícita.
-- Endpoints atuais ficam em `IdentityEndpoints.cs`; o host usa Minimal APIs, não controllers.
-- Identity oferece registro, login, refresh rotation, logout, `GET /api/v1/me`, atualização parcial de perfil/preferências, troca de senha e leitura de perfil público.
+- Endpoints ficam nos arquivos `*Endpoints.cs` da API, separados por módulo; o host usa Minimal APIs, não controllers. A confirmação de pagamento vem do webhook autenticado, e o comprador confirma recebimento em `/orders/{id}/deliver`.
+- Identity oferece registro, login, refresh rotation, logout, `GET /api/v1/me`, atualização parcial de perfil/preferências, endereço de entrega, troca de senha e leitura de perfil público. Recuperação por e-mail, exportação e exclusão de conta ainda precisam de implementação.
 - PATCH de perfil/preferências requer ETag em `If-Match`; omissão preserva campo e `null` limpa apenas opcionais conforme o contrato. Não permita alterar email/username pelo endpoint de perfil.
 - Erros são `ProblemDetails`; preserve mapeamento entre validação, domínio, autenticação, autorização, not-found e conflito. Erros 500 são genéricos para o cliente; nunca retorne stack trace.
 - Password hashing usa o hasher da plataforma (PBKDF2 configurado em 210.000 iterações); não invente criptografia ou hash próprio.
@@ -135,9 +136,9 @@ Os testes de integração requerem Docker. O desenho de testes atual usa Postgre
 - Autenticação JWT é configurada via options validadas no startup. Mantenha as opções ligadas à configuração efetiva do host (inclusive testes/overrides); não capture valores de configuração prematuramente em closures.
 - Mantenha Swashbuckle e Microsoft.OpenApi em versões binariamente compatíveis; não force uma versão direta que sobrescreva a dependência exigida pelo Swashbuckle sem validar geração e execução do Swagger.
 
-## 6. Aplicativo móvel futuro
+## 6. Aplicativo móvel
 
-Quando uma tarefa solicitar criar ou evoluir o app, a direção de produto é .NET MAUI com Android/iOS iniciais e organização MVVM ou equivalente. Antes de criá-lo, procure issue/escopo e mantenha-o separado do backend.
+O app existente usa .NET MAUI/MVVM, Android por padrão e iOS mediante build em Mac. Ao evoluí-lo, preserve a separação entre telas, ViewModels e os clientes testáveis de App.Core. Mudanças de backend não ampliam automaticamente o escopo das telas.
 
 No app:
 

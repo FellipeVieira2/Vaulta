@@ -13,7 +13,8 @@ public sealed class MarketplaceCommandHandlers(
     IMarketplaceCatalog catalog,
     IMarketplaceCollection collection,
     IMarketplaceAssets assets,
-    IClock clock)
+    IClock clock,
+    ListingPublicationService publication)
 {
     public async Task<SellerProfileDto> Handle(EnableSellerCommand command, CancellationToken cancellationToken)
     {
@@ -33,7 +34,7 @@ public sealed class MarketplaceCommandHandlers(
             now);
         store.AddSellerProfile(profile);
         await store.Save(cancellationToken);
-        return MapProfile(profile);
+        return MapProfile(profile, new(0, 0));
     }
 
     public async Task<Guid> Handle(UpdateSellerProfileCommand command, CancellationToken cancellationToken)
@@ -60,7 +61,8 @@ public sealed class MarketplaceCommandHandlers(
 
         var item = await collection.GetCollectibleItem(command.UserId, command.Request.CollectibleItemId, cancellationToken)
             ?? throw new NotFoundException("Collectible item not found or does not belong to this user.");
-        if (item.Status != "active") throw new ConflictException("Only active collectible items can be listed.");
+        if (!string.Equals(item.Status, MarketplaceRules.ActiveStatus, StringComparison.OrdinalIgnoreCase))
+            throw new ConflictException("Only active collectible items can be listed.");
 
         var printing = await catalog.GetPrinting(command.Request.PrintingId, cancellationToken)
             ?? throw new NotFoundException("Printing not found.");
@@ -86,7 +88,9 @@ public sealed class MarketplaceCommandHandlers(
             command.Request.Description,
             now);
         store.AddListing(listing);
+        listing.PreparePublication(now);
         await store.Save(cancellationToken);
+        await publication.Publish(listing, cancellationToken);
         return await MapListing(listing, cancellationToken);
     }
 
@@ -100,6 +104,7 @@ public sealed class MarketplaceCommandHandlers(
             command.Request.Description,
             command.Request.Version,
             clock.UtcNow);
+        await collection.ReserveListingItem(listing, cancellationToken);
         await store.Save(cancellationToken);
         return listing.Version;
     }
@@ -109,6 +114,7 @@ public sealed class MarketplaceCommandHandlers(
         var listing = await RequireListing(command.UserId, command.ListingId, cancellationToken);
         listing.Cancel(command.Version, clock.UtcNow);
         await store.Save(cancellationToken);
+        await collection.ReleaseListingItem(listing, cancellationToken);
     }
 
     public async Task Handle(AddListingPhotoCommand command, CancellationToken cancellationToken)
@@ -144,16 +150,16 @@ public sealed class MarketplaceCommandHandlers(
             throw new DomainException("Only ready, private image assets can be attached to a listing.");
     }
 
-    public static SellerProfileDto MapProfile(SellerProfile p) => new(
+    public static SellerProfileDto MapProfile(SellerProfile p, SellerReputation reputation) => new(
         p.UserId, p.Status, p.Bio, p.Street, p.City, p.State, p.ZipCode,
-        p.AverageRating, p.TotalSales, p.CreatedAt, p.Version);
+        reputation.AverageRating, p.TotalSales, p.CreatedAt, p.Version, reputation.TotalReviews);
 
     internal async Task<ListingDto> MapListing(Listing l, CancellationToken ct)
     {
         var photos = new List<ListingPhotoDto>();
         foreach (var photo in l.Photos.OrderBy(p => p.SortOrder))
         {
-            var url = await assets.GetUrl(photo.AssetId, ct);
+            var url = await assets.GetUrl(l.SellerUserId, photo.AssetId, ct);
             photos.Add(new ListingPhotoDto(photo.AssetId, photo.Type, photo.SortOrder, photo.IsPrimary,
                 url?.Url ?? "", url?.ExpiresAt ?? DateTimeOffset.MinValue));
         }

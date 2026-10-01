@@ -126,7 +126,7 @@ internal sealed class CollectionQueries(CollectionDbContext db, ICatalogCollecti
     {
         if (itemIds.Count == 0) return [];
         var rows = await db.Items.AsNoTracking().Where(x => itemIds.Contains(x.Id) && x.UserId == userId && x.Status == CollectionRules.ActiveStatus)
-            .Select(x => new { x.Id, x.CollectionEntryId, x.Condition, x.AcquisitionAmount, x.AcquisitionCurrency, x.AcquisitionDate, x.Notes, x.Status, x.CreatedAt, x.UpdatedAt, x.Version,
+            .Select(x => new { x.Id, x.CollectionEntryId, x.Condition, x.AcquisitionAmount, x.AcquisitionCurrency, x.AcquisitionDate, x.Notes, x.Status, x.CreatedAt, x.UpdatedAt, x.Version, x.ListedById,
                 Assets = x.Assets.OrderBy(asset => asset.SortOrder).Select(asset => new { asset.AssetId, asset.Type, asset.SortOrder, asset.IsPrimary }).ToArray() }).ToArrayAsync(cancellationToken);
         var result = new List<CollectibleItemDto>(rows.Length);
         foreach (var row in rows)
@@ -138,7 +138,7 @@ internal sealed class CollectionQueries(CollectionDbContext db, ICatalogCollecti
                 if (signed is not null) assetDtos.Add(new CollectionAssetDto(asset.AssetId, asset.Type, asset.SortOrder, asset.IsPrimary, signed.Url, signed.ExpiresAt));
             }
             var price = row.AcquisitionAmount is not null && row.AcquisitionCurrency is not null ? new AcquisitionPrice(row.AcquisitionAmount.Value, row.AcquisitionCurrency) : null;
-            result.Add(new CollectibleItemDto(row.Id, row.CollectionEntryId, row.Condition, price, row.AcquisitionDate, row.Notes, row.Status, row.CreatedAt, row.UpdatedAt, row.Version, assetDtos));
+            result.Add(new CollectibleItemDto(row.Id, row.CollectionEntryId, row.Condition, price, row.AcquisitionDate, row.Notes, row.Status, row.CreatedAt, row.UpdatedAt, row.Version, assetDtos, row.ListedById));
         }
         return result;
     }

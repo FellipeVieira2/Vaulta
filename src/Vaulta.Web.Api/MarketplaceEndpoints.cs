@@ -28,11 +28,11 @@ public static class MarketplaceEndpoints
         }).WithName("GetListingById").Produces<ListingDto>().ProducesProblem(404);
 
         // Seller profile management
-        mySeller.MapGet("", async (ClaimsPrincipal principal, IMarketplaceStore store, CancellationToken ct) =>
+        mySeller.MapGet("", async (ClaimsPrincipal principal, IMarketplaceQueries queries, CancellationToken ct) =>
         {
             var userId = UserId(principal);
-            var profile = await store.FindSellerProfile(userId, ct);
-            return profile is null ? Results.NotFound() : Results.Ok(MarketplaceCommandHandlers.MapProfile(profile));
+            var profile = await queries.GetSellerProfile(userId, ct);
+            return profile is null ? Results.NotFound() : Results.Ok(profile);
         }).WithName("GetMySellerProfile").Produces<SellerProfileDto>().ProducesProblem(401).ProducesProblem(404);
 
         mySeller.MapPost("", async (SellerProfileRequest request, ClaimsPrincipal principal,

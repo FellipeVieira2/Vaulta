@@ -4,6 +4,7 @@ namespace Vaulta.Payments.Application;
 
 public interface IPaymentStore
 {
+    Task<PaymentTransaction?> FindById(Guid paymentId, CancellationToken cancellationToken);
     Task<PaymentTransaction?> FindByOrderId(Guid orderId, CancellationToken cancellationToken);
     Task<PaymentTransaction?> FindByAsaasId(string asaasPaymentId, CancellationToken cancellationToken);
     void Add(PaymentTransaction transaction);
@@ -15,7 +16,11 @@ public interface IPaymentStore
 public interface IPaymentGateway
 {
     Task<CreatePaymentResult> CreatePaymentAsync(GatewayPaymentRequest request, CancellationToken cancellationToken);
+    Task<CreatePaymentResult?> FindPaymentAsync(GatewayPaymentRequest request, CancellationToken cancellationToken);
+    Task<GatewayPixPayload> GetPixPayloadAsync(string paymentId, CancellationToken cancellationToken);
 }
+
+public sealed record GatewayPixPayload(string Payload, string? ExpirationDate);
 
 public sealed record GatewayPaymentRequest(
     decimal Amount,

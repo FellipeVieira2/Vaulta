@@ -1,0 +1,36 @@
+namespace Vaulta.App.Core.Catalog;
+
+/// <summary>Local preview sampling gates recognition requests, never identifies a card itself.</summary>
+public sealed class ScannerSceneGate
+{
+    private byte[]? _stable;
+    private byte[]? _consumed;
+    private long _stableSince;
+    private bool _changed;
+
+    public bool Observe(byte[] signature, long timeMs)
+    {
+        if (signature.Length == 0) return false;
+        if (_consumed is not null && Distance(signature, _consumed) >= 22) _changed = true;
+        if (_stable is null || Distance(signature, _stable) > 9)
+        {
+            _stable = signature.ToArray(); _stableSince = timeMs; return false;
+        }
+        return timeMs - _stableSince >= 900 && (_consumed is null || _changed);
+    }
+
+    public void Consume(byte[] signature)
+    {
+        _consumed = signature.ToArray(); _changed = false;
+    }
+
+    public static bool IsSameScene(byte[] left, byte[] right) => Distance(left, right) < 22;
+
+    private static double Distance(byte[] left, byte[] right)
+    {
+        if (left.Length != right.Length) return 255;
+        long total = 0;
+        for (var i = 0; i < left.Length; i++) total += Math.Abs(left[i] - right[i]);
+        return (double)total / left.Length;
+    }
+}

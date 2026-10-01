@@ -32,6 +32,8 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
 
     public void ApplyQueryAttributes(IDictionary<string, object> query)
     {
+        if (query.TryGetValue("printingId", out var printingId) && Guid.TryParse(printingId.ToString(), out var id))
+            _viewModel.SelectPrinting(id);
         if (query.TryGetValue("screen", out var screen))
             _viewModel.ScreenId = Uri.UnescapeDataString(screen.ToString() ?? "home");
         BuildContent();
@@ -85,6 +87,7 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
             return;
         }
 
+        if (_scroll.Parent is Layout previousLayout) previousLayout.Children.Remove(_scroll);
         Content = _scroll;
         _content.Children.Clear();
         if (screen.Id is not ("home" or "collection" or "market" or "profile" or "login"))
@@ -106,6 +109,13 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
         if (!string.IsNullOrWhiteSpace(screen.Subtitle))
             _content.Children.Add(CreateLabel(screen.Subtitle, "BodyTextStyle", "TextSecondary"));
 
+        if (screen.Id is "home" or "collection")
+        {
+            var scanButton = CreateButton("Escanear carta", true);
+            scanButton.Clicked += async (_, _) => await _viewModel.NavigateCommand.ExecuteAsync("scanner");
+            _content.Children.Add(scanButton);
+        }
+
         if (screen.Id.StartsWith("scanner", StringComparison.Ordinal) || screen.Id.StartsWith("scan-", StringComparison.Ordinal))
             AddScannerVisual(screen);
 
@@ -124,34 +134,39 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
         if (screen.Id == "checkout")
             AddCheckoutAddressFields();
 
-        if (screen.Id == "wallet")
-            AddWalletView();
+        if (screen.Id == "payouts")
+            AddPayoutsView();
+        if (screen.Id == "orders")
+            AddOrdersView();
 
-        if (screen.Options is not null)
+        if (screen.Options is not null && screen.Id != "scanner-card-detail")
             AddOptions(screen);
 
         if (screen.Metrics is not null)
             AddMetrics(screen);
 
-        if (screen.Id == "card-detail")
+        if (screen.Id is "collection" or "home" or "portfolio" or "collection-item")
+            AddCollectionValuationComparisons();
+
+        if (screen.Id is "card-detail" or "add-to-collection")
             _content.Children.Add(CreateCardArtwork(_viewModel.SelectedPrinting?.ArtworkUrl, screen.Title, 300));
+
+        if (screen.Id == "scanner-card-detail")
+            _content.Children.Add(CreateScannerArtwork(_viewModel.SelectedPrinting?.ArtworkUrl, screen.Title));
+
+        if (screen.Id is "card-detail" or "scanner-card-detail")
+            AddScannerCardDetails();
 
         if (screen.Id == "collection-item")
         {
             AddCollectionItemFields(screen);
-            var cardHistory = _viewModel.SelectedPrintingId.HasValue
-                ? _viewModel.GetCardChartData(_viewModel.SelectedPrintingId.Value)
-                : null;
-            _content.Children.Add(new Vaulta.App.Views.Components.VaultaChart
-            {
-                ChartHeight = 120,
-                ItemsSource = cardHistory
-            });
         }
+
+        if (screen.Id == "listing-detail" && _viewModel.SelectedListing?.Photos.FirstOrDefault() is { } photo)
+            _content.Children.Add(CreateCardArtwork(photo.Url, "Foto real do anúncio", 300));
 
         if (screen.Id == "market")
         {
-            _viewModel.LoadMarketplaceListingsCommand.Execute(CancellationToken.None);
             if (_viewModel.MarketplaceListings is { Items.Count: > 0 })
             {
                 foreach (var listing in _viewModel.MarketplaceListings.Items)
@@ -190,7 +205,7 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
                 _content.Children.Add(CreateLabel("Nenhum anúncio ativo no momento.", "BodyTextStyle", "TextSecondary"));
             }
         }
-        else if (screen.Cards is not null)
+        else if (screen.Cards is not null && screen.Id != "orders")
         {
             AddCards(screen);
         }
@@ -204,9 +219,10 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
         busy.SetBinding(IsVisibleProperty, nameof(ExperienceViewModel.IsBusy));
         _content.Children.Add(busy);
 
-        if (screen.Actions is null || screen.Id is "checkout" or "wallet") return;
+        if (screen.Actions is null || screen.Id is "checkout" or "payouts" or "scanner-card-detail") return;
         foreach (var action in screen.Actions)
         {
+            if (action.Route == "scanner" && screen.Id is ("home" or "collection")) continue;
             var isGoogleSignIn = action.Title == "Continuar com Google";
             var button = isGoogleSignIn ? CreateGoogleSignInButton() : CreateButton(action.Title, action.IsPrimary);
             if (screen.Id == "listing-detail" && action.Title == "Comprar agora")
@@ -570,6 +586,8 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
     {
         if (screen.Id == "scanner")
         {
+            if (_viewModel.CapturedImageBytes is null)
+                _content.Children.Add(CreateScannerGuide());
             var captureButton = CreateButton("📷  Escanear Carta", true);
             captureButton.MinimumHeightRequest = 64;
             captureButton.FontSize = 18;
@@ -605,26 +623,20 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
                             CreateLabel($"Confiança: {candidate.ConfidenceScore:P0}", "CaptionTextStyle", "StatusSuccess")
                         }
                     };
-                    if (candidate.EstimatedMarketValueBrl.HasValue)
-                        details.Children.Add(CreateLabel($"Valor estimado: {candidate.EstimatedMarketValueBrl.Value:C2}", "LabelTextStyle", "BrandPrimary"));
-                    else
-                        details.Children.Add(CreateLabel("Valor de mercado indisponível", "CaptionTextStyle", "TextTertiary"));
+                    details.Children.Insert(0, CreateCardArtwork(candidate.ArtworkUrl, candidate.Name, 280));
+                    if (!string.IsNullOrWhiteSpace(candidate.Rarity))
+                        details.Children.Add(CreateLabel($"Raridade: {candidate.Rarity}", "BodySmallTextStyle"));
+                    var marketValueBrl = string.Equals(candidate.Currency, "BRL", StringComparison.OrdinalIgnoreCase)
+                        ? candidate.EstimatedMarketValueBrl
+                        : null;
+                    var formattedMarketValue = marketValueBrl?.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"));
+                    if (formattedMarketValue is not null)
+                        details.Children.Add(CreateLabel($"Valor estimado: {formattedMarketValue}", "LabelTextStyle", "BrandPrimary"));
 
-                    var addBtn = CreateButton("Adicionar à Coleção", true);
+                    var addBtn = CreateButton("Ver informações e valor", true);
                     addBtn.Clicked += async (_, _) =>
                     {
                         await _viewModel.AddScannedCardToCollectionCommand.ExecuteAsync(candidate);
-                        if (_viewModel.StatusMessage?.Contains("adicionada", StringComparison.OrdinalIgnoreCase) == true)
-                        {
-                            _viewModel.SelectCard("scan-candidates", new ScreenCard(
-                                Title: candidate.Name,
-                                Game: "Pokémon",
-                                Detail: $"{candidate.SetName} · #{candidate.CollectorNumber}",
-                                Price: candidate.EstimatedMarketValueBrl?.ToString("C2") ?? "Valor indisponível",
-                                ArtworkUrl: candidate.ArtworkUrl,
-                                Change: null));
-                            await _viewModel.NavigateCommand.ExecuteAsync("scan-confirmed");
-                        }
                     };
                     details.Children.Add(addBtn);
                     _content.Children.Add(CreateSurface(details));
@@ -712,6 +724,15 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
 
     private void AddItemFields(ScreenDefinition screen, bool includeListingFields)
     {
+        if (!includeListingFields && _viewModel.VariantLabels.Count > 0)
+        {
+            _content.Children.Add(CreateLabel("VARIANTE", "CaptionTextStyle"));
+            var variantPicker = new Picker { ItemsSource = _viewModel.VariantLabels, Title = "Selecione a variante" };
+            variantPicker.SetBinding(Picker.SelectedItemProperty, nameof(ExperienceViewModel.SelectedVariantLabel), BindingMode.TwoWay);
+            variantPicker.SelectedIndexChanged += (_, _) => _viewModel.SelectVariantCommand.Execute(variantPicker.SelectedItem as string);
+            BindInteraction(variantPicker);
+            _content.Children.Add(variantPicker);
+        }
         _content.Children.Add(CreateLabel("CONDIÇÃO", "CaptionTextStyle"));
         foreach (var condition in screen.Options ?? [])
         {
@@ -750,6 +771,36 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
 
     private void AddCheckoutAddressFields()
     {
+        if (_viewModel.CurrentPayment is { } payment)
+        {
+            _content.Children.Add(CreateLabel($"Pedido {payment.OrderId.ToString("N")[..8]} · {payment.Amount.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))}", "H3TextStyle"));
+            if (payment.Status is "pending" or "overdue")
+            {
+                if (!string.IsNullOrWhiteSpace(payment.PixQrCode))
+                {
+                    _content.Children.Add(new Editor { Text = payment.PixQrCode, IsReadOnly = true, AutoSize = EditorAutoSizeOption.TextChanges });
+                    var copy = CreateButton("Copiar código Pix", true);
+                    copy.Clicked += async (_, _) => await Clipboard.Default.SetTextAsync(payment.PixQrCode);
+                    _content.Children.Add(copy);
+                    if (payment.PixExpirationDate is { } expiration)
+                        _content.Children.Add(CreateLabel($"Validade informada pelo Asaas: {expiration.Replace('T', ' ')}. Atualize o pagamento para consultar o código vigente.", "BodySmallTextStyle", "TextSecondary"));
+                }
+                if (payment.CheckoutUrl is { } invoice)
+                {
+                    var open = CreateButton("Abrir cobrança", false);
+                    open.Clicked += async (_, _) => await Browser.Default.OpenAsync(invoice, BrowserLaunchMode.External);
+                    _content.Children.Add(open);
+                }
+            }
+            var refresh = CreateButton("Atualizar pagamento", false);
+            refresh.Clicked += async (_, _) => await _viewModel.RefreshPaymentCommand.ExecuteAsync(null);
+            _content.Children.Add(refresh);
+            return;
+        }
+        _content.Children.Add(CreateLabel("DADOS PARA COBRANÇA", "CaptionTextStyle"));
+        _content.Children.Add(CreateLabel("Na primeira compra, informe nome completo ou razão social e CPF/CNPJ do pagador. Os dados são privados e usados na cobrança pelo Asaas.", "BodySmallTextStyle", "TextSecondary"));
+        AddEntry("Nome completo / razão social", "Nome do pagador", nameof(ExperienceViewModel.BillingLegalName));
+        AddEntry("CPF / CNPJ", "Documento do pagador", nameof(ExperienceViewModel.BillingDocument));
         AddEntry("CEP", "00000-000", nameof(ExperienceViewModel.ShippingZipCode), Keyboard.Numeric);
 
         var addressLoadingIndicator = new ActivityIndicator
@@ -763,6 +814,10 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
         _content.Children.Add(addressLoadingIndicator);
 
         AddEntry("Rua / Logradouro", "Ex: Rua das Flores, 123", nameof(ExperienceViewModel.ShippingStreet));
+        AddEntry("Número", "Número ou S/N", nameof(ExperienceViewModel.ShippingNumber));
+        AddEntry("Complemento", "Opcional", nameof(ExperienceViewModel.ShippingComplement));
+        AddEntry("Bairro", "Bairro", nameof(ExperienceViewModel.ShippingNeighborhood));
+        AddEntry("Destinatário", "Quem vai receber", nameof(ExperienceViewModel.ShippingRecipient));
         AddEntry("Cidade", "Ex: São Paulo", nameof(ExperienceViewModel.ShippingCity));
         AddEntry("Estado", "Ex: SP", nameof(ExperienceViewModel.ShippingState));
 
@@ -771,21 +826,141 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
         _content.Children.Add(submitButton);
     }
 
-    private void AddWalletView()
+    private void AddPayoutsView()
     {
-        var balanceLabel = CreateLabel("R$ 0,00", "TitleTextStyle", "BrandPrimary");
-        balanceLabel.SetBinding(Label.TextProperty, new Binding(nameof(ExperienceViewModel.WalletBalance), stringFormat: "R$ {0:N2}"));
-        _content.Children.Add(balanceLabel);
+        var destination = _viewModel.PixDestination;
+        _content.Children.Add(CreateLabel(destination is null ? "CADASTRE SUA CHAVE PIX"
+            : destination.Status == "VERIFIED" ? "CHAVE PIX VERIFICADA" : "CHAVE PIX EM VERIFICAÇÃO", "CaptionTextStyle"));
+        if (destination is not null)
+            _content.Children.Add(CreateLabel($"{destination.KeyType} · {destination.MaskedKey}\n{destination.HolderName}", "BodySmallTextStyle"));
+        _content.Children.Add(CreateLabel("Use uma chave de sua titularidade. Alterar a chave exige nova verificação.", "BodySmallTextStyle", "TextSecondary"));
+        var typePicker = new Picker { Title = "Tipo de chave Pix", ItemsSource = new[] { "CPF", "CNPJ", "EMAIL", "PHONE", "EVP" } };
+        typePicker.SetBinding(Picker.SelectedItemProperty, nameof(ExperienceViewModel.PixKeyType), mode: BindingMode.TwoWay);
+        BindInteraction(typePicker);
+        _content.Children.Add(typePicker);
+        AddEntry("Chave Pix", "CPF/CNPJ sem pontuação; telefone com +55", nameof(ExperienceViewModel.PixKey));
+        var save = CreateButton(destination is null ? "Cadastrar chave Pix" : "Alterar chave Pix", true);
+        save.Clicked += async (_, _) => await _viewModel.RegisterPixCommand.ExecuteAsync(null);
+        _content.Children.Add(save);
+        var refresh = CreateButton("Atualizar repasses", false);
+        refresh.Clicked += async (_, _) => await _viewModel.LoadPayoutsCommand.ExecuteAsync(null);
+        _content.Children.Add(refresh);
+        _content.Children.Add(CreateLabel("REPASSES POR PEDIDO", "CaptionTextStyle"));
+        if (_viewModel.SellerPayouts is not { } page) return;
+        if (page.TotalCount == 0)
+            _content.Children.Add(CreateLabel("Seus repasses aparecerão aqui após o pagamento das vendas.", "BodySmallTextStyle", "TextSecondary"));
+        foreach (var payout in page.Items)
+        {
+            _content.Children.Add(CreateSurface(new VerticalStackLayout
+            {
+                Spacing = 6,
+                Children =
+                {
+                    CreateLabel($"Pedido {payout.OrderId.ToString("N")[..8]}", "CaptionTextStyle"),
+                    CreateLabel(payout.SellerNetBrl is { } net
+                        ? $"Repasse líquido: {net.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))}"
+                        : $"{(payout.PaymentFeeBrl.HasValue ? "Antes da tarifa Pix" : "Estimativa antes das tarifas")}: {payout.AmountBrl.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))}", "H3TextStyle", "BrandPrimary"),
+                    CreateLabel($"Venda: {payout.ItemPriceBrl.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))} · Taxa (8%): {payout.PlatformFeeBrl.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))}", "BodySmallTextStyle"),
+                    CreateLabel($"Tarifa da cobrança: {(payout.PaymentFeeBrl is { } chargeFee ? chargeFee.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) : "aguardando liquidação")}\nTarifa Pix: {(payout.TransferFeeBrl is { } pixFee ? pixFee.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) : "aguardando transferência")}", "BodySmallTextStyle"),
+                    CreateLabel(ExperienceViewModel.PayoutStatusText(payout.Status), "BodySmallTextStyle", "TextSecondary"),
+                    CreateLabel(payout.MaskedDestinationKey is null ? "" : $"Destino: {payout.MaskedDestinationKey}", "BodySmallTextStyle", "TextSecondary")
+                }
+            }));
+        }
+        if (page.Page > 1)
+        {
+            var previous = CreateButton("Página anterior", false);
+            previous.Clicked += async (_, _) => await _viewModel.ChangePayoutPageCommand.ExecuteAsync(page.Page - 1);
+            _content.Children.Add(previous);
+        }
+        if ((long)page.Page * page.PageSize < page.TotalCount)
+        {
+            var next = CreateButton("Próxima página", false);
+            next.Clicked += async (_, _) => await _viewModel.ChangePayoutPageCommand.ExecuteAsync(page.Page + 1);
+            _content.Children.Add(next);
+        }
+    }
 
-        _content.Children.Add(CreateLabel("HISTÓRICO DE TRANSAÇÕES", "CaptionTextStyle"));
-        _content.Children.Add(CreateLabel("Carregando transações...", "BodySmallTextStyle", "TextSecondary"));
-
-        AddEntry("Valor do saque", "Ex: 150,00", nameof(ExperienceViewModel.WithdrawAmount), Keyboard.Numeric);
-        var withdrawButton = CreateButton("Solicitar saque", true);
-        withdrawButton.Clicked += async (_, _) => await _viewModel.RequestWithdrawalCommand.ExecuteAsync(null);
-        _content.Children.Add(withdrawButton);
-
-        _ = _viewModel.LoadWalletCommand.ExecuteAsync(null);
+    private void AddOrdersView()
+    {
+        var refresh = CreateButton("Atualizar pedidos", false);
+        refresh.Clicked += async (_, _) => await _viewModel.ChangeOrderPageCommand.ExecuteAsync(_viewModel.UserOrdersPage?.Page ?? 1);
+        _content.Children.Add(refresh);
+        foreach (var order in _viewModel.UserOrders)
+        {
+            var details = new VerticalStackLayout { Spacing = 8 };
+            details.Children.Add(CreateLabel($"Pedido {order.Id.ToString("N")[..8]}", "CaptionTextStyle"));
+            details.Children.Add(CreateLabel(order.Snapshot.TotalAmountBrl.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")), "H3TextStyle", "BrandPrimary"));
+            details.Children.Add(CreateLabel(order.Status switch
+            {
+                "pending" => "Aguardando pagamento", "paid" => "Pagamento confirmado", "shipped" => "Enviado",
+                "delivered" => "Recebimento confirmado", "cancelled" => "Cancelado", "refunded" => "Reembolsado",
+                "refund_pending" => "Cancelamento solicitado · aguardando reembolso", _ => "Verificando pedido"
+            }, "BodySmallTextStyle"));
+            if (!string.IsNullOrWhiteSpace(order.TrackingCode)) details.Children.Add(CreateLabel($"Rastreio: {order.TrackingCode}", "BodySmallTextStyle"));
+            if (_viewModel.IsBuyer(order) && order.Status == "shipped")
+            {
+                var confirm = CreateButton("Confirmar recebimento", true);
+                confirm.Clicked += async (_, _) =>
+                {
+                    if (await DisplayAlertAsync("Recebeu sua carta?", "Confirme apenas depois de receber e conferir o pedido. A confirmação permite o repasse ao vendedor.", "Sim, recebi", "Cancelar"))
+                        await _viewModel.ConfirmReceiptCommand.ExecuteAsync(order.Id);
+                };
+                BindInteraction(confirm);
+                details.Children.Add(confirm);
+            }
+            if (_viewModel.IsSeller(order) && order.Status == "paid")
+            {
+                var tracking = new Entry { Placeholder = "Código de rastreio" };
+                var ship = CreateButton("Registrar envio", true);
+                ship.Clicked += async (_, _) => await _viewModel.MarkShipmentAsync(order.Id, tracking.Text ?? string.Empty);
+                BindInteraction(tracking); BindInteraction(ship);
+                details.Children.Add(tracking); details.Children.Add(ship);
+            }
+            if (order.Status is "pending" or "paid")
+            {
+                if (_viewModel.IsBuyer(order) && order.Status == "pending")
+                {
+                    var pay = CreateButton("Continuar pagamento", true);
+                    pay.Clicked += (_, _) => _viewModel.ContinueOrderPayment(order);
+                    BindInteraction(pay); details.Children.Add(pay);
+                }
+                var cancel = CreateButton("Cancelar pedido", false);
+                cancel.Clicked += async (_, _) =>
+                {
+                    var reason = await DisplayPromptAsync("Cancelar pedido", "Informe o motivo do cancelamento. Se o pedido foi pago, será solicitado o reembolso integral.", "Solicitar cancelamento", "Voltar", maxLength: 500);
+                    if (!string.IsNullOrWhiteSpace(reason)) await _viewModel.CancelOrderAsync(order.Id, reason);
+                };
+                BindInteraction(cancel); details.Children.Add(cancel);
+            }
+            if (order.Status == "refund_pending" || order.Status == "cancelled" && order.PaidAt.HasValue)
+            {
+                var refund = CreateButton("Verificar reembolso", false);
+                refund.Clicked += async (_, _) =>
+                {
+                    var state = await _viewModel.GetRefundAsync(order.Id);
+                    if (_viewModel.IsBuyer(order) && state?.RequestUrl is { } url)
+                        await Browser.Default.OpenAsync(url, BrowserLaunchMode.External);
+                };
+                BindInteraction(refund); details.Children.Add(refund);
+            }
+            if (order.Status is "shipped" or "delivered")
+                details.Children.Add(CreateLabel("Cancelamento após o envio: procure o atendimento.", "BodySmallTextStyle", "TextSecondary"));
+            _content.Children.Add(CreateSurface(details));
+        }
+        if (_viewModel.UserOrdersPage is not { } page) return;
+        if (page.Page > 1)
+        {
+            var previous = CreateButton("Página anterior", false);
+            previous.Clicked += async (_, _) => await _viewModel.ChangeOrderPageCommand.ExecuteAsync(page.Page - 1);
+            _content.Children.Add(previous);
+        }
+        if ((long)page.Page * page.PageSize < page.TotalCount)
+        {
+            var next = CreateButton("Próxima página", false);
+            next.Clicked += async (_, _) => await _viewModel.ChangeOrderPageCommand.ExecuteAsync(page.Page + 1);
+            _content.Children.Add(next);
+        }
     }
 
     private void AddEntry(string label, string placeholder, string propertyName, Keyboard? keyboard = null, bool isPassword = false)
@@ -818,6 +993,7 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
 
     private void AddCollectionItemFields(ScreenDefinition screen)
     {
+        if (_viewModel.SelectedItem?.ListedById.HasValue == true) return;
         _content.Children.Add(CreateLabel("CONDIÇÃO", "CaptionTextStyle"));
         foreach (var condition in screen.Options ?? [])
         {
@@ -841,7 +1017,7 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
 
         foreach (var option in screen.Options!)
         {
-            if (screen.Id == "card-detail")
+            if (screen.Id is "card-detail" or "scanner-card-detail")
             {
                 var variantChip = CreateButton(option, _viewModel.SelectedVariantLabel == option);
                 variantChip.ClassId = option;
@@ -891,9 +1067,7 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
 
     private void AddMetrics(ScreenDefinition screen)
     {
-        var metrics = screen.Id == "portfolio"
-            ? screen.Metrics!.Concat([new ScreenMetric("VARIAÇÃO 24H", "+ 2,4%"), new ScreenMetric("VARIAÇÃO 30D", "+ 8,7%")])
-            : screen.Metrics!;
+        var metrics = screen.Metrics!;
 
         foreach (var metric in metrics)
         {
@@ -903,6 +1077,21 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
             if (metric.Detail is not null)
                 block.Children.Add(CreateLabel(metric.Detail, "CaptionTextStyle"));
             _content.Children.Add(CreateSurface(block));
+        }
+    }
+
+    private void AddCollectionValuationComparisons()
+    {
+        if (_viewModel.VisibleValuation is not { } valuation) return;
+        foreach (var period in valuation.Comparisons)
+        {
+            var color = period.DifferenceBrl < 0 ? "StatusError" : "StatusSuccess";
+            var content = new VerticalStackLayout { Spacing = 6 };
+            content.Children.Add(CreateLabel($"VS. MÉDIA DE {period.Days} {(period.Days == 1 ? "DIA" : "DIAS")}", "CaptionTextStyle"));
+            content.Children.Add(CreateLabel((period.DifferenceBrl > 0 ? "+ " : "") + ExperienceViewModel.FormatBrl(period.DifferenceBrl), "H2TextStyle", color));
+            content.Children.Add(CreateLabel($"{period.ComparedItems} de {valuation.TotalItems} cartas com comparação" +
+                (period.DifferencePercent is { } percent ? $" · {percent.ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))}%" : ""), "CaptionTextStyle", "TextSecondary"));
+            _content.Children.Add(CreateSurface(content));
         }
     }
 

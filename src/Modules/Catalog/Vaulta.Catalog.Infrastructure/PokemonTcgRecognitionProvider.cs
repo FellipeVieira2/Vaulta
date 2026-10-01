@@ -41,7 +41,7 @@ public sealed class PokemonTcgRecognitionProvider(
 
             return candidates;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not (OperationCanceledException or OcrUnavailableException or Vaulta.SharedKernel.DomainException))
         {
             logger.LogError(ex, "Card recognition failed unexpectedly");
             return [];

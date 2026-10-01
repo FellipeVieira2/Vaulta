@@ -10,7 +10,8 @@ namespace Vaulta.Orders.Application;
 public sealed class OrderCommandHandlers(
     IOrderStore store,
     IOrderMarketplace marketplace,
-    IClock clock)
+    IClock clock,
+    IOrderCollection collection)
 {
     public async Task<OrderDto> Handle(CreateOrderCommand command, CancellationToken cancellationToken)
     {
@@ -45,9 +46,13 @@ public sealed class OrderCommandHandlers(
             listing.PriceBrl,
             platformFee,
             command.Request.ShippingStreet,
+            command.Request.ShippingNumber,
+            command.Request.ShippingComplement,
+            command.Request.ShippingNeighborhood,
             command.Request.ShippingCity,
             command.Request.ShippingState,
             command.Request.ShippingZipCode,
+            command.Request.ShippingRecipient,
             now);
 
         store.AddOrder(order);
@@ -61,12 +66,9 @@ public sealed class OrderCommandHandlers(
         return MapOrder(order);
     }
 
-    public async Task Handle(ConfirmPaymentCommand command, CancellationToken cancellationToken)
-    {
-        var order = await RequireOrder(command.OrderId, cancellationToken);
-        order.MarkAsPaid(command.PaymentId, clock.UtcNow);
-        await store.Save(cancellationToken);
-    }
+    public Task Handle(ConfirmPaymentCommand command, CancellationToken cancellationToken) =>
+        Task.FromException(new ForbiddenException(
+            "Payment confirmation is only accepted from the authenticated payment provider."));
 
     public async Task Handle(MarkShippedCommand command, CancellationToken cancellationToken)
     {
@@ -80,8 +82,14 @@ public sealed class OrderCommandHandlers(
     public async Task Handle(MarkDeliveredCommand command, CancellationToken cancellationToken)
     {
         var order = await RequireOrder(command.OrderId, cancellationToken);
-        order.MarkAsDelivered(clock.UtcNow);
-        await store.Save(cancellationToken);
+        if (order.BuyerId != command.BuyerId)
+            throw new ForbiddenException("Only the buyer can confirm delivery of an order.");
+        if (order.Status != OrderRules.DeliveredStatus)
+        {
+            order.MarkAsDelivered(clock.UtcNow);
+            await store.Save(cancellationToken);
+        }
+        await collection.TransferDeliveredItem(order, cancellationToken);
     }
 
     public async Task Handle(CancelOrderCommand command, CancellationToken cancellationToken)
@@ -94,7 +102,7 @@ public sealed class OrderCommandHandlers(
 
         // Release the listing back to active if cancelled before payment
         if (order.Status == OrderRules.CancelledStatus && order.PaidAt is null)
-            await marketplace.ReleaseListing(order.ListingId, cancellationToken);
+            await marketplace.ReleaseListing(order, cancellationToken);
     }
 
     private async Task<Order> RequireOrder(Guid orderId, CancellationToken cancellationToken) =>
@@ -104,7 +112,7 @@ public sealed class OrderCommandHandlers(
     internal static OrderDto MapOrder(Order o) => new(
         o.Id, o.BuyerId, o.SellerId, o.ListingId, o.CollectibleItemId, o.PrintingId, o.VariantId,
         new OrderSnapshotDto(o.Condition, o.ItemPriceBrl, o.PlatformFeeBrl, o.TotalAmountBrl, o.Currency),
-        new OrderShippingDto(o.ShippingStreet, o.ShippingCity, o.ShippingState, o.ShippingZipCode),
+        new OrderShippingDto(o.ShippingStreet, o.ShippingNumber, o.ShippingComplement, o.ShippingNeighborhood, o.ShippingCity, o.ShippingState, o.ShippingZipCode, o.ShippingRecipient),
         o.Status, o.PaymentId, o.TrackingCode, o.CancellationReason,
         o.CreatedAt, o.UpdatedAt, o.PaidAt, o.ShippedAt, o.DeliveredAt, o.CancelledAt, o.Version);
 }

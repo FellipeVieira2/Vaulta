@@ -32,7 +32,9 @@ internal sealed class ProfileConfiguration : IEntityTypeConfiguration<UserProfil
         b.Property(x => x.DisplayName).HasMaxLength(100); b.Property(x => x.Bio).HasMaxLength(500);
         b.Property(x => x.AvatarUrl).HasMaxLength(2048); b.Property(x => x.CountryCode).HasMaxLength(2);
         b.Property(x => x.State).HasMaxLength(100); b.Property(x => x.City).HasMaxLength(100);
-        b.Property(x => x.ShippingStreet).HasMaxLength(200); b.Property(x => x.ShippingCity).HasMaxLength(100);
+        b.Property(x => x.ShippingStreet).HasMaxLength(200); b.Property(x => x.ShippingCity).HasMaxLength(200);
+        b.Property(x => x.ShippingNumber).HasMaxLength(20); b.Property(x => x.ShippingComplement).HasMaxLength(100);
+        b.Property(x => x.ShippingNeighborhood).HasMaxLength(100); b.Property(x => x.ShippingRecipient).HasMaxLength(100);
         b.Property(x => x.ShippingState).HasMaxLength(100); b.Property(x => x.ShippingZipCode).HasMaxLength(9);
     }
 }

@@ -11,7 +11,12 @@ public static class DependencyInjection
     {
         services.AddDbContext<CollectionDbContext>(options => options.UseNpgsql(configuration.GetConnectionString("Vaulta")));
         services.AddScoped<ICollectionStore, CollectionStore>();
+        services.AddScoped<ICollectionCommerceStore, CollectionCommerceStore>();
+        services.AddScoped<ICollectionMarketplace, CollectionMarketplaceService>();
         services.AddScoped<ICollectionQueries, CollectionQueries>();
+        services.AddScoped<ICollectionValuationSource, CollectionValuationSource>();
+        services.AddSingleton(CollectionValuationLimits.Default);
+        services.AddScoped<CollectionValuationService>();
         services.AddScoped<ICollectionCatalog, CollectionCatalogAdapter>();
         services.AddScoped<ICollectionAssets, CollectionAssetsAdapter>();
         services.AddScoped<CollectionCommandHandlers>();

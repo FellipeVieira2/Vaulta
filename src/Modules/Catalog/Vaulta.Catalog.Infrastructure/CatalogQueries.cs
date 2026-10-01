@@ -4,8 +4,28 @@ using Vaulta.Catalog.Contracts;
 
 namespace Vaulta.Catalog.Infrastructure;
 
-internal sealed class CatalogQueries(CatalogDbContext db) : ICatalogSearch, ICatalogCollectionReader
+internal sealed class CatalogQueries(CatalogDbContext db) : ICatalogSearch, ICatalogCollectionReader, ICardRecognitionCatalog
 {
+    public async Task<IReadOnlyList<RecognitionCatalogCard>> FindCandidatesAsync(string name, string? collectorNumber, string gameCode, CancellationToken cancellationToken)
+    {
+        var normalizedName = Catalog.Domain.CatalogNormalizer.NormalizeName(name);
+        if (normalizedName.Length < 3) return [];
+        var number = collectorNumber is null ? null : System.Text.RegularExpressions.Regex.Replace(collectorNumber.Split('/')[0], @"\s+", "").ToUpperInvariant().TrimStart('0');
+        var numberPattern = string.IsNullOrEmpty(number) ? null : "^0*" + System.Text.RegularExpressions.Regex.Escape(number) + "(?:/.*)?$";
+        var matches = await db.Printings.AsNoTracking()
+            .Where(x => x.IsActive && x.Card.Game.Code == gameCode)
+            .Where(x => EF.Functions.TrigramsSimilarity(x.Card.NormalizedName, normalizedName) >= 0.25
+                || (numberPattern != null && System.Text.RegularExpressions.Regex.IsMatch(x.NormalizedCollectorNumber, numberPattern)))
+            .OrderByDescending(x => EF.Functions.TrigramsSimilarity(x.Card.NormalizedName, normalizedName))
+            .ThenBy(x => x.Id).Take(50)
+            .Select(x => new
+            {
+                Card = new CatalogSearchResult(x.Id, x.Card.Game.Code, x.SetId, x.Set.Name, x.Card.Name, x.CollectorNumber, x.Language, x.Rarity, x.ExternalArtworkUrl),
+                Variants = x.Variants.Where(v => v.IsActive).OrderBy(v => v.Code).Select(v => v.Code).ToArray()
+            }).ToArrayAsync(cancellationToken);
+        return matches.Select(x => new RecognitionCatalogCard(x.Card, x.Variants)).ToArray();
+    }
+
     public async Task<CatalogSearchPage> Search(string query, string? gameCode, int page, int pageSize, CancellationToken cancellationToken)
     {
         var normalized = Catalog.Domain.CatalogNormalizer.NormalizeName(query);

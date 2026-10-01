@@ -19,3 +19,5 @@ backups/
 *.key
 secrets.json
 __pycache__/
+.arena/
+hs_err_pid*.log

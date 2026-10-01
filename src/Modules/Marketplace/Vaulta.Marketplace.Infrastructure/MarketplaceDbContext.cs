@@ -52,7 +52,7 @@ public sealed class MarketplaceDbContext(DbContextOptions<MarketplaceDbContext> 
             b.HasIndex(x => new { x.SellerUserId, x.Status }).HasDatabaseName("ix_marketplace_listings_seller_status");
             b.HasIndex(x => new { x.PrintingId, x.Status }).HasDatabaseName("ix_marketplace_listings_printing_status");
             b.HasIndex(x => new { x.Status, x.CreatedAt }).HasDatabaseName("ix_marketplace_listings_status_created");
-            b.HasIndex(x => x.CollectibleItemId).IsUnique().HasFilter("status = 'active'").HasDatabaseName("ux_marketplace_listings_active_item");
+            b.HasIndex(x => x.CollectibleItemId).IsUnique().HasFilter("status IN ('active', 'publishing')").HasDatabaseName("ux_marketplace_listings_active_item");
         });
 
         modelBuilder.Entity<ListingPhoto>(b =>

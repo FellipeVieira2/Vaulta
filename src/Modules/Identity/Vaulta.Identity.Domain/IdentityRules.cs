@@ -55,4 +55,17 @@ public static partial class IdentityRules
             throw new DomainException("Avatar URL must use HTTPS.");
         return value;
     }
+
+    [GeneratedRegex(@"^\d{5}-?\d{3}$", RegexOptions.CultureInvariant)]
+    private static partial Regex ZipCodePattern();
+
+    public static string? ZipCode(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var trimmed = value.Trim();
+        if (trimmed.Length > 10) throw new DomainException("shippingZipCode is too long.");
+        if (!ZipCodePattern().IsMatch(trimmed))
+            throw new DomainException("Invalid zip code format. Expected 00000-000 or 00000000.");
+        return trimmed;
+    }
 }

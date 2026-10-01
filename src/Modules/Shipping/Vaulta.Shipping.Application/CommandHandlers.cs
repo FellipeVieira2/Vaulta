@@ -68,8 +68,7 @@ public sealed class ShippingCommandHandlers(
 
         await store.Save(cancellationToken);
 
-        if (shipment.Status == ShippingRules.DeliveredStatus)
-            await orders.MarkOrderAsDelivered(shipment.OrderId, cancellationToken);
+        // Carrier/seller tracking does not confirm buyer receipt or authorize seller payout.
     }
 
     public static ShipmentDto MapShipment(Shipment s) => new(

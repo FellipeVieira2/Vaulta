@@ -5,6 +5,7 @@
 <ProjectReference Include="../../Catalog/Vaulta.Catalog.Application/Vaulta.Catalog.Application.csproj" />
 <ProjectReference Include="../../Assets/Vaulta.Assets.Application/Vaulta.Assets.Application.csproj" />
 <ProjectReference Include="../../Collection/Vaulta.Collection.Application/Vaulta.Collection.Application.csproj" />
+<ProjectReference Include="../../Reviews/Vaulta.Reviews.Application/Vaulta.Reviews.Application.csproj" />
 <FrameworkReference Include="Microsoft.AspNetCore.App" />
 <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
 <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.6" />

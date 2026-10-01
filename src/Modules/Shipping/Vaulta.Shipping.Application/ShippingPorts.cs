@@ -14,5 +14,4 @@ public interface IShippingOrders
 {
     Task<Orders.Contracts.OrderDto?> GetOrder(Guid orderId, CancellationToken cancellationToken);
     Task MarkOrderAsShipped(Guid orderId, string trackingCode, CancellationToken cancellationToken);
-    Task MarkOrderAsDelivered(Guid orderId, CancellationToken cancellationToken);
 }

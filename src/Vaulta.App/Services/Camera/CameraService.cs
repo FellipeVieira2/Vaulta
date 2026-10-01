@@ -9,7 +9,12 @@ public sealed class CameraService : ICameraService
 
         var photo = await MediaPicker.Default.CapturePhotoAsync(new MediaPickerOptions
         {
-            Title = "Escanear carta"
+            Title = "Escanear carta",
+            MaximumWidth = 1920,
+            MaximumHeight = 1920,
+            CompressionQuality = 90,
+            RotateImage = true,
+            PreserveMetaData = false
         });
 
         if (photo is null)

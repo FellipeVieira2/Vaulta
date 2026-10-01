@@ -10,13 +10,14 @@ public interface ICardSearchProvider
 
 public sealed class ScannerService(
     IEnumerable<ICardRecognitionProvider> recognitionProviders,
-    IEnumerable<ICardSearchProvider> searchProviders,
     ICatalogSearch catalogSearch,
     IExternalIdResolver externalIdResolver)
 {
     public async Task<CardScanResultDto> IdentifyAsync(CardScanRequest request, CancellationToken cancellationToken)
     {
         var gameCode = request.GameCode?.Trim().ToLowerInvariant();
+        if (gameCode is not null && !recognitionProviders.Any(p => p.GameCode.Equals(gameCode, StringComparison.OrdinalIgnoreCase)))
+            throw new Vaulta.SharedKernel.DomainException("O scanner ainda não suporta este jogo.");
         var candidates = new List<CardRecognitionCandidate>();
 
         foreach (var provider in recognitionProviders)
@@ -28,25 +29,6 @@ public sealed class ScannerService(
             candidates.AddRange(results);
         }
 
-        if (candidates.Count == 0 && !string.IsNullOrWhiteSpace(gameCode))
-        {
-            var searchResults = await catalogSearch.Search("", gameCode, 1, 5, cancellationToken);
-            foreach (var item in searchResults.Items)
-            {
-                candidates.Add(new CardRecognitionCandidate(
-                    PrintingId: item.PrintingId.ToString(),
-                    Name: item.CardName,
-                    SetName: item.SetName,
-                    CollectorNumber: item.CollectorNumber,
-                    Rarity: item.Rarity,
-                    ArtworkUrl: item.ArtworkUrl,
-                    EstimatedMarketValueBrl: null,
-                    Currency: null,
-                    VariantCodes: ["normal"],
-                    ConfidenceScore: 0.5));
-            }
-        }
-
         return await MapResult(candidates, cancellationToken);
     }
 
@@ -55,32 +37,21 @@ public sealed class ScannerService(
         var normalizedGame = gameCode?.Trim().ToLowerInvariant();
         var candidates = new List<CardRecognitionCandidate>();
 
-        foreach (var provider in searchProviders)
+        var searchResults = await catalogSearch.Search(query, normalizedGame, 1, 10, cancellationToken);
+        foreach (var item in searchResults.Items)
         {
-            if (normalizedGame is not null && !string.Equals(provider.GameCode, normalizedGame, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            var results = await provider.SearchByNameAsync(query, cancellationToken);
-            candidates.AddRange(results);
-        }
-
-        if (candidates.Count == 0)
-        {
-            var searchResults = await catalogSearch.Search(query, normalizedGame, 1, 10, cancellationToken);
-            foreach (var item in searchResults.Items)
-            {
-                candidates.Add(new CardRecognitionCandidate(
-                    PrintingId: item.PrintingId.ToString(),
-                    Name: item.CardName,
-                    SetName: item.SetName,
-                    CollectorNumber: item.CollectorNumber,
-                    Rarity: item.Rarity,
-                    ArtworkUrl: item.ArtworkUrl,
-                    EstimatedMarketValueBrl: null,
-                    Currency: null,
-                    VariantCodes: ["normal"],
-                    ConfidenceScore: 0.7));
-            }
+            var printing = await catalogSearch.GetPrinting(item.PrintingId, cancellationToken);
+            candidates.Add(new CardRecognitionCandidate(
+                PrintingId: item.PrintingId.ToString(),
+                Name: item.CardName,
+                SetName: item.SetName,
+                CollectorNumber: item.CollectorNumber,
+                Rarity: item.Rarity,
+                ArtworkUrl: item.ArtworkUrl,
+                EstimatedMarketValueBrl: null,
+                Currency: null,
+                VariantCodes: printing?.Variants.Select(x => x.Code).ToArray() ?? [],
+                ConfidenceScore: 0.7));
         }
 
         return await MapResult(candidates, cancellationToken);
@@ -116,7 +87,8 @@ public sealed class ScannerService(
                     c.Currency,
                     c.VariantCodes,
                     c.ConfidenceScore,
-                    externalPrintingId);
+                    externalPrintingId,
+                    c.HasCollectorNumberMatch);
             })
             .ToArray();
 

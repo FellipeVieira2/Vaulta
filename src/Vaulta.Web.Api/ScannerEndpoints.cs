@@ -10,10 +10,20 @@ public static class ScannerEndpoints
     {
         var scanner = app.MapGroup("/api/v1/scanner").WithTags("Scanner").RequireAuthorization();
 
-        scanner.MapPost("/identify", async (IFormFile image, string? gameCode, ScannerService service, CancellationToken ct) =>
+        scanner.MapGet("/printings/{printingId:guid}", async (Guid printingId, IScannerCardDetailsReader reader, CancellationToken ct) =>
+        {
+            var result = await reader.GetAsync(printingId, ct);
+            return result is null ? Results.NotFound() : Results.Ok(result);
+        }).WithName("GetScannerCardDetails").Produces<ScannerCardDetailsDto>().ProducesProblem(401).Produces(404);
+
+        scanner.MapPost("/identify", async (IFormFile image, [FromQuery] string? gameCode, ScannerService service, CancellationToken ct) =>
         {
             if (image is null || image.Length == 0)
-                return Results.BadRequest(new { error = "Image file is required." });
+                return Results.Problem(statusCode: 400, title: "Envie uma imagem da carta.");
+            if (image.Length > 15 * 1024 * 1024)
+                return Results.Problem(statusCode: 413, title: "A imagem deve ter até 15 MB.");
+            if (image.ContentType is not ("image/jpeg" or "image/png" or "image/webp"))
+                return Results.Problem(statusCode: 415, title: "Use uma imagem JPEG, PNG ou WebP.");
 
             using var stream = image.OpenReadStream();
             using var memoryStream = new MemoryStream();

@@ -20,5 +20,6 @@ public sealed record PaymentDto(
     IReadOnlyList<PaymentSplitDto> Splits,
     DateTimeOffset CreatedAt,
     DateTimeOffset? ConfirmedAt,
-    Guid Version);
+    Guid Version,
+    string? PixExpirationDate = null);
 public sealed record WebhookPayload(string Event, string PaymentId, string? Status, decimal? Value, decimal? NetValue);

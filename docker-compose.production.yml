@@ -35,6 +35,12 @@ services:
       Jwt__Secret: ${JWT_SECRET:?Set JWT_SECRET in .env.production}
       Jwt__Issuer: ${JWT_ISSUER:-vaulta}
       Jwt__Audience: ${JWT_AUDIENCE:-vaulta-app}
+      Asaas__BaseUrl: ${ASAAS_BASE_URL:-https://api.asaas.com/}
+      Asaas__ApiKey: ${ASAAS_API_KEY:-}
+      Asaas__WebhookToken: ${ASAAS_WEBHOOK_TOKEN:-}
+      Payouts__TransfersEnabled: ${PAYOUTS_TRANSFERS_ENABLED:-false}
+      Refunds__RequestsEnabled: ${REFUNDS_REQUESTS_ENABLED:-false}
+      Payouts__IdentityReviewerUserIds__0: ${PAYOUTS_IDENTITY_REVIEWER_USER_ID:-}
       Database__ApplyMigrations: "false"
       Assets__S3__Bucket: ${ASSETS_BUCKET:-vaulta-assets-142767402064-us-east-1}
       Assets__S3__Region: ${AWS_REGION:-us-east-1}

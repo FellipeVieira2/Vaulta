@@ -70,6 +70,7 @@
     <Project Path="src/Modules/Wallets/Vaulta.Wallets.Infrastructure/Vaulta.Wallets.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Vaulta.Commerce.UnitTests/Vaulta.Commerce.UnitTests.csproj" />
     <Project Path="tests/Vaulta.App.Core.UnitTests/Vaulta.App.Core.UnitTests.csproj" />
     <Project Path="tests/Vaulta.ArchitectureTests/Vaulta.ArchitectureTests.csproj" />
     <Project Path="tests/Vaulta.Identity.IntegrationTests/Vaulta.Identity.IntegrationTests.csproj" />

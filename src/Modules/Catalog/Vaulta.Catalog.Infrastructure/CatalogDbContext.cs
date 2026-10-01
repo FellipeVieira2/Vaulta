@@ -19,6 +19,7 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("catalog");
+        modelBuilder.HasPostgresExtension("pg_trgm");
         modelBuilder.Entity<Game>().HasData(new Game
         {
             Id = Guid.Parse("f18fd4d1-2514-4b19-9eaa-f33c04564c7b"),

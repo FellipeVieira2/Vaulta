@@ -4,12 +4,13 @@ using Vaulta.SharedKernel;
 
 namespace Vaulta.Orders.Infrastructure;
 
-public sealed class OrderMarketplaceAdapter(IMarketplaceStore store) : IOrderMarketplace
+public sealed class OrderMarketplaceAdapter(IMarketplaceStore store, IClock clock, IMarketplaceCollection collection) : IOrderMarketplace
 {
     public async Task<Marketplace.Contracts.ListingDto?> GetActiveListing(Guid listingId, CancellationToken cancellationToken)
     {
         var listing = await store.FindActiveListing(listingId, cancellationToken);
         if (listing is null) return null;
+        await collection.ReserveListingItem(listing, cancellationToken);
         return new Marketplace.Contracts.ListingDto(
             listing.Id, listing.SellerUserId, listing.CollectibleItemId, listing.PrintingId, listing.VariantId,
             listing.Condition, listing.PriceBrl, listing.Currency, listing.Status, listing.Description,
@@ -24,14 +25,18 @@ public sealed class OrderMarketplaceAdapter(IMarketplaceStore store) : IOrderMar
             listing.MarkAsSold(orderId, now);
             await store.Save(cancellationToken);
         }
+        else throw new ConflictException("Anúncio não está mais disponível para este pedido.");
     }
 
-    public async Task ReleaseListing(Guid listingId, CancellationToken cancellationToken)
+    public async Task ReleaseListing(Orders.Domain.Order order, CancellationToken cancellationToken)
     {
-        // In a full implementation, this would restore the listing to active status.
-        // For now, the listing remains in its current state since we don't have a direct
-        // "unmark as sold" operation in the Listing aggregate. This is a known limitation
-        // that should be addressed by adding a Reactivate() method to the Listing aggregate.
-        await Task.CompletedTask;
+        if (order.ShippedAt.HasValue || order.Status is not (Orders.Domain.OrderRules.CancelledStatus or Orders.Domain.OrderRules.RefundedStatus))
+            throw new ConflictException("Only a cancelled or fully refunded order before shipping can release its listing.");
+        var listing = await store.FindListing(order.SellerId, order.ListingId, cancellationToken);
+        if (listing?.Status == Marketplace.Domain.MarketplaceRules.SoldStatus && listing.SoldToOrderId == order.Id)
+        {
+            await collection.ReserveListingItem(listing, cancellationToken);
+            if (listing.ReleaseCancelledOrder(order.Id, clock.UtcNow)) await store.Save(cancellationToken);
+        }
     }
 }

@@ -17,10 +17,7 @@ public sealed class WalletCommandHandlers(
             throw new DomainException("Credit amount must be greater than zero.");
 
         var wallet = await store.FindByUserId(command.UserId, cancellationToken)
-            ?? Wallet.Create(command.UserId, clock.UtcNow);
-
-        if (wallet.Id == Guid.Empty)
-            store.Add(wallet);
+            ?? CreateWallet(command.UserId);
 
         wallet.Credit(command.Amount, command.ReferenceId, command.Description, clock.UtcNow);
         await store.Save(cancellationToken);
@@ -52,10 +49,22 @@ public sealed class WalletCommandHandlers(
 
             if (credit.Amount <= 0) continue;
 
-            wallet.Credit(Math.Round(credit.Amount, 2), paymentId.ToString(), credit.Description ?? "Payment split", occurredAt);
+            // Outbox delivery is at-least-once, so a redelivered event must not credit twice.
+            var reference = paymentId.ToString();
+            if (await store.HasLedgerEntry(wallet.Id, reference, "CREDIT", cancellationToken))
+                continue;
+
+            wallet.Credit(Math.Round(credit.Amount, 2), reference, credit.Description ?? "Payment split", occurredAt);
         }
 
         await store.Save(cancellationToken);
+    }
+
+    private Wallet CreateWallet(Guid userId)
+    {
+        var wallet = Wallet.Create(userId, clock.UtcNow);
+        store.Add(wallet);
+        return wallet;
     }
 
     internal static WalletDto MapWallet(Wallet w) => new(w.Id, w.UserId, w.Balance, w.Currency, w.UpdatedAt);

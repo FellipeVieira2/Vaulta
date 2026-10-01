@@ -11,6 +11,7 @@ public sealed class CollectionDbContext(DbContextOptions<CollectionDbContext> op
     public DbSet<CollectibleItemAsset> ItemAssets => Set<CollectibleItemAsset>();
     public DbSet<CollectionIdempotencyKey> IdempotencyKeys => Set<CollectionIdempotencyKey>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<ItemOwnershipTransfer> OwnershipTransfers => Set<ItemOwnershipTransfer>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -69,6 +70,17 @@ public sealed class CollectionDbContext(DbContextOptions<CollectionDbContext> op
             b.Property(x => x.Type).HasMaxLength(150).IsRequired();
             b.Property(x => x.Payload).HasColumnType("jsonb").IsRequired();
             b.Property(x => x.Error).HasColumnType("text");
+        });
+        modelBuilder.Entity<ItemOwnershipTransfer>(b =>
+        {
+            b.ToTable("item_ownership_transfers");
+            b.HasKey(x => x.OrderId);
+            b.Property(x => x.OrderId).ValueGeneratedNever();
+            b.Property(x => x.PriceBrl).HasPrecision(18, 2);
+            b.HasIndex(x => x.SellerItemId).IsUnique().HasDatabaseName("ux_collection_transfer_seller_item");
+            b.HasIndex(x => x.BuyerItemId).IsUnique().HasDatabaseName("ux_collection_transfer_buyer_item");
+            b.HasOne<CollectibleItem>().WithMany().HasForeignKey(x => x.SellerItemId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<CollectibleItem>().WithMany().HasForeignKey(x => x.BuyerItemId).OnDelete(DeleteBehavior.Restrict);
         });
         modelBuilder.Entity<CollectionIdempotencyKey>(b =>
         {
@@ -135,6 +147,7 @@ public sealed class CollectionDbContext(DbContextOptions<CollectionDbContext> op
         CollectibleItemUpdatedDomainEvent => "collection.item-updated.v1",
         CollectibleItemRemovedDomainEvent => "collection.item-removed.v1",
         CollectibleItemAssetChangedDomainEvent => "collection.item-asset-changed.v1",
+        CollectibleItemSoldDomainEvent => "collection.item-sold.v1",
         _ => throw new InvalidOperationException("Unmapped collection domain event.")
     };
 }

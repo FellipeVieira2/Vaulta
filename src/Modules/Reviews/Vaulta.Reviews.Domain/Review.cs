@@ -12,11 +12,12 @@ public sealed class Review : AggregateRoot
     public Guid OrderId { get; private set; }
     public Guid ReviewerId { get; private set; }
     public Guid ReviewedUserId { get; private set; }
+    public string ReviewedRole { get; private set; } = "UNKNOWN";
     public int Rating { get; private set; }
     public string? Comment { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
-    public static Review Create(Guid orderId, Guid reviewerId, Guid reviewedUserId, int rating, string? comment, DateTimeOffset now)
+    public static Review Create(Guid orderId, Guid reviewerId, Guid reviewedUserId, string reviewedRole, int rating, string? comment, DateTimeOffset now)
     {
         if (orderId == Guid.Empty || reviewerId == Guid.Empty || reviewedUserId == Guid.Empty)
             throw new DomainException("Order, reviewer and reviewed user identifiers are required.");
@@ -24,6 +25,8 @@ public sealed class Review : AggregateRoot
             throw new DomainException("Users cannot review themselves.");
         if (rating < 1 || rating > 5)
             throw new DomainException("Rating must be between 1 and 5.");
+        if (reviewedRole is not ("BUYER" or "SELLER"))
+            throw new DomainException("Review role must identify the buyer or seller of the order.");
 
         var normalizedComment = ReviewRules.Comment(comment);
 
@@ -33,6 +36,7 @@ public sealed class Review : AggregateRoot
             OrderId = orderId,
             ReviewerId = reviewerId,
             ReviewedUserId = reviewedUserId,
+            ReviewedRole = reviewedRole,
             Rating = rating,
             Comment = normalizedComment,
             CreatedAt = now

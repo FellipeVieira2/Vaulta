@@ -210,9 +210,29 @@ namespace Vaulta.Identity.Infrastructure.Persistence.Migrations
                         .HasColumnName("normalized_username");
 
                     b.Property<string>("ShippingCity")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("shipping_city");
+
+                    b.Property<string>("ShippingComplement")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
-                        .HasColumnName("shipping_city");
+                        .HasColumnName("shipping_complement");
+
+                    b.Property<string>("ShippingNeighborhood")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("shipping_neighborhood");
+
+                    b.Property<string>("ShippingNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("shipping_number");
+
+                    b.Property<string>("ShippingRecipient")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("shipping_recipient");
 
                     b.Property<string>("ShippingState")
                         .HasMaxLength(100)

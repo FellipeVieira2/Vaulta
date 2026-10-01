@@ -45,9 +45,13 @@ public sealed class OrdersDbContext(DbContextOptions<OrdersDbContext> options) :
             b.Property(x => x.TotalAmountBrl).HasPrecision(18, 2).IsRequired();
             b.Property(x => x.Currency).HasMaxLength(3).IsRequired();
             b.Property(x => x.ShippingStreet).HasMaxLength(200);
+            b.Property(x => x.ShippingNumber).HasMaxLength(20);
+            b.Property(x => x.ShippingComplement).HasMaxLength(100);
+            b.Property(x => x.ShippingNeighborhood).HasMaxLength(100);
             b.Property(x => x.ShippingCity).HasMaxLength(200);
-            b.Property(x => x.ShippingState).HasMaxLength(200);
+            b.Property(x => x.ShippingState).HasMaxLength(100);
             b.Property(x => x.ShippingZipCode).HasMaxLength(10);
+            b.Property(x => x.ShippingRecipient).HasMaxLength(100);
             b.Property(x => x.Status).HasMaxLength(20).IsRequired();
             b.Property(x => x.PaymentId).HasMaxLength(200);
             b.Property(x => x.TrackingCode).HasMaxLength(100);
@@ -56,7 +60,7 @@ public sealed class OrdersDbContext(DbContextOptions<OrdersDbContext> options) :
             b.Ignore(x => x.DomainEvents);
             b.HasIndex(x => new { x.BuyerId, x.Status }).HasDatabaseName("ix_orders_orders_buyer_status");
             b.HasIndex(x => new { x.SellerId, x.Status }).HasDatabaseName("ix_orders_orders_seller_status");
-            b.HasIndex(x => x.ListingId).IsUnique().HasDatabaseName("ux_orders_orders_listing");
+            b.HasIndex(x => x.ListingId).IsUnique().HasFilter("status NOT IN ('cancelled', 'refunded')").HasDatabaseName("ux_orders_orders_listing");
             b.HasIndex(x => x.CreatedAt).HasDatabaseName("ix_orders_orders_created");
         });
 

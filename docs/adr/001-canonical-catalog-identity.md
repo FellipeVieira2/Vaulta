@@ -41,7 +41,7 @@
 - TCGdex é o primeiro adapter de leitura. IDs de provider são ligados por `CatalogExternalId`; a API pública não expõe uma operação de sync. Credenciais não são embutidas e a URL base/idioma do provider são configurações.
 - A implementação atual semeia Pokémon como jogo inicial, sincroniza sets e cards por set, registra `CatalogSyncRun` e usa lock consultivo do PostgreSQL por provider/escopo. Cada set é persistido em batch separado; falhas não removem entidades previamente sincronizadas.
 - O adapter recebe imagem como URL externa, mas não baixa nem espelha artwork. Armazenamento/licença de imagens exige avaliação dos termos do provider e caso de produto separado.
-- Search atual é filtro por nome normalizado com paginação limitada; ranking avançado, impressão exata por número como prioridade e similaridade/trigram ficam para evolução medida.
+- Search pública é filtro por nome normalizado com paginação limitada. O scanner tem um fluxo separado de reconhecimento e busca aproximada; a revisão de implementação abaixo descreve seus índices e limitações.
 
 ## Consequências
 
@@ -78,7 +78,7 @@
   Status permanece persistido e consultável por CLI; morte abrupta do processo pode exigir inspeção de runs `running`.
 - Índices atuais de Card/Game/name, Printing/CardId, Printing/SetId/number/language, Variant/PrintingId/code,
   ExternalId/provider/type/id e SyncRun/provider/started atendem joins/identidade/filtros atuais. Nenhum B-tree adicional
-  foi criado prometendo acelerar contains; trigram depende de volume e medição futuros.
+  foi criado prometendo acelerar contains. A migration posterior de reconhecimento do scanner adiciona trigram conforme a revisão abaixo.
 - Referências verificadas: https://tcgdex.dev/rest/set, https://tcgdex.dev/reference/card e https://tcgdex.dev/assets.
 
 ## Revisão — Printing lifecycle e hardening final (pré-integração MAUI)
@@ -107,3 +107,9 @@
 - Limitação conhecida: se o processo morrer no meio de um sync, o `CatalogSyncRun` correspondente pode permanecer
   com `Status = "running"` indefinidamente. Não há job manager para expirar/corrigir automaticamente esse estado
   nesta entrega; runs muito antigos em `running` devem ser investigados manualmente.
+
+## Revisão de implementação — 2026-10-01
+
+- A resolução atual do sync utiliza `(provider, entity_type, external_id)`. O resolver do reconhecimento Pokémon TCG também filtra explicitamente `provider = pokemontcg`. O fallback canônico por set + collector number + idioma descrito na decisão permanece pendente; não se deve presumir consolidação entre providers sem esse caminho.
+- `NormalizeLanguage` atualmente preserva o código recebido após trim e troca de `_` por `-`; `pt` permanece `pt`. Tanto `pt` quanto `pt-BR` são códigos BCP 47, mas expressam escopos distintos. O idioma da printing não é a preferência de interface `pt-BR` do usuário. Uma política de aliases e regionalização explícita permanece pendente; não inferir uma região pela língua.
+- A migration `ScannerFuzzyRecognition` instala `pg_trgm` e índices GIN sobre nome normalizado e collector number para o reconhecimento. A busca aproximada do scanner preserva os IDs internos da Printing e não usa similaridade para fundir entidades durante sync.

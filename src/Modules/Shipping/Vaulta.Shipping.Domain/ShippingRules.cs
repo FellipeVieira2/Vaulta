@@ -1,8 +1,9 @@
+using System.Text.RegularExpressions;
 using Vaulta.SharedKernel;
 
 namespace Vaulta.Shipping.Domain;
 
-public static class ShippingRules
+public static partial class ShippingRules
 {
     public const string CreatedStatus = "created";
     public const string InTransitStatus = "in_transit";
@@ -37,12 +38,17 @@ public static class ShippingRules
         return trimmed;
     }
 
+    [GeneratedRegex(@"^\d{5}-?\d{3}$", RegexOptions.CultureInvariant)]
+    private static partial Regex ZipCodePattern();
+
     public static string? ValidateZipCode(string? zipCode)
     {
         if (zipCode is null) return null;
         var trimmed = zipCode.Trim();
         if (trimmed.Length == 0) return null;
         if (trimmed.Length > 10) throw new DomainException("Zip code must be at most 10 characters.");
+        if (!ZipCodePattern().IsMatch(trimmed))
+            throw new DomainException("Invalid zip code format. Expected 00000-000 or 00000000.");
         return trimmed;
     }
 

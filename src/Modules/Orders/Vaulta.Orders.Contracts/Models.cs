@@ -1,13 +1,13 @@
 namespace Vaulta.Orders.Contracts;
 
-public sealed record CreateOrderRequest(Guid ListingId, string? ShippingStreet, string? ShippingCity, string? ShippingState, string? ShippingZipCode);
+public sealed record CreateOrderRequest(Guid ListingId, string? ShippingStreet, string? ShippingNumber, string? ShippingComplement, string? ShippingNeighborhood, string? ShippingCity, string? ShippingState, string? ShippingZipCode, string? ShippingRecipient);
 public sealed record ConfirmPaymentRequest(string PaymentId);
 public sealed record MarkShippedRequest(string TrackingCode);
 public sealed record CancelOrderRequest(string Reason);
 
 public sealed record ReservationDto(Guid Id, Guid ListingId, string Status, DateTimeOffset ReservedUntil, DateTimeOffset CreatedAt);
 public sealed record OrderSnapshotDto(string Condition, decimal ItemPriceBrl, decimal PlatformFeeBrl, decimal TotalAmountBrl, string Currency);
-public sealed record OrderShippingDto(string? Street, string? City, string? State, string? ZipCode);
+public sealed record OrderShippingDto(string? Street, string? Number, string? Complement, string? Neighborhood, string? City, string? State, string? ZipCode, string? Recipient);
 public sealed record OrderDto(
     Guid Id,
     Guid BuyerId,

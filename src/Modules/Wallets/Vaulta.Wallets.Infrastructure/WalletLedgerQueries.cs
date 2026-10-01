@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Vaulta.Wallets.Application;
 using Vaulta.Wallets.Contracts;
+using Vaulta.SharedKernel;
 
 namespace Vaulta.Wallets.Infrastructure;
 
@@ -8,6 +9,9 @@ public sealed class WalletLedgerQueries(WalletsDbContext db) : IWalletLedgerQuer
 {
     public async Task<WalletPageDto> GetTransactions(Guid userId, int page, int pageSize, CancellationToken cancellationToken)
     {
+        var paging = Pagination.Normalize(page, pageSize);
+        page = paging.Page;
+        pageSize = paging.Size;
         var wallet = await db.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.UserId == userId, cancellationToken);
         if (wallet is null)
             return new WalletPageDto([], page, pageSize, 0);
@@ -18,7 +22,7 @@ public sealed class WalletLedgerQueries(WalletsDbContext db) : IWalletLedgerQuer
 
         var totalCount = await query.CountAsync(cancellationToken);
         var items = await query
-            .Skip((page - 1) * pageSize)
+            .Skip(paging.Offset)
             .Take(pageSize)
             .Select(e => new WalletTransactionDto(e.Id, e.Type, e.Amount, e.ReferenceId, e.Description, e.CreatedAt))
             .ToListAsync(cancellationToken);

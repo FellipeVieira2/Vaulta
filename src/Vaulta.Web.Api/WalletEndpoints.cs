@@ -26,12 +26,8 @@ public static class WalletEndpoints
             return Results.Ok(await queries.GetTransactions(userId, page ?? 1, pageSize ?? 20, ct));
         }).WithName("GetWalletTransactions").Produces<WalletPageDto>().ProducesProblem(401);
 
-        wallets.MapPost("/withdraw", async (WithdrawRequest request, ClaimsPrincipal principal,
-            WalletCommandHandlers handler, CancellationToken ct) =>
-        {
-            var userId = Guid.Parse(principal.FindFirstValue("sub")!);
-            var wallet = await handler.Handle(new RequestWithdrawalCommand(userId, request), ct);
-            return Results.Ok(wallet);
-        }).WithName("RequestWithdrawal").Produces<WalletDto>().ProducesProblem(400).ProducesProblem(401).ProducesProblem(404);
+        wallets.MapPost("/withdraw", () => Results.Problem(statusCode: 410,
+            title: "Withdrawals are no longer supported. Seller payouts use Pix after buyer-confirmed receipt."))
+            .WithName("RequestWithdrawal").ProducesProblem(401).ProducesProblem(410);
     }
 }

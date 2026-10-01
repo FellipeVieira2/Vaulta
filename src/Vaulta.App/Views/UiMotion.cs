@@ -2,7 +2,7 @@ namespace Vaulta.App.Views;
 
 internal static class UiMotion
 {
-    private static bool ReducedMotion
+    internal static bool ReducedMotion
     {
         get
         {

@@ -7,7 +7,7 @@ using Vaulta.Catalog.Contracts;
 namespace Vaulta.Catalog.Infrastructure.Recognition;
 
 public sealed partial class FuzzyCardSearchService(
-    ICatalogSearch catalogSearch,
+    ICardRecognitionCatalog catalogSearch,
     ILogger<FuzzyCardSearchService> logger)
 {
     private const double NameWeight = 0.5;
@@ -21,37 +21,38 @@ public sealed partial class FuzzyCardSearchService(
         if (string.IsNullOrWhiteSpace(ocrResult.RawText))
             return [];
 
-        var extracted = ExtractFields(ocrResult);
-        if (string.IsNullOrWhiteSpace(extracted.Name))
+        var extractedFields = ExtractFieldCandidates(ocrResult);
+        if (extractedFields.Count == 0)
         {
             logger.LogDebug("OCR did not extract a usable card name");
             return [];
         }
 
-        // Search catalog by extracted name
-        var searchResults = await catalogSearch.Search(
-            extracted.Name, gameCode, 1, 20, cancellationToken);
-
-        if (searchResults.Items.Count == 0)
-            return [];
-
-        var candidates = new List<(CatalogSearchResult Item, double Score)>();
-
-        foreach (var item in searchResults.Items)
+        var candidates = new Dictionary<Guid, (RecognitionCatalogCard Item, double Score, bool NumberMatch)>();
+        // OCR can read a decorative header before the name. Try a few header lines,
+        // stopping when the name and collector number provide a strong match.
+        foreach (var extracted in extractedFields)
         {
-            var score = CalculateScore(item, extracted);
-            if (score > 0.3)
-                candidates.Add((item, score));
+            var searchResults = await catalogSearch.FindCandidatesAsync(
+                extracted.Name, extracted.CollectorNumber, gameCode, cancellationToken);
+            foreach (var item in searchResults)
+            {
+                var score = CalculateScore(item.Card, extracted);
+                if (score >= 0.55 && (!candidates.TryGetValue(item.Card.PrintingId, out var previous) || previous.Score < score))
+                    candidates[item.Card.PrintingId] = (item, score, extracted.CollectorNumber is not null &&
+                        NormalizeNumber(item.Card.CollectorNumber) == NormalizeNumber(extracted.CollectorNumber));
+            }
+            if (candidates.Values.Any(x => x.Score >= 0.9)) break;
         }
 
-        return candidates
+        return candidates.Values
             .OrderByDescending(c => c.Score)
             .Take(MaxCandidates)
-            .Select(c => MapToCandidate(c.Item, c.Score))
+            .Select(c => MapToCandidate(c.Item, c.Score, c.NumberMatch))
             .ToArray();
     }
 
-    private static ExtractedFields ExtractFields(OcrResult ocr)
+    private static IReadOnlyList<ExtractedFields> ExtractFieldCandidates(OcrResult ocr)
     {
         var words = ocr.Regions
             .Where(r => !string.IsNullOrWhiteSpace(r.Text))
@@ -62,7 +63,7 @@ public sealed partial class FuzzyCardSearchService(
 
         // Try to find collector number pattern (e.g., "12/102", "SV03-223", "045/198")
         string? collectorNumber = null;
-        foreach (var word in words.Concat(rawLines))
+        foreach (var word in rawLines.Reverse().Concat(words.AsEnumerable().Reverse()))
         {
             if (CollectorNumberRegex().IsMatch(word))
             {
@@ -71,18 +72,25 @@ public sealed partial class FuzzyCardSearchService(
             }
         }
 
-        // The card name is typically the longest meaningful text region or first prominent line
-        var name = words
-            .Where(w => w.Length >= 3 && !CollectorNumberRegex().IsMatch(w) && !SetKeywordRegex().IsMatch(w))
-            .OrderByDescending(w => w.Length)
-            .FirstOrDefault() ?? rawLines.FirstOrDefault(w => w.Length >= 3) ?? string.Empty;
+        // Preserve complete names from the header, instead of selecting an attack/description word.
+        var names = rawLines.Take(8)
+            .Select(line => System.Text.RegularExpressions.Regex.Replace(line, @"\b(?:HP|PS|PV)\s*\d+|\d+\s*(?:HP|PS|PV)\b", "", RegexOptions.IgnoreCase).Trim())
+            .Select(line => Regex.Replace(line, @"^(?:basic|básico|basico|trainer|treinador|stage\s*\d|estágio\s*\d|estagio\s*\d)\s*", "", RegexOptions.IgnoreCase).Trim(' ', '.', ',', '-', '·'))
+            .Where(line => line.Length >= 3 && !CollectorNumberRegex().IsMatch(line)
+                && !Regex.IsMatch(line, @"^(pok[eé]mon|energy|energia|item|supporter|apoiador|stadium|estádio|pokémon tool|ferramenta pokémon)$", RegexOptions.IgnoreCase)
+                && !Regex.IsMatch(line, @"^(basic|básico|basico|stage\s*\d|estágio\s*\d|estagio\s*\d|evolves from|evolui de|put .+ on the stage|coloque .+ sobre)\b", RegexOptions.IgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase).Take(4);
 
-        // Try to extract set name from remaining text
-        var setName = words
-            .Where(w => w != name && !CollectorNumberRegex().IsMatch(w))
-            .FirstOrDefault(w => SetKeywordRegex().IsMatch(w) || w.Length > 5);
+        // Card layouts usually do not print the expansion name; unrelated rules text is not set evidence.
+        string? setName = null;
 
-        return new ExtractedFields(name, collectorNumber, setName);
+        // A single B immediately before digits can be a misread 8 in a numeric
+        // collector number. Always try the printed prefix first (B8 may be valid).
+        var numbers = new List<string?> { collectorNumber };
+        if (collectorNumber is not null && Regex.IsMatch(collectorNumber, @"^B\s*\d+\s*/\s*\d+$", RegexOptions.IgnoreCase))
+            numbers.Add(Regex.Replace(collectorNumber, @"^B\s*", "8", RegexOptions.IgnoreCase));
+
+        return names.SelectMany(name => numbers.Select(number => new ExtractedFields(name, number, setName))).ToArray();
     }
 
     private static double CalculateScore(CatalogSearchResult item, ExtractedFields extracted)
@@ -95,8 +103,8 @@ public sealed partial class FuzzyCardSearchService(
         if (!string.IsNullOrWhiteSpace(extracted.CollectorNumber))
         {
             numberScore = string.Equals(
-                Normalize(item.CollectorNumber),
-                Normalize(extracted.CollectorNumber),
+                NormalizeNumber(item.CollectorNumber),
+                NormalizeNumber(extracted.CollectorNumber),
                 StringComparison.OrdinalIgnoreCase) ? 1.0 : 0.0;
         }
 
@@ -108,11 +116,14 @@ public sealed partial class FuzzyCardSearchService(
                 Normalize(extracted.SetName)) / 100.0;
         }
 
-        return (nameScore * NameWeight) + (numberScore * NumberWeight) + (setScore * SetWeight);
+        if (nameScore < 0.55 || (extracted.CollectorNumber is not null && numberScore == 0)) return 0;
+        var availableWeight = NameWeight + (extracted.CollectorNumber is not null ? NumberWeight : 0) + (extracted.SetName is not null ? SetWeight : 0);
+        return Math.Min(0.95, ((nameScore * NameWeight) + (numberScore * NumberWeight) + (setScore * SetWeight)) / availableWeight);
     }
 
-    private static CardRecognitionCandidate MapToCandidate(CatalogSearchResult item, double score)
+    private static CardRecognitionCandidate MapToCandidate(RecognitionCatalogCard match, double score, bool numberMatch)
     {
+        var item = match.Card;
         return new CardRecognitionCandidate(
             PrintingId: item.PrintingId.ToString(),
             Name: item.CardName,
@@ -122,9 +133,11 @@ public sealed partial class FuzzyCardSearchService(
             ArtworkUrl: item.ArtworkUrl,
             EstimatedMarketValueBrl: null,
             Currency: null,
-            VariantCodes: ["normal"],
-            ConfidenceScore: Math.Round(score, 3));
+            VariantCodes: match.VariantCodes,
+            ConfidenceScore: Math.Round(score, 3), HasCollectorNumberMatch: numberMatch);
     }
+
+    private static string NormalizeNumber(string value) => Regex.Replace(value.Split('/')[0], @"\s+", "").ToUpperInvariant().TrimStart('0');
 
     private static string Normalize(string value)
     {
@@ -132,7 +145,7 @@ public sealed partial class FuzzyCardSearchService(
         return value.ToLowerInvariant().Trim();
     }
 
-    [GeneratedRegex(@"\d+[/\-]\d+|[A-Z]{2,}\d{2,}-?\d+", RegexOptions.Compiled)]
+    [GeneratedRegex(@"\b(?:[A-Z]{1,4}\s*)?\d{1,4}\s*/\s*(?:[A-Z]{1,4}\s*)?\d{1,4}\b|[A-Z]{2,}\d{2,}-?\d+", RegexOptions.Compiled | RegexOptions.IgnoreCase)]
     private static partial Regex CollectorNumberRegex();
 
     [GeneratedRegex(@"^(base|jungle|fossil|team|rocket|gym|neo|aquapolis|expedition|skyridge|ex|diamond|pearl|platinum|heartgold|soulsilver|black|white|xy|sun|moon|sword|shield|scarlet|violet|prismatic|evolutions|champions|destiny|dragon|legendary|mythical|ultra|shining|reverse|holo|promo|secret|rare|common|uncommon)$", RegexOptions.Compiled | RegexOptions.IgnoreCase)]

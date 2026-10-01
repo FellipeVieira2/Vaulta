@@ -7,13 +7,29 @@ namespace Vaulta.Payments.Infrastructure;
 public sealed class PaymentsDbContext(DbContextOptions<PaymentsDbContext> options) : DbContext(options)
 {
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
+    public DbSet<BuyerCustomer> BuyerCustomers => Set<BuyerCustomer>();
     public DbSet<PaymentSplit> PaymentSplits => Set<PaymentSplit>();
     public DbSet<WebhookEvent> WebhookEvents => Set<WebhookEvent>();
+    public DbSet<SellerPixDestination> SellerPixDestinations => Set<SellerPixDestination>();
+    public DbSet<SellerPayout> SellerPayouts => Set<SellerPayout>();
+    public DbSet<TransferWebhookReceipt> TransferWebhookReceipts => Set<TransferWebhookReceipt>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("payments");
+        modelBuilder.Entity<BuyerCustomer>(b =>
+        {
+            b.ToTable("buyer_customers"); b.HasKey(x => x.UserId); b.Property(x => x.UserId).ValueGeneratedNever();
+            b.Property(x => x.LegalName).HasMaxLength(200).IsRequired();
+            b.Property(x => x.Document).HasMaxLength(14).IsRequired();
+            b.Property(x => x.ExternalReference).HasMaxLength(100).IsRequired();
+            b.Property(x => x.Status).HasMaxLength(40).IsRequired();
+            b.Property(x => x.AsaasCustomerId).HasMaxLength(200);
+            b.Property(x => x.Version).IsConcurrencyToken();
+            b.HasIndex(x => x.ExternalReference).IsUnique();
+            b.HasIndex(x => x.AsaasCustomerId).IsUnique().HasFilter("asaas_customer_id IS NOT NULL");
+        });
 
         modelBuilder.Entity<PaymentTransaction>(b =>
         {
@@ -32,8 +48,14 @@ public sealed class PaymentsDbContext(DbContextOptions<PaymentsDbContext> option
             b.Property(x => x.AsaasCustomerId).HasMaxLength(200);
             b.Property(x => x.CheckoutUrl).HasMaxLength(2000);
             b.Property(x => x.PixQrCode).HasColumnType("text");
+            b.Property(x => x.PixExpirationDate).HasMaxLength(64);
             b.Property(x => x.BankSlipUrl).HasMaxLength(2000);
             b.Property(x => x.FailureReason).HasMaxLength(1000);
+            b.Property(x => x.PayoutHoldReason).HasMaxLength(100);
+            b.Property(x => x.RefundReason).HasMaxLength(500);
+            b.Property(x => x.RefundStatus).HasMaxLength(40);
+            b.Property(x => x.RefundRequestUrl).HasMaxLength(2000);
+            b.HasIndex(x => new { x.RefundStatus, x.RefundNextCheckAt });
             b.Property(x => x.Version).IsConcurrencyToken();
             b.Ignore(x => x.DomainEvents);
             b.HasMany(x => x.Splits).WithOne().HasForeignKey(x => x.PaymentId).OnDelete(DeleteBehavior.Cascade);
@@ -66,6 +88,54 @@ public sealed class PaymentsDbContext(DbContextOptions<PaymentsDbContext> option
             b.Property(x => x.Error).HasColumnType("text");
             b.HasIndex(x => new { x.AsaasPaymentId, x.EventType }).HasDatabaseName("ix_payments_webhook_payment_event");
             b.HasIndex(x => new { x.Processed, x.ReceivedAt }).HasDatabaseName("ix_payments_webhook_pending");
+        });
+
+        modelBuilder.Entity<SellerPixDestination>(b =>
+        {
+            b.ToTable("seller_pix_destinations");
+            b.HasKey(x => x.SellerId);
+            b.Property(x => x.SellerId).ValueGeneratedNever();
+            b.Property(x => x.Key).HasMaxLength(200).IsRequired();
+            b.Property(x => x.KeyType).HasMaxLength(10).IsRequired();
+            b.Property(x => x.HolderName).HasMaxLength(200).IsRequired();
+            b.Property(x => x.HolderDocument).HasMaxLength(30).IsRequired();
+            b.Property(x => x.IdentityEvidenceReference).HasMaxLength(200);
+            b.Property(x => x.Version).IsConcurrencyToken();
+        });
+        modelBuilder.Entity<SellerPayout>(b =>
+        {
+            b.ToTable("seller_payouts");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.ItemPriceBrl).HasPrecision(18, 2);
+            b.Property(x => x.PlatformFeeBrl).HasPrecision(18, 2);
+            b.Property(x => x.AmountBrl).HasPrecision(18, 2);
+            b.Property(x => x.PaymentFeeBrl).HasPrecision(18, 2);
+            b.Property(x => x.TransferFeeBrl).HasPrecision(18, 2);
+            b.Property(x => x.SellerNetBrl).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(3).IsRequired();
+            b.Property(x => x.Status).HasMaxLength(40).IsRequired();
+            b.Property(x => x.ExternalReference).HasMaxLength(100).IsRequired();
+            b.Property(x => x.TransferId).HasMaxLength(200);
+            b.Property(x => x.PixKey).HasMaxLength(200);
+            b.Property(x => x.PixKeyType).HasMaxLength(10);
+            b.Property(x => x.DestinationHolderName).HasMaxLength(200);
+            b.Property(x => x.DestinationHolderDocument).HasMaxLength(30);
+            b.Property(x => x.DestinationEvidenceReference).HasMaxLength(200);
+            b.Property(x => x.Version).IsConcurrencyToken();
+            b.HasIndex(x => x.OrderId).IsUnique();
+            b.HasIndex(x => x.PaymentId).IsUnique();
+            b.HasIndex(x => x.ExternalReference).IsUnique();
+            b.HasIndex(x => x.TransferId).IsUnique().HasFilter("transfer_id IS NOT NULL");
+            b.HasIndex(x => new { x.Status, x.NextCheckAt });
+            b.HasIndex(x => new { x.SellerId, x.CreatedAt });
+        });
+        modelBuilder.Entity<TransferWebhookReceipt>(b =>
+        {
+            b.ToTable("transfer_webhook_receipts");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Id).HasMaxLength(200).ValueGeneratedNever();
+            b.HasOne<SellerPayout>().WithMany().HasForeignKey(x => x.PayoutId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<OutboxMessage>(b =>

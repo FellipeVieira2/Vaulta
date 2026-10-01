@@ -106,9 +106,29 @@ namespace Vaulta.Orders.Infrastructure.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("shipping_city");
 
+                    b.Property<string>("ShippingComplement")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("shipping_complement");
+
+                    b.Property<string>("ShippingNeighborhood")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("shipping_neighborhood");
+
+                    b.Property<string>("ShippingNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("shipping_number");
+
+                    b.Property<string>("ShippingRecipient")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("shipping_recipient");
+
                     b.Property<string>("ShippingState")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("shipping_state");
 
                     b.Property<string>("ShippingStreet")
@@ -157,7 +177,8 @@ namespace Vaulta.Orders.Infrastructure.Migrations
 
                     b.HasIndex("ListingId")
                         .IsUnique()
-                        .HasDatabaseName("ux_orders_orders_listing");
+                        .HasDatabaseName("ux_orders_orders_listing")
+                        .HasFilter("status NOT IN ('cancelled', 'refunded')");
 
                     b.HasIndex("BuyerId", "Status")
                         .HasDatabaseName("ix_orders_orders_buyer_status");

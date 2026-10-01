@@ -6,6 +6,9 @@ namespace Vaulta.Payments.Infrastructure;
 
 public sealed class PaymentStore(PaymentsDbContext db) : IPaymentStore
 {
+    public Task<PaymentTransaction?> FindById(Guid paymentId, CancellationToken cancellationToken) =>
+        db.PaymentTransactions.Include(x => x.Splits).FirstOrDefaultAsync(x => x.Id == paymentId, cancellationToken);
+
     public Task<PaymentTransaction?> FindByOrderId(Guid orderId, CancellationToken cancellationToken) =>
         db.PaymentTransactions.Include(x => x.Splits).FirstOrDefaultAsync(x => x.OrderId == orderId, cancellationToken);
 

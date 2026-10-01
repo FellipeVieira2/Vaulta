@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Vaulta.Identity.Application;
 using Vaulta.Identity.Domain;
@@ -12,7 +12,6 @@ internal static class SeedAdminCommand
     private const string AdminEmail = "admin@vaultatcg.com.br";
     private const string AdminUsername = "admin";
     private const string AdminDisplayName = "Vaulta Admin";
-    private const string DefaultPassword = "Vaulta@2026!Admin";
 
     public static async Task<bool> TryExecute(WebApplication app, string[] args)
     {
@@ -39,7 +38,11 @@ internal static class SeedAdminCommand
                 return true;
             }
 
-            var hash = passwords.Hash(DefaultPassword);
+            var seedPassword = app.Configuration["Admin:SeedPassword"];
+            if (string.IsNullOrWhiteSpace(seedPassword))
+                throw new InvalidOperationException("Configure Admin:SeedPassword securely before creating the admin account.");
+            await new PasswordValidator().ValidateAndThrowAsync(seedPassword);
+            var hash = passwords.Hash(seedPassword);
             var now = clock.UtcNow;
             var user = User.Register(AdminEmail, hash, AdminUsername, AdminDisplayName, now);
 
@@ -54,7 +57,6 @@ internal static class SeedAdminCommand
             Console.WriteLine($"Admin seeded successfully.");
             Console.WriteLine($"  Email:    {AdminEmail}");
             Console.WriteLine($"  Username: {AdminUsername}");
-            Console.WriteLine($"  Password: {DefaultPassword}");
             Console.WriteLine($"  UserId:   {user.Id}");
             Console.WriteLine();
             Console.WriteLine("⚠️  Change this password after first login.");

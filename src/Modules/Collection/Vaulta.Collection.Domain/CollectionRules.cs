@@ -7,6 +7,7 @@ public static partial class CollectionRules
 {
     public const string ActiveStatus = "ACTIVE";
     public const string RemovedStatus = "REMOVED";
+    public const string SoldStatus = "SOLD";
 
     /// <summary>
     /// The only condition codes persisted by Collection. Raw/free text from users or clients is

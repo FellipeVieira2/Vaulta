@@ -9,7 +9,6 @@ using Vaulta.App.Core.Http;
 using Vaulta.App.Core.Marketplace;
 using Vaulta.App.Core.Orders;
 using Vaulta.App.Core.Payments;
-using Vaulta.App.Core.Wallets;
 using Vaulta.Assets.Contracts;
 using Vaulta.App.Services.Api;
 using Vaulta.App.Services.Authentication;
@@ -21,7 +20,6 @@ using Vaulta.Identity.Contracts;
 using Vaulta.Marketplace.Contracts;
 using Vaulta.Orders.Contracts;
 using Vaulta.Payments.Contracts;
-using Vaulta.Wallets.Contracts;
 
 namespace Vaulta.App.ViewModels;
 
@@ -62,27 +60,28 @@ public static class ScreenCatalog
         new("onboarding-2", "Descubra quanto ela vale", "Acompanhe valores, veja tendências e mantenha seu portfólio sempre à vista.", "VALOR DA COLEÇÃO · R$ 24.850,00", Actions: [new("Criar minha conta", "signup", true), new("Entrar", "login")]),
         new("login", "Bem-vindo de volta", "Acesse sua coleção e continue de onde parou.", "ENTRAR NA VAULTA", Actions: [new("Esqueci minha senha", "unsupported"), new("Entrar", "login-submit", true), new("Continuar com Google", "unsupported"), new("Criar conta", "signup")]),
         new("signup", "Sua coleção começa aqui", "Crie sua conta para organizar e acompanhar seus TCGs.", "CRIAR CONTA", Actions: [new("Criar conta", "signup-submit", true), new("Continuar com Google", "unsupported"), new("Já tenho uma conta · Entrar", "login")]),
-        new("home", "Olá, colecionador", "Sua coleção, oportunidades e cartas favoritas em um só lugar.", "BEM-VINDO À VAULTA", Notice: "Prévia de interface · os dados de mercado e portfólio ainda são demonstrativos.", Metrics: [new("ESTIMATIVA TOTAL", "Indisponível", "Pricing ainda não integrado"), new("CARTAS", "0", "na coleção")], Actions: [new("Escanear carta", "scanner", true), new("Buscar carta", "catalog")]),
-        new("collection", "Minha coleção", "Suas cartas e o valor estimado do seu acervo.", "MEU VAULT", Metrics: [new("CARTAS", "0"), new("VALOR ESTIMADO", "Indisponível")], Actions: [new("Escanear carta", "scanner", true), new("Adicionar carta", "catalog")]),
+        new("home", "Olá, colecionador", "Sua coleção, oportunidades e cartas favoritas em um só lugar.", "BEM-VINDO À VAULTA", Metrics: [new("ESTIMATIVA TOTAL", "Indisponível"), new("CARTAS", "0", "na coleção")], Actions: [new("Escanear carta", "scanner", true), new("Buscar carta", "catalog"), new("Ver valor do acervo", "portfolio")]),
+        new("collection", "Minha coleção", "Suas cartas e o valor estimado do seu acervo.", "MEU VAULT", Metrics: [new("CARTAS", "0"), new("VALOR ESTIMADO", "Indisponível")], Actions: [new("Escanear carta", "scanner", true), new("Adicionar carta", "catalog"), new("Ver valor do acervo", "portfolio"), new("Atualizar valores", "collection-valuation-refresh")]),
         new("empty-collection", "Sua coleção começa aqui", "Escaneie ou busque sua primeira carta para acompanhar seu acervo.", "MEU VAULT", Actions: [new("Escanear carta", "scanner", true), new("Buscar manualmente", "catalog"), new("Adicionar anúncio", "market")]),
         new("catalog", "Encontre sua próxima carta", "Busque cartas, sets e expansões de diferentes TCGs.", "CATÁLOGO", InputHint: "Buscar carta, set ou expansão...", Options: ["Pokémon", "Magic", "Yu-Gi-Oh!", "One Piece"], Actions: [new("Abrir detalhes", "card-detail", true)]),
         new("search-results", "Resultados da busca", "Cartas encontradas no catálogo Vaulta.", "CATÁLOGO", InputHint: "Buscar carta, set ou expansão...", Actions: [new("Ver carta", "card-detail", true)]),
         new("card-detail", "Carregando carta...", "Selecione uma carta no catálogo para ver os detalhes.", "DETALHES DA CARTA", Actions: [new("Adicionar à coleção", "add-to-collection", true), new("Adicionar à wishlist", "wishlist")]),
         new("add-to-collection", "Adicionar à coleção", "Registre condição, quantidade e custo de aquisição.", "NOVO ITEM", Options: ["Mint", "Near Mint", "Lightly Played", "Moderately Played", "Heavily Played", "Damaged"], Actions: [new("Adicionar à coleção", "add-to-collection-submit", true)]),
-        new("collection-item", "Detalhes do card", "Charizard ex · Obsidian Flames · 125/197", "SUA COLEÇÃO", Metrics: [new("PAGO INICIAL", "R$ 65,00"), new("PREÇO DE MERCADO", "R$ 89,90"), new("LUCRO ESTIMADO", "+ R$ 24,90")], Actions: [new("Editar anúncio", "sell", true), new("Vender item", "sell"), new("Remover da coleção", "collection")]),
+        new("collection-item", "Detalhes da carta", "Carregando a unidade selecionada.", "SUA COLEÇÃO"),
         new("scanner", "Centralize o card", "Enquadre a carta inteira e evite reflexos para obter uma identificação melhor.", "SCANNER", Actions: [new("Buscar manualmente", "catalog")]),
         new("scanner-card-detail", "Informações da carta", "Confira a edição, a variante e os valores antes de adicionar.", "CARTA IDENTIFICADA", Actions: [new("Adicionar à coleção", "add-to-collection", true)]),
         new("scanner-analyzing", "Identificando carta...", "Analisando imagem e detalhes da carta. Esta é uma prévia do fluxo do scanner.", "SCANNER · DEMONSTRAÇÃO", Actions: [new("Ver resultado de exemplo", "scan-result", true)]),
         new("scan-result", "Pikachu VMAX", "Lost Origin · 029/196 · Full Art · Ultra Rare", "RESULTADO DO SCAN · 98%", Actions: [new("Confirmar seleção", "scan-candidates", true), new("Não é essa carta?", "scan-candidates")]),
         new("scan-candidates", "Selecione o card", "Vários resultados podem corresponder. Escolha a impressão correta.", "VÁRIOS MATCHES", Cards: [new("LOST ORIGIN", "Pikachu VMAX", "029/196 · Full Art", "98%"), new("SWSH PROMO", "Pikachu VMAX", "SWSH286 · Promo", "82%"), new("LOST ORIGIN", "Pikachu V", "120/196 · Standard", "68%")], Actions: [new("Confirmar seleção", "scan-confirmed", true)]),
         new("scan-confirmed", "Carta identificada!", "Pikachu VMAX · Lost Origin foi confirmada na prévia. A adição real depende da integração de coleção.", "SCAN CONCLUÍDO · DEMONSTRAÇÃO", Actions: [new("Ver fluxo de adicionar", "add-to-collection", true), new("Escanear outra", "scanner")]),
-        new("portfolio", "Meu Vault", "Acompanhe o valor e a evolução estimada da sua coleção.", "PORTFÓLIO · DEMONSTRAÇÃO", Metrics: [new("TOTAL ESTIMADO", "R$ 12.450,00"), new("CUSTO DE AQUISIÇÃO", "R$ 8.920,00"), new("LUCRO TOTAL", "+ R$ 3.530,00")], Cards: [new("POKÉMON", "Charizard ex", "Mais valorizadas", "R$ 420,00", "+12,4%"), new("MAGIC", "Black Lotus", "Mais valioso", "R$ 1.950,00"), new("YU-GI-OH!", "Blue-Eyes White Dragon", "Acompanhe o mercado", "R$ 310,00", "-2,8%")]),
-        new("market", "Mercado Vaulta", "Descubra cartas e oportunidades de colecionadores.", "MERCADO · DEMONSTRAÇÃO", InputHint: "Buscar carta, TCG ou edição...", Options: ["Pokémon", "Magic", "One Piece", "Yu-Gi-Oh!"], Cards: [new("ONE PIECE", "Monkey D. Luffy · OP-05", "Near Mint · Envio nacional", "R$ 950,00"), new("POKÉMON", "Espeon VMAX", "Promo · Near Mint", "R$ 320,00"), new("MAGIC", "Black Lotus", "Collector edition", "R$ 8.500,00")], Actions: [new("Ver anúncio", "listing-detail", true), new("Vender uma carta", "sell")]),
-        new("listing-detail", "Detalhes do item", "Pokémon Card 151 · #094/165 · Reverse Holo", "POKÉMON TCG", Metrics: [new("PREÇO", "R$ 82,00"), new("MÉDIA DE MERCADO", "R$ 97,00")], Cards: [new("VENDEDOR", "Thiago TCG", "4,9 · 42 vendas · Belo Horizonte, MG", "envio nacional")], Actions: [new("Comprar agora", null, true), new("Fazer oferta", null)]),
+        new("portfolio", "Meu Vault", "O valor estimado das suas cartas, em reais.", "VALOR DO ACERVO", Actions: [new("Atualizar valores", "collection-valuation-refresh", true), new("Minha coleção", "collection")]),
+        new("market", "Mercado Vaulta", "Descubra cartas e oportunidades de colecionadores.", "MERCADO", Actions: [new("Vender uma carta", "sell")]),
+        new("listing-detail", "Detalhes do anúncio", "Carregando os dados do anúncio selecionado.", "MERCADO"),
         new("checkout", "Endereço de entrega", "Informe onde devemos entregar seu pedido.", "CHECKOUT", Actions: [new("Confirmar e pagar", null, true)]),
-        new("wallet", "Minha Carteira", "Saldo disponível e histórico de transações.", "CARTEIRA", Metrics: [new("SALDO", "R$ 0,00")], Actions: [new("Solicitar saque", null, true)]),
+        new("payouts", "Meus repasses", "Você recebe por Pix após o comprador confirmar o recebimento. Os 8% da Vaulta e as tarifas do Asaas são descontados do vendedor.", "VENDAS E REPASSES"),
+        new("orders", "Meus pedidos", "Acompanhe compras e vendas. Confirme o recebimento quando a carta chegar.", "PEDIDOS"),
         new("sell", "Vender carta", "Informe condição, preço e fotos reais do item.", "NOVO ANÚNCIO · DEMONSTRAÇÃO", Notice: "O marketplace ainda não está integrado; nenhum anúncio será publicado.", Options: ["Near Mint", "Lightly Played", "Moderately Played", "Heavily Played"], Actions: [new("Publicar anúncio", "unsupported", true)]),
-        new("profile", "Lucas Oliveira", "@lucas_tcg · Colecionador desde 2012", "PERFIL DO COLECIONADOR", Metrics: [new("CARTAS", "284"), new("TROCAS", "57"), new("VALOR", "R$ 12,4k")], Actions: [new("Editar perfil", "settings", true), new("Configurações", "settings"), new("Minha coleção", "collection")]),
+        new("profile", "Meu perfil", "Seus dados, preferências e vendas.", "PERFIL DO COLECIONADOR", Actions: [new("Editar perfil", "settings", true), new("Configurações", "settings"), new("Minha coleção", "collection"), new("Meus pedidos", "orders"), new("Meus repasses", "payouts")]),
         new("settings", "Configurações", "Gerencie sua conta e preferências da Vaulta.", "CONTA E SEGURANÇA", Options: ["Conta", "TCGs preferidos", "Segurança", "Notificações", "Privacidade", "Tema: Escuro"], Actions: [new("TCGs preferidos", "preferences-tcg", true), new("Sair da conta", "logout")]),
         new("preferences-tcg", "Seus TCGs", "O que você coleciona? Vamos personalizar sua experiência.", "PREFERÊNCIAS", Options: ["Pokémon", "Magic: The Gathering", "Yu-Gi-Oh!", "One Piece TCG", "Digimon", "Lorcana"], Actions: [new("Salvar preferências", "home", true)]),
         new("wishlist", "Sua wishlist", "Cartas que você quer acompanhar.", "WISHLIST", Actions: [new("Explorar catálogo", "catalog", true)])
@@ -105,7 +104,7 @@ public partial class ExperienceViewModel : ObservableObject
     private readonly IMarketplaceClient _marketplaceClient;
     private readonly IOrdersClient _ordersClient;
     private readonly IPaymentsClient _paymentsClient;
-    private readonly IWalletsClient _walletsClient;
+    private readonly IPayoutsClient _payoutsClient;
     private readonly IViaCepClient _viaCepClient;
     private readonly IPriceHistoryProvider _priceHistoryProvider;
     private readonly ITokenStore _tokenStore;
@@ -119,6 +118,18 @@ public partial class ExperienceViewModel : ObservableObject
     private bool _collectionLoadedOnce;
     private MyProfileDto? _currentProfile;
     private OrderPageDto? _userOrders;
+    private int _payoutPage = 1;
+    private int _orderPage = 1;
+    private Guid? _privateDataOwner;
+    private CancellationTokenSource? _collectionReadCts;
+    private CancellationTokenSource? _collectionValueCts;
+    private CancellationTokenSource? _entryReadCts;
+    private CancellationTokenSource? _entryValueCts;
+    private string? _collectionValueError;
+    private string? _entryValueError;
+    [ObservableProperty] private CollectionValuationDto? collectionValuation;
+    [ObservableProperty] private CollectionValuationDto? entryValuation;
+    public CollectionValuationDto? VisibleValuation => ScreenId == "collection-item" ? EntryValuation : CollectionValuation;
 
     public ExperienceViewModel(
         IAuthenticationService authenticationService,
@@ -131,7 +142,7 @@ public partial class ExperienceViewModel : ObservableObject
         IMarketplaceClient marketplaceClient,
         IOrdersClient ordersClient,
         IPaymentsClient paymentsClient,
-        IWalletsClient walletsClient,
+        IPayoutsClient payoutsClient,
         IViaCepClient viaCepClient,
         IPriceHistoryProvider priceHistoryProvider,
         ITokenStore tokenStore,
@@ -147,7 +158,7 @@ public partial class ExperienceViewModel : ObservableObject
         _marketplaceClient = marketplaceClient;
         _ordersClient = ordersClient;
         _paymentsClient = paymentsClient;
-        _walletsClient = walletsClient;
+        _payoutsClient = payoutsClient;
         _viaCepClient = viaCepClient;
         _priceHistoryProvider = priceHistoryProvider;
         _tokenStore = tokenStore;
@@ -179,13 +190,25 @@ public partial class ExperienceViewModel : ObservableObject
     [ObservableProperty] private OrderDto? currentOrder;
     [ObservableProperty] private PaymentDto? currentPayment;
     [ObservableProperty] private Guid? selectedListingId;
+    [ObservableProperty] private ListingDto? selectedListing;
+    private CatalogPrintingDetails? _listingPrinting;
+    partial void OnSelectedListingChanged(ListingDto? value) => OnPropertyChanged(nameof(Screen));
     [ObservableProperty] private IReadOnlyList<Vaulta.App.Views.Components.ChartPoint>? filterChartData;
     [ObservableProperty] private string shippingStreet = string.Empty;
+    [ObservableProperty] private string shippingNumber = string.Empty;
+    [ObservableProperty] private string shippingComplement = string.Empty;
+    [ObservableProperty] private string shippingNeighborhood = string.Empty;
     [ObservableProperty] private string shippingCity = string.Empty;
     [ObservableProperty] private string shippingState = string.Empty;
     [ObservableProperty] private string shippingZipCode = string.Empty;
+    [ObservableProperty] private string shippingRecipient = string.Empty;
+    [ObservableProperty] private string billingLegalName = string.Empty;
+    [ObservableProperty] private string billingDocument = string.Empty;
     [ObservableProperty] private bool isAddressLoading;
-    [ObservableProperty] private decimal walletBalance;
+    [ObservableProperty] private string pixKey = string.Empty;
+    [ObservableProperty] private string pixKeyType = "CPF";
+    [ObservableProperty] private PixDestinationDto? pixDestination;
+    [ObservableProperty] private SellerPayoutPageDto? sellerPayouts;
 
     partial void OnShippingZipCodeChanged(string value)
     {
@@ -207,6 +230,7 @@ public partial class ExperienceViewModel : ObservableObject
             if (result is not null)
             {
                 ShippingStreet = result.Logradouro ?? string.Empty;
+                ShippingNeighborhood = result.Bairro ?? string.Empty;
                 ShippingCity = result.Localidade ?? string.Empty;
                 ShippingState = result.Uf ?? string.Empty;
             }
@@ -221,26 +245,25 @@ public partial class ExperienceViewModel : ObservableObject
                 IsAddressLoading = false;
         }
     }
-    [ObservableProperty] private IReadOnlyList<Vaulta.Wallets.Contracts.WalletTransactionDto>? walletTransactions;
-    [ObservableProperty] private string withdrawAmount = string.Empty;
-
     [RelayCommand]
-    private async Task RequestWithdrawalAsync(CancellationToken cancellationToken)
+    private async Task RegisterPixAsync(CancellationToken cancellationToken)
     {
-        if (!decimal.TryParse(WithdrawAmount, out var amount) || amount <= 0)
+        var userId = _sessionState.User?.Id;
+        if (string.IsNullOrWhiteSpace(PixKey))
         {
-            StatusMessage = "Informe um valor válido para saque.";
+            StatusMessage = "Informe sua chave Pix.";
             return;
         }
         IsBusy = true;
         StatusMessage = null;
         try
         {
-            var wallet = await _walletsClient.RequestWithdrawalAsync(new Vaulta.Wallets.Contracts.WithdrawRequest(amount), cancellationToken);
-            WalletBalance = wallet.Balance;
-            WithdrawAmount = string.Empty;
-            StatusMessage = "Solicitação de saque registrada com sucesso.";
-            await LoadWalletAsync(cancellationToken);
+            var destination = await _payoutsClient.RegisterDestinationAsync(new(PixKey.Trim(), PixKeyType), cancellationToken);
+            if (userId != _sessionState.User?.Id) return;
+            PixDestination = destination;
+            PixKey = string.Empty;
+            StatusMessage = "Chave consultada. A titularidade será verificada antes dos repasses.";
+            OnPropertyChanged(nameof(Screen));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -253,26 +276,170 @@ public partial class ExperienceViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task LoadWalletAsync(CancellationToken cancellationToken)
+    private async Task LoadPayoutsAsync(CancellationToken cancellationToken)
     {
+        var userId = _sessionState.User?.Id;
+        if (userId is null) return;
         IsBusy = true;
         StatusMessage = null;
         try
         {
-            var wallet = await _walletsClient.GetMyWalletAsync(cancellationToken);
-            WalletBalance = wallet.Balance;
-            var page = await _walletsClient.GetTransactionsAsync(1, 20, cancellationToken);
-            WalletTransactions = page.Items;
+            var destination = await _payoutsClient.GetDestinationAsync(cancellationToken);
+            var payouts = await _payoutsClient.GetPayoutsAsync(page: _payoutPage, ct: cancellationToken);
+            if (userId != _sessionState.User?.Id) return;
+            PixDestination = destination;
+            SellerPayouts = payouts;
+            OnPropertyChanged(nameof(Screen));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            StatusMessage = $"Erro ao carregar carteira: {ex.Message}";
+            StatusMessage = ApiErrorMessage(ex);
         }
         finally
         {
             IsBusy = false;
         }
     }
+
+    partial void OnCurrentPaymentChanged(PaymentDto? value) => OnPropertyChanged(nameof(Screen));
+
+    public void ContinueOrderPayment(OrderDto order)
+    {
+        if (!IsBuyer(order) || order.Status != "pending") return;
+        CurrentOrder = order; CurrentPayment = null; SelectedListingId = order.ListingId;
+        ShippingStreet = order.Shipping.Street ?? string.Empty;
+        ShippingNumber = order.Shipping.Number ?? string.Empty;
+        ShippingComplement = order.Shipping.Complement ?? string.Empty;
+        ShippingNeighborhood = order.Shipping.Neighborhood ?? string.Empty;
+        ShippingCity = order.Shipping.City ?? string.Empty;
+        ShippingState = order.Shipping.State ?? string.Empty;
+        ShippingZipCode = order.Shipping.ZipCode ?? string.Empty;
+        ShippingRecipient = order.Shipping.Recipient ?? string.Empty;
+        ScreenId = "checkout";
+    }
+
+    [RelayCommand]
+    private async Task RefreshPaymentAsync(CancellationToken ct)
+    {
+        if (IsBusy) return;
+        if (CurrentOrder is not { } order || !IsBuyer(order)) return;
+        var userId = _sessionState.User?.Id;
+        IsBusy = true;
+        try
+        {
+            var payment = await _paymentsClient.GetOrderPaymentAsync(order.Id, ct);
+            if (userId != _sessionState.User?.Id) return;
+            if (payment?.Status is "pending" or "overdue")
+            {
+                payment = await _paymentsClient.InitiatePaymentAsync(new(order.Id, payment.BillingType, null), ct);
+                if (userId != _sessionState.User?.Id) return;
+            }
+            CurrentPayment = payment;
+            StatusMessage = payment?.Status switch
+            {
+                "confirmed" => "Pagamento confirmado. Aguarde o envio do vendedor.",
+                "refunded" => "Reembolso confirmado.",
+                _ => "Aguardando confirmação do pagamento."
+            };
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException) { StatusMessage = ApiErrorMessage(ex); }
+        finally { IsBusy = false; }
+    }
+    [RelayCommand]
+    private async Task ChangePayoutPageAsync(int page, CancellationToken cancellationToken)
+    {
+        _payoutPage = Math.Max(1, page);
+        await LoadPayoutsAsync(cancellationToken);
+    }
+
+    public IReadOnlyList<OrderDto> UserOrders => _userOrders?.Items ?? [];
+    public OrderPageDto? UserOrdersPage => _userOrders;
+    public bool IsBuyer(OrderDto order) => order.BuyerId == _sessionState.User?.Id;
+    public bool IsSeller(OrderDto order) => order.SellerId == _sessionState.User?.Id;
+
+    [RelayCommand]
+    private async Task ChangeOrderPageAsync(int page)
+    {
+        _orderPage = Math.Max(1, page);
+        _userOrders = null;
+        await LoadOrdersAsync();
+    }
+
+    [RelayCommand]
+    private async Task ConfirmReceiptAsync(Guid orderId, CancellationToken cancellationToken)
+    {
+        IsBusy = true;
+        StatusMessage = null;
+        try
+        {
+            await _ordersClient.ConfirmReceiptAsync(orderId, cancellationToken);
+            _userOrders = null;
+            await LoadOrdersAsync();
+            StatusMessage = "Recebimento confirmado. O repasse ao vendedor será processado.";
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException) { StatusMessage = ApiErrorMessage(ex); }
+        finally { IsBusy = false; }
+    }
+
+    public async Task MarkShipmentAsync(Guid orderId, string trackingCode)
+    {
+        if (string.IsNullOrWhiteSpace(trackingCode)) { StatusMessage = "Informe o código de rastreio."; return; }
+        IsBusy = true;
+        StatusMessage = null;
+        try
+        {
+            await _ordersClient.MarkShippedAsync(orderId, trackingCode.Trim());
+            _userOrders = null;
+            await LoadOrdersAsync();
+            StatusMessage = "Envio registrado.";
+        }
+        catch (Exception ex) { StatusMessage = ApiErrorMessage(ex); }
+        finally { IsBusy = false; }
+    }
+
+    public async Task CancelOrderAsync(Guid orderId, string reason)
+    {
+        IsBusy = true;
+        StatusMessage = null;
+        try
+        {
+            await _ordersClient.CancelOrderAsync(orderId, reason);
+            _userOrders = null;
+            await LoadOrdersAsync();
+            StatusMessage = "Solicitação registrada. Pedidos pagos aguardam a confirmação do reembolso integral.";
+        }
+        catch (Exception ex) { StatusMessage = ApiErrorMessage(ex); }
+        finally { IsBusy = false; }
+    }
+
+    public async Task<OrderRefundDto?> GetRefundAsync(Guid orderId)
+    {
+        try
+        {
+            var refund = await _ordersClient.GetRefundAsync(orderId);
+            StatusMessage = refund?.Status switch
+            {
+                "DONE" => "Reembolso integral confirmado.",
+                "RECONCILIATION_REQUIRED" => "Reembolso em análise. Procure o atendimento.",
+                _ => "Reembolso solicitado. Aguardando a confirmação do Asaas."
+            };
+            return refund;
+        }
+        catch (Exception ex) { StatusMessage = ApiErrorMessage(ex); return null; }
+    }
+
+    public static string PayoutStatusText(string status) => status switch
+    {
+        "WAITING_RECEIPT" => "Aguardando recebimento pelo comprador",
+        "WAITING_SETTLEMENT" => "Aguardando liquidação do pagamento",
+        "WAITING_DESTINATION" => "Aguardando chave Pix verificada",
+        "READY" => "Aguardando repasse",
+        "SUBMITTING" or "PROCESSING" => "Repasse em processamento",
+        "DONE" => "Repasse concluído",
+        "FAILED" => "Repasse não concluído · entre em contato com o suporte",
+        "INSUFFICIENT_NET" or "BLOCKED" or "RECONCILIATION_REQUIRED" => "Repasse em análise",
+        _ => "Verificando repasse"
+    };
     public bool HasStatusMessage => !string.IsNullOrWhiteSpace(StatusMessage);
     public bool HasScanCandidates => ScanResult?.Candidates is { Count: > 0 };
     public ObservableCollection<string> SelectedTcgs { get; } = [];
@@ -285,7 +452,22 @@ public partial class ExperienceViewModel : ObservableObject
     public ScreenDefinition Screen => MergeDynamicData(ScreenCatalog.Get(ScreenId));
     public string DisplayGreeting => string.IsNullOrWhiteSpace(_sessionState.User?.DisplayName) ? Screen.Title : $"Olá, {_sessionState.User.DisplayName}";
 
-    public void RefreshGreeting() => OnPropertyChanged(nameof(DisplayGreeting));
+    public void RefreshGreeting()
+    {
+        var changedOwner = EnsurePrivateDataOwner();
+        // Appearing after session import must reload even when the tab's ScreenId did not change.
+        if (ScreenId == "collection") _ = LoadCollectionAsync();
+        else if (ScreenId == "home") _ = LoadHomeSummaryAsync();
+        else if (ScreenId == "portfolio") _ = LoadValuationAsync();
+        if (changedOwner)
+        {
+            if (ScreenId == "profile") _ = LoadProfileAsync();
+            if (ScreenId == "orders") _ = LoadOrdersAsync();
+            if (ScreenId == "payouts") _ = LoadPayoutsAsync(CancellationToken.None);
+            OnPropertyChanged(nameof(Screen));
+        }
+        OnPropertyChanged(nameof(DisplayGreeting));
+    }
 
     public void SelectPrinting(Guid printingId) => SelectedPrintingId = printingId;
 
@@ -323,11 +505,18 @@ public partial class ExperienceViewModel : ObservableObject
 
     partial void OnScreenIdChanged(string value)
     {
+        EnsurePrivateDataOwner();
         OnPropertyChanged(nameof(Screen));
         OnPropertyChanged(nameof(DisplayGreeting));
         StatusMessage = null;
         switch (value)
         {
+            case "market":
+                _ = LoadMarketplaceListingsAsync(CancellationToken.None);
+                break;
+            case "listing-detail" when SelectedListingId is { } listingId:
+                _ = LoadListingDetailAsync(listingId);
+                break;
             case "card-detail" or "scanner-card-detail" or "add-to-collection" when SelectedPrintingId is { } printingId:
                 _ = LoadCardDetailAsync(printingId);
                 break;
@@ -340,11 +529,17 @@ public partial class ExperienceViewModel : ObservableObject
             case "home":
                 _ = LoadHomeSummaryAsync();
                 break;
+            case "portfolio":
+                _ = LoadValuationAsync();
+                break;
             case "profile":
                 _ = LoadProfileAsync();
                 break;
             case "orders":
                 _ = LoadOrdersAsync();
+                break;
+            case "payouts":
+                _ = LoadPayoutsAsync(CancellationToken.None);
                 break;
             case "add-to-collection":
                 // Entering the screen is a new voluntary intent; any previous retry key is discarded.
@@ -461,18 +656,44 @@ public partial class ExperienceViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+            OnPropertyChanged(nameof(Screen));
         }
+    }
+
+    private async Task LoadListingDetailAsync(Guid listingId)
+    {
+        SelectedListing = null; _listingPrinting = null;
+        IsBusy = true;
+        try
+        {
+            var listing = await _marketplaceClient.GetListingAsync(listingId);
+            if (SelectedListingId != listingId) return;
+            if (listing is null) { StatusMessage = "Anúncio não encontrado."; return; }
+            try { _listingPrinting = await _catalogClient.GetPrintingAsync(listing.PrintingId); }
+            catch (Exception ex) when (ex is not OperationCanceledException) { /* Listing data remains available when catalog lookup fails. */ }
+            if (SelectedListingId != listingId) return;
+            SelectedListing = listing;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException) { StatusMessage = ApiErrorMessage(ex); }
+        finally { IsBusy = false; OnPropertyChanged(nameof(Screen)); }
     }
 
     [RelayCommand]
     private async Task BuyListingAsync(Guid listingId, CancellationToken cancellationToken)
     {
+        if (IsBusy || SelectedListing is not { Status: "active" } listing || listing.Id != listingId) return;
+        if (listing.SellerUserId == _sessionState.User?.Id) { StatusMessage = "Você não pode comprar seu próprio anúncio."; return; }
+        if (CurrentOrder?.ListingId != listingId) { CurrentOrder = null; CurrentPayment = null; }
         SelectedListingId = listingId;
         var savedAddress = _currentProfile?.DefaultShippingAddress;
         ShippingStreet = savedAddress?.Street ?? string.Empty;
+        ShippingNumber = savedAddress?.Number ?? string.Empty;
+        ShippingComplement = savedAddress?.Complement ?? string.Empty;
+        ShippingNeighborhood = savedAddress?.Neighborhood ?? string.Empty;
         ShippingCity = savedAddress?.City ?? string.Empty;
         ShippingState = savedAddress?.State ?? string.Empty;
         ShippingZipCode = savedAddress?.ZipCode ?? string.Empty;
+        ShippingRecipient = savedAddress?.Recipient ?? string.Empty;
         StatusMessage = null;
         await NavigateCommand.ExecuteAsync("checkout");
     }
@@ -499,17 +720,31 @@ public partial class ExperienceViewModel : ObservableObject
         StatusMessage = null;
         try
         {
-            var order = await _ordersClient.CreateOrderAsync(
-                new CreateOrderRequest(listingId, ShippingStreet.Trim(), ShippingCity.Trim(), ShippingState.Trim(), ShippingZipCode.Trim()), cancellationToken);
+            var buyerId = _sessionState.User?.Id;
+            var billing = await _paymentsClient.GetCustomerAsync(cancellationToken);
+            if (buyerId != _sessionState.User?.Id) return;
+            if (billing?.Status != "READY" || !string.IsNullOrWhiteSpace(BillingDocument))
+            {
+                billing = await _paymentsClient.RegisterCustomerAsync(new(BillingLegalName, BillingDocument), cancellationToken);
+                if (buyerId != _sessionState.User?.Id) return;
+            }
+            if (billing.Status != "READY") { StatusMessage = "Cadastro de cobrança em conciliação. Aguarde antes de criar o pedido."; return; }
+            BillingDocument = string.Empty;
+            var order = CurrentOrder is { Status: "pending" } saved && saved.ListingId == listingId && saved.BuyerId == buyerId
+                ? saved
+                : await _ordersClient.CreateOrderAsync(
+                    new CreateOrderRequest(listingId, ShippingStreet.Trim(), ShippingNumber.Trim(), ShippingComplement.Trim(), ShippingNeighborhood.Trim(), ShippingCity.Trim(), ShippingState.Trim(), ShippingZipCode.Trim(), ShippingRecipient.Trim()), cancellationToken);
+            if (buyerId != _sessionState.User?.Id) return;
             CurrentOrder = order;
 
             var payment = await _paymentsClient.InitiatePaymentAsync(
                 new CreatePaymentRequest(order.Id, "PIX", null), cancellationToken);
+            if (buyerId != _sessionState.User?.Id) return;
             CurrentPayment = payment;
 
             StatusMessage = !string.IsNullOrWhiteSpace(payment.PixQrCode)
-                ? "Pedido criado! Use o QR Code PIX para pagar."
-                : "Pedido criado! Aguardando confirmação de pagamento.";
+                ? "Copie o código Pix e pague no seu banco. Depois, atualize o pagamento."
+                : "Cobrança criada. Abra a cobrança ou tente carregar o código Pix novamente.";
 
             try
             {
@@ -519,9 +754,13 @@ public partial class ExperienceViewModel : ObservableObject
                     await _apiClient.UpdateShippingAddressAsync(
                         tokens.AccessToken,
                         ShippingStreet.Trim(),
+                        ShippingNumber.Trim(),
+                        ShippingComplement.Trim(),
+                        ShippingNeighborhood.Trim(),
                         ShippingCity.Trim(),
                         ShippingState.Trim(),
                         ShippingZipCode.Trim(),
+                        ShippingRecipient.Trim(),
                         cancellationToken);
                 }
             }
@@ -624,10 +863,15 @@ public partial class ExperienceViewModel : ObservableObject
 
     private async Task LoadCollectionAsync()
     {
+        var owner = _sessionState.User?.Id;
+        if (owner is null) return;
+        var request = RenewRequest(ref _collectionReadCts);
+        _collectionValueCts?.Cancel(); CollectionValuation = null; _collectionValueError = null;
         IsBusy = true;
         try
         {
-            var page = await _collectionClient.GetCollectionAsync(new CollectionQuery(null, null, null, null, null, 1, 50, "recent"));
+            var page = await _collectionClient.GetCollectionAsync(new CollectionQuery(null, null, null, null, null, 1, 50, "recent"), request.Token);
+            if (!OwnsRequest(owner, request)) return;
             CollectionEntries.Clear();
             foreach (var item in page.Items)
             {
@@ -640,27 +884,41 @@ public partial class ExperienceViewModel : ObservableObject
                     ArtworkUrl: item.ArtworkUrl,
                     EntryId: item.CollectionEntryId));
             }
-            try { CollectionSummary = await _collectionClient.GetSummaryAsync(); }
-            catch { /* summary is a bonus metric; the list itself already loaded successfully */ }
+            try
+            {
+                var summary = await _collectionClient.GetSummaryAsync(request.Token);
+                if (!OwnsRequest(owner, request)) return;
+                CollectionSummary = summary;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch { CollectionSummary = null; }
         }
+        catch (OperationCanceledException) { }
         catch (Exception exception)
         {
-            StatusMessage = ApiErrorMessage(exception);
+            if (OwnsRequest(owner, request)) StatusMessage = ApiErrorMessage(exception);
         }
         finally
         {
-            IsBusy = false;
-            _collectionLoadedOnce = true;
-            OnPropertyChanged(nameof(Screen));
+            if (OwnsRequest(owner, request) && ReferenceEquals(request, _collectionReadCts))
+            {
+                IsBusy = false; _collectionLoadedOnce = true; OnPropertyChanged(nameof(Screen));
+            }
         }
+        if (OwnsRequest(owner, request)) _ = LoadValuationAsync();
     }
 
     private async Task LoadCollectionEntryAsync(Guid entryId)
     {
+        var owner = _sessionState.User?.Id;
+        if (owner is null) return;
+        var request = RenewRequest(ref _entryReadCts);
+        _entryValueCts?.Cancel(); EntryValuation = null; _entryValueError = null;
         IsBusy = true;
         try
         {
-            var entry = await _collectionClient.GetEntryAsync(entryId, 1, 20);
+            var entry = await _collectionClient.GetEntryAsync(entryId, 1, 20, request.Token);
+            if (!OwnsRequest(owner, request) || SelectedEntryId != entryId) return;
             SelectedEntry = entry;
             var firstItem = entry.Items.FirstOrDefault();
             SelectedItem = firstItem;
@@ -668,27 +926,67 @@ public partial class ExperienceViewModel : ObservableObject
             ItemNotes = firstItem?.Notes ?? string.Empty;
             OnPropertyChanged(nameof(Screen));
         }
+        catch (OperationCanceledException) { }
         catch (Exception exception)
         {
-            StatusMessage = ApiErrorMessage(exception);
+            if (OwnsRequest(owner, request) && SelectedEntryId == entryId) StatusMessage = ApiErrorMessage(exception);
         }
         finally
         {
-            IsBusy = false;
+            if (OwnsRequest(owner, request) && ReferenceEquals(request, _entryReadCts)) IsBusy = false;
         }
+        if (OwnsRequest(owner, request) && SelectedEntryId == entryId) _ = LoadValuationAsync(entryId);
     }
 
     private async Task LoadHomeSummaryAsync()
     {
+        var owner = _sessionState.User?.Id;
+        if (owner is null) return;
+        var request = RenewRequest(ref _collectionReadCts);
         try
         {
-            CollectionSummary = await _collectionClient.GetSummaryAsync();
+            var summary = await _collectionClient.GetSummaryAsync(request.Token);
+            if (!OwnsRequest(owner, request)) return;
+            CollectionSummary = summary;
             OnPropertyChanged(nameof(Screen));
         }
+        catch (OperationCanceledException) { }
         catch
         {
-            // The home metric stays in its demonstrative/neutral state when the summary can't load.
+            if (OwnsRequest(owner, request)) { CollectionSummary = null; OnPropertyChanged(nameof(Screen)); }
         }
+        if (OwnsRequest(owner, request)) _ = LoadValuationAsync();
+    }
+
+    private static CancellationTokenSource RenewRequest(ref CancellationTokenSource? previous)
+    {
+        previous?.Cancel(); previous?.Dispose(); return previous = new CancellationTokenSource();
+    }
+
+    private bool OwnsRequest(Guid? owner, CancellationTokenSource request) => !request.IsCancellationRequested && owner == _sessionState.User?.Id;
+
+    private async Task LoadValuationAsync(Guid? entryId = null)
+    {
+        var owner = _sessionState.User?.Id;
+        if (owner is null) return;
+        var request = entryId.HasValue ? RenewRequest(ref _entryValueCts) : RenewRequest(ref _collectionValueCts);
+        if (entryId.HasValue) { EntryValuation = null; _entryValueError = null; }
+        else { CollectionValuation = null; _collectionValueError = null; }
+        OnPropertyChanged(nameof(Screen));
+        try
+        {
+            var valuation = await _collectionClient.GetValuationAsync(entryId, request.Token);
+            if (!OwnsRequest(owner, request) || entryId.HasValue && SelectedEntryId != entryId) return;
+            if (valuation.Currency != "BRL") throw new InvalidDataException("Collection valuation must be in BRL.");
+            if (entryId.HasValue) EntryValuation = valuation; else CollectionValuation = valuation;
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            if (!OwnsRequest(owner, request)) return;
+            if (entryId.HasValue) _entryValueError = ApiErrorMessage(ex); else _collectionValueError = ApiErrorMessage(ex);
+        }
+        finally { if (OwnsRequest(owner, request)) OnPropertyChanged(nameof(Screen)); }
     }
 
     [RelayCommand]
@@ -760,6 +1058,7 @@ public partial class ExperienceViewModel : ObservableObject
     private async Task UpdateCollectionItemAsync()
     {
         if (IsBusy || SelectedItem is null) return;
+        if (SelectedItem.ListedById.HasValue) { StatusMessage = "Cancele o anúncio antes de alterar esta carta."; return; }
 
         IsBusy = true;
         StatusMessage = null;
@@ -796,6 +1095,7 @@ public partial class ExperienceViewModel : ObservableObject
     private async Task RemoveCollectionItemAsync()
     {
         if (IsBusy || SelectedItem is null) return;
+        if (SelectedItem.ListedById.HasValue) { StatusMessage = "Cancele o anúncio antes de remover esta carta."; return; }
 
         IsBusy = true;
         try
@@ -821,20 +1121,42 @@ public partial class ExperienceViewModel : ObservableObject
         "collection" => MergeCollection(baseScreen),
         "collection-item" => MergeCollectionItem(baseScreen),
         "home" => MergeHome(baseScreen),
+        "portfolio" => MergePortfolio(baseScreen),
         "profile" => MergeProfile(baseScreen),
         "orders" => MergeOrders(baseScreen),
+        "listing-detail" => MergeListingDetail(baseScreen),
         _ => baseScreen
     };
 
+    private ScreenDefinition MergeListingDetail(ScreenDefinition baseScreen)
+    {
+        if (SelectedListing is not { } listing) return baseScreen;
+        var culture = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+        var rating = listing.SellerTotalReviews == 0 ? "Sem avaliações como vendedor"
+            : $"{listing.SellerAverageRating.ToString("N2", culture)} / 5 · {listing.SellerTotalReviews} avaliações";
+        return baseScreen with
+        {
+            Title = _listingPrinting?.CardName ?? "Detalhes do anúncio",
+            Subtitle = _listingPrinting is { } printing ? $"{printing.SetName} · {printing.CollectorNumber}" : "Confira as fotos e a descrição do vendedor.",
+            Notice = listing.Description,
+            Metrics = [new("PREÇO", listing.PriceBrl.ToString("C2", culture)), new("CONDIÇÃO", ConditionMapper.ToUiLabel(listing.Condition)), new("VENDEDOR", rating)],
+            Actions = listing.Status == "active" && listing.SellerUserId != _sessionState.User?.Id
+                ? [new("Comprar agora", null, true)] : null
+        };
+    }
+
     private async Task LoadProfileAsync()
     {
+        var userId = _sessionState.User?.Id;
         if (_currentProfile is not null || !_sessionState.IsAuthenticated) return;
         IsBusy = true;
         try
         {
             var tokens = await _tokenStore.GetAsync(CancellationToken.None);
             if (tokens is null) return;
-            _currentProfile = await _apiClient.GetCurrentUserAsync(tokens.AccessToken, CancellationToken.None);
+            var profile = await _apiClient.GetCurrentUserAsync(tokens.AccessToken, CancellationToken.None);
+            if (userId != _sessionState.User?.Id) return;
+            _currentProfile = profile;
             OnPropertyChanged(nameof(Screen));
         }
         catch (Exception exception)
@@ -849,11 +1171,14 @@ public partial class ExperienceViewModel : ObservableObject
 
     private async Task LoadOrdersAsync()
     {
+        var userId = _sessionState.User?.Id;
         if (_userOrders is not null || !_sessionState.IsAuthenticated) return;
         IsBusy = true;
         try
         {
-            _userOrders = await _ordersClient.GetUserOrdersAsync(cancellationToken: CancellationToken.None);
+            var orders = await _ordersClient.GetUserOrdersAsync(page: _orderPage, cancellationToken: CancellationToken.None);
+            if (userId != _sessionState.User?.Id) return;
+            _userOrders = orders;
             OnPropertyChanged(nameof(Screen));
         }
         catch (Exception exception)
@@ -879,7 +1204,7 @@ public partial class ExperienceViewModel : ObservableObject
             Title = profile.DisplayName,
             Subtitle = $"@{profile.Username} · {location}",
             Metrics = [new("INTERESSES", interests), new("MOEDA", profile.Preferences.Currency), new("IDIOMA", profile.Preferences.Language)],
-            Actions = [new("Editar perfil", "settings", true), new("Configurações", "settings"), new("Minha coleção", "collection"), new("Meus pedidos", "orders")]
+            Actions = [new("Editar perfil", "settings", true), new("Configurações", "settings"), new("Minha coleção", "collection"), new("Meus pedidos", "orders"), new("Meus repasses", "payouts")]
         };
     }
 
@@ -926,10 +1251,9 @@ public partial class ExperienceViewModel : ObservableObject
             return baseScreen with { Title = empty.Title, Subtitle = empty.Subtitle, Cards = null, Metrics = null, Actions = empty.Actions };
         }
 
-        var metrics = (baseScreen.Metrics ?? []).Select(metric => metric.Label == "CARTAS" && CollectionSummary is not null
-            ? metric with { Value = CollectionSummary.TotalItems.ToString() }
-            : metric).ToArray();
-        return baseScreen with { Cards = CollectionEntries.ToArray(), Metrics = metrics };
+        var metrics = new ScreenMetric[] { new("CARTAS", (CollectionValuation?.TotalItems ?? CollectionSummary?.TotalItems)?.ToString() ?? "—"),
+            ValuationMetric("VALOR ESTIMADO", CollectionValuation, _collectionValueError) };
+        return baseScreen with { Cards = CollectionEntries.ToArray(), Metrics = metrics, Notice = ValuationNotice(CollectionValuation, _collectionValueError) };
     }
 
     private ScreenDefinition MergeCollectionItem(ScreenDefinition baseScreen)
@@ -937,24 +1261,43 @@ public partial class ExperienceViewModel : ObservableObject
         if (SelectedEntry is null) return baseScreen;
         var entry = SelectedEntry;
         var conditionLabel = SelectedItem is not null ? ConditionMapper.ToUiLabel(SelectedItem.Condition) : "—";
+        var listed = SelectedItem?.ListedById.HasValue == true;
         return baseScreen with
         {
             Title = entry.CardName,
             Subtitle = $"{entry.SetName} · {entry.CollectorNumber} · {conditionLabel}",
-            Metrics = [new ScreenMetric("QUANTIDADE", entry.Quantity.ToString()), new ScreenMetric("PREÇO DE MERCADO", "Indisponível", "Pricing ainda não integrado")],
-            Options = ConditionMapper.UiLabels.ToArray(),
-            Actions = [new ScreenAction("Salvar alterações", "collection-item-update", true), new ScreenAction("Remover da coleção", "collection-item-remove")]
+            Metrics = [new ScreenMetric("QUANTIDADE", entry.Quantity.ToString()), ValuationMetric("VALOR ESTIMADO DAS UNIDADES", EntryValuation, _entryValueError)],
+            Notice = (listed ? "Esta carta está anunciada. Cancele o anúncio para alterar ou remover o item. " : "") + ValuationNotice(EntryValuation, _entryValueError),
+            Options = listed ? null : ConditionMapper.UiLabels.ToArray(),
+            Actions = listed ? null : [new ScreenAction("Salvar alterações", "collection-item-update", true), new ScreenAction("Remover da coleção", "collection-item-remove")]
         };
     }
 
     private ScreenDefinition MergeHome(ScreenDefinition baseScreen)
     {
-        if (CollectionSummary is null) return baseScreen;
-        var metrics = (baseScreen.Metrics ?? []).Select(metric => metric.Label == "CARTAS"
-            ? metric with { Value = CollectionSummary.TotalItems.ToString() }
-            : metric).ToArray();
-        return baseScreen with { Metrics = metrics };
+        var metrics = new ScreenMetric[] { ValuationMetric("ESTIMATIVA TOTAL", CollectionValuation, _collectionValueError),
+            new("CARTAS", (CollectionValuation?.TotalItems ?? CollectionSummary?.TotalItems)?.ToString() ?? "—", "na coleção") };
+        return baseScreen with { Metrics = metrics, Notice = ValuationNotice(CollectionValuation, _collectionValueError) };
     }
+
+    private ScreenDefinition MergePortfolio(ScreenDefinition baseScreen) => baseScreen with
+    {
+        Metrics = [ValuationMetric("TOTAL ESTIMADO", CollectionValuation, _collectionValueError),
+            new("CARTAS AVALIADAS", CollectionValuation is { } value ? $"{value.PricedItems} / {value.TotalItems}" : "—",
+                CollectionValuation?.UnpricedItems > 0 ? $"{CollectionValuation.UnpricedItems} sem cotação ou variante confirmada" : "Unidades ativas no estoque")],
+        Cards = null, Notice = ValuationNotice(CollectionValuation, _collectionValueError)
+    };
+
+    private static ScreenMetric ValuationMetric(string label, CollectionValuationDto? value, string? error)
+    {
+        if (value is null) return new(label, error is null ? "Calculando…" : "Indisponível", error);
+        var money = value.PricedItems == 0 && value.TotalItems > 0 ? "Indisponível" : FormatBrl(value.EstimatedValueBrl);
+        var coverage = value.IsPartial ? $"Parcial · {value.PricedItems} de {value.TotalItems} cartas avaliadas" : $"{value.PricedItems} cartas avaliadas";
+        return new(label, money, coverage + (value.OldestQuoteAt is { } quote ? $" · cotação mais antiga {quote.ToLocalTime():dd/MM HH:mm}" : ""));
+    }
+
+    private static string ValuationNotice(CollectionValuationDto? value, string? error) => error ?? value?.Notice ?? "Consultando referências de mercado em reais…";
+    public static string FormatBrl(decimal value) => value.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"));
 
     private static string FormatGame(string gameCode) => gameCode.ToUpperInvariant();
 
@@ -978,6 +1321,10 @@ public partial class ExperienceViewModel : ObservableObject
     [RelayCommand]
     private async Task NavigateAsync(string? route)
     {
+        if (route == "collection-valuation-refresh")
+        {
+            await LoadValuationAsync(); return;
+        }
         if (IsBusy) return;
         if (ScreenId.StartsWith("onboarding-", StringComparison.Ordinal) && (route is "login" or "signup"))
             AppShell.CompleteOnboarding();
@@ -1029,6 +1376,12 @@ public partial class ExperienceViewModel : ObservableObject
             return;
         }
 
+        if (route == "scanner")
+        {
+            await Shell.Current.GoToAsync("scanner-session");
+            return;
+        }
+
         if (route is "welcome" or "login")
         {
             await Shell.Current.GoToAsync("experience?screen=login");
@@ -1054,6 +1407,7 @@ public partial class ExperienceViewModel : ObservableObject
         await RunAuthenticationAsync(async () =>
         {
             await _authenticationService.LoginAsync(new LoginRequest(Email.Trim(), Password));
+            ClearPrivateCommerceData();
             await Shell.Current.GoToAsync("//main/home/home-page");
         });
     }
@@ -1076,6 +1430,7 @@ public partial class ExperienceViewModel : ObservableObject
         {
             await _authenticationService.RegisterAsync(new RegisterRequest(Email.Trim(), Password, Username.Trim(), DisplayName.Trim()));
             await _authenticationService.LoginAsync(new LoginRequest(Email.Trim(), Password));
+            ClearPrivateCommerceData();
             await Shell.Current.GoToAsync("//main/home/home-page");
         });
     }
@@ -1083,6 +1438,7 @@ public partial class ExperienceViewModel : ObservableObject
     [RelayCommand]
     private async Task LogoutAsync()
     {
+        if (IsBusy) return;
         IsBusy = true;
         try
         {
@@ -1094,9 +1450,38 @@ public partial class ExperienceViewModel : ObservableObject
         }
         finally
         {
+            ClearPrivateCommerceData();
             IsBusy = false;
             await ((AppShell)Shell.Current).ShowLoginAsync();
         }
+    }
+
+    private void ClearPrivateCommerceData()
+    {
+        _collectionReadCts?.Cancel(); _collectionValueCts?.Cancel(); _entryReadCts?.Cancel(); _entryValueCts?.Cancel();
+        CollectionEntries.Clear(); CollectionSummary = null; CollectionValuation = null; EntryValuation = null;
+        SelectedEntry = null; SelectedItem = null; SelectedEntryId = null; ItemNotes = string.Empty;
+        _collectionValueError = null; _entryValueError = null; _collectionLoadedOnce = false;
+        _currentProfile = null;
+        _userOrders = null;
+        PixDestination = null;
+        SellerPayouts = null;
+        PixKey = string.Empty;
+        _payoutPage = 1;
+        _orderPage = 1;
+        CurrentOrder = null;
+        CurrentPayment = null;
+        BillingLegalName = string.Empty;
+        BillingDocument = string.Empty;
+    }
+
+    private bool EnsurePrivateDataOwner()
+    {
+        var userId = _sessionState.User?.Id;
+        if (_privateDataOwner == userId) return false;
+        _privateDataOwner = userId;
+        ClearPrivateCommerceData();
+        return true;
     }
 
     private async Task RunAuthenticationAsync(Func<Task> action)

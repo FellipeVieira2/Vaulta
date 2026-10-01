@@ -10,6 +10,7 @@ public interface IOrderStore
     Task<Order?> FindOrder(Guid orderId, CancellationToken cancellationToken);
     Task<Order?> FindOrderForUser(Guid userId, Guid orderId, CancellationToken cancellationToken);
     void AddOrder(Order order);
+    Task<IReadOnlyList<Order>> ReleasableOrders(int offset, CancellationToken cancellationToken);
     Task Save(CancellationToken cancellationToken);
 }
 
@@ -23,5 +24,5 @@ public interface IOrderMarketplace
 {
     Task<Marketplace.Contracts.ListingDto?> GetActiveListing(Guid listingId, CancellationToken cancellationToken);
     Task MarkListingAsSold(Guid listingId, Guid orderId, DateTimeOffset now, CancellationToken cancellationToken);
-    Task ReleaseListing(Guid listingId, CancellationToken cancellationToken);
+    Task ReleaseListing(Order order, CancellationToken cancellationToken);
 }

@@ -1,5 +1,24 @@
 namespace Vaulta.Catalog.Application;
 
+public interface IScannerCardDetailsReader
+{
+    Task<Vaulta.Catalog.Contracts.ScannerCardDetailsDto?> GetAsync(Guid printingId, CancellationToken cancellationToken);
+}
+
+public interface IBrlExchangeRateProvider
+{
+    Task<BrlExchangeRate?> GetAsync(string currency, CancellationToken cancellationToken);
+}
+
+public sealed record BrlExchangeRate(string Currency, decimal Rate, DateTimeOffset UpdatedAt);
+
+public interface ICardRecognitionCatalog
+{
+    Task<IReadOnlyList<RecognitionCatalogCard>> FindCandidatesAsync(string name, string? collectorNumber, string gameCode, CancellationToken cancellationToken);
+}
+
+public sealed record RecognitionCatalogCard(Vaulta.Catalog.Contracts.CatalogSearchResult Card, IReadOnlyList<string> VariantCodes);
+
 public interface ICardRecognitionProvider
 {
     string GameCode { get; }
@@ -16,7 +35,8 @@ public sealed record CardRecognitionCandidate(
     decimal? EstimatedMarketValueBrl,
     string? Currency,
     IReadOnlyList<string> VariantCodes,
-    double ConfidenceScore);
+    double ConfidenceScore,
+    bool HasCollectorNumberMatch = false);
 
 public interface IExternalIdResolver
 {

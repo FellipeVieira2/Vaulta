@@ -5,6 +5,7 @@ namespace Vaulta.Payments.Domain;
 public static class PaymentRules
 {
     public const string PendingStatus = "pending";
+    public const string OverdueStatus = "overdue";
     public const string ConfirmedStatus = "confirmed";
     public const string FailedStatus = "failed";
     public const string RefundedStatus = "refunded";

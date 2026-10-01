@@ -5,6 +5,7 @@ namespace Vaulta.Collection.Domain;
 public sealed record CollectibleItemUpdatedDomainEvent(Guid Id, Guid CollectibleItemId, Guid CollectionEntryId, DateTimeOffset OccurredAt) : IDomainEvent;
 public sealed record CollectibleItemRemovedDomainEvent(Guid Id, Guid CollectibleItemId, Guid CollectionEntryId, DateTimeOffset OccurredAt) : IDomainEvent;
 public sealed record CollectibleItemAssetChangedDomainEvent(Guid Id, Guid CollectibleItemId, Guid AssetId, bool Attached, DateTimeOffset OccurredAt) : IDomainEvent;
+public sealed record CollectibleItemSoldDomainEvent(Guid Id, Guid CollectibleItemId, Guid OrderId, Guid BuyerItemId, DateTimeOffset OccurredAt) : IDomainEvent;
 
 public sealed class CollectibleItem : AggregateRoot
 {
@@ -24,6 +25,7 @@ public sealed class CollectibleItem : AggregateRoot
     public DateTimeOffset UpdatedAt { get; private set; }
     public DateTimeOffset? RemovedAt { get; private set; }
     public Guid Version { get; private set; }
+    public Guid? ListedById { get; private set; }
     public IReadOnlyCollection<CollectibleItemAsset> Assets => _assets.AsReadOnly();
 
     public static CollectibleItem Create(Guid entryId, Guid userId, string condition, Money? price, DateOnly? acquisitionDate, string? notes, DateTimeOffset now)
@@ -99,7 +101,38 @@ public sealed class CollectibleItem : AggregateRoot
 
     private void EnsureActive()
     {
-        if (!IsActive) throw new DomainException("Removed collectible items cannot be changed.");
+        if (!IsActive) throw new DomainException("Somente itens ativos da coleção podem ser alterados.");
+        if (ListedById.HasValue) throw new ConflictException("O item está vinculado a um anúncio. Cancele o anúncio antes de alterar o item.");
+    }
+
+    public void ReserveForListing(Guid listingId, DateTimeOffset now)
+    {
+        if (listingId == Guid.Empty) throw new DomainException("Listing identifier is required.");
+        if (!IsActive || ListedById.HasValue && ListedById != listingId)
+            throw new ConflictException("Esta unidade não está disponível para o anúncio.");
+        if (ListedById == listingId) return;
+        ListedById = listingId;
+        Touch(now);
+        Raise(new CollectibleItemUpdatedDomainEvent(Guid.NewGuid(), Id, CollectionEntryId, now));
+    }
+
+    public void ReleaseListing(Guid listingId, DateTimeOffset now)
+    {
+        if (!IsActive || ListedById != listingId) return;
+        ListedById = null;
+        Touch(now);
+        Raise(new CollectibleItemUpdatedDomainEvent(Guid.NewGuid(), Id, CollectionEntryId, now));
+    }
+
+    public void RecordSale(Guid listingId, Guid orderId, Guid buyerItemId, DateTimeOffset now)
+    {
+        if (!IsActive || ListedById != listingId || orderId == Guid.Empty || buyerItemId == Guid.Empty)
+            throw new ConflictException("A transferência não corresponde à unidade anunciada.");
+        // Keep the seller's acquisition, notes and private asset links as history.
+        // A new ownership record is created for the buyer in the same transaction.
+        Status = CollectionRules.SoldStatus;
+        Touch(now);
+        Raise(new CollectibleItemSoldDomainEvent(Guid.NewGuid(), Id, orderId, buyerItemId, now));
     }
 
     private void EnsureVersion(Guid expectedVersion)

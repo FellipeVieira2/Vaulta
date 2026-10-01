@@ -12,7 +12,13 @@ public static class DependencyInjection
         services.AddDbContext<MarketplaceDbContext>(options => options.UseNpgsql(configuration.GetConnectionString("Vaulta")));
         services.AddScoped<IMarketplaceStore, MarketplaceStore>();
         services.AddScoped<IMarketplaceQueries, MarketplaceQueries>();
+        services.AddScoped<IMarketplaceCatalog, MarketplaceCatalogAdapter>();
+        services.AddScoped<IMarketplaceCollection, MarketplaceCollectionAdapter>();
+        services.AddScoped<IMarketplaceAssets, MarketplaceAssetsAdapter>();
+        services.AddScoped<IMarketplaceReputation, MarketplaceReputationAdapter>();
         services.AddScoped<MarketplaceCommandHandlers>();
+        services.AddScoped<ListingPublicationService>();
+        if (configuration.GetValue("Marketplace:CollectionWorkerEnabled", true)) services.AddHostedService<ListingCollectionWorker>();
         return services;
     }
 }

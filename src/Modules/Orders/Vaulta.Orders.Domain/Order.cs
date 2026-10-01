@@ -29,9 +29,13 @@ public sealed class Order : AggregateRoot
 
     // Shipping address snapshot
     public string? ShippingStreet { get; private set; }
+    public string? ShippingNumber { get; private set; }
+    public string? ShippingComplement { get; private set; }
+    public string? ShippingNeighborhood { get; private set; }
     public string? ShippingCity { get; private set; }
     public string? ShippingState { get; private set; }
     public string? ShippingZipCode { get; private set; }
+    public string? ShippingRecipient { get; private set; }
 
     public string Status { get; private set; } = null!;
     public string? PaymentId { get; private set; }
@@ -58,9 +62,13 @@ public sealed class Order : AggregateRoot
         decimal itemPriceBrl,
         decimal platformFeeBrl,
         string? shippingStreet,
+        string? shippingNumber,
+        string? shippingComplement,
+        string? shippingNeighborhood,
         string? shippingCity,
         string? shippingState,
         string? shippingZipCode,
+        string? shippingRecipient,
         DateTimeOffset now)
     {
         if (buyerId == Guid.Empty || sellerId == Guid.Empty || listingId == Guid.Empty)
@@ -71,7 +79,8 @@ public sealed class Order : AggregateRoot
         var normalizedCondition = OrderRules.ValidateCondition(condition);
         var normalizedPrice = OrderRules.ValidatePrice(itemPriceBrl);
         var normalizedFee = Math.Round(platformFeeBrl, 2);
-        var total = Math.Round(normalizedPrice + normalizedFee, 2);
+        // The platform fee is deducted from the seller payout; the buyer pays the listed price.
+        var total = normalizedPrice;
 
         var order = new Order
         {
@@ -86,10 +95,14 @@ public sealed class Order : AggregateRoot
             ItemPriceBrl = normalizedPrice,
             PlatformFeeBrl = normalizedFee,
             TotalAmountBrl = total,
-            ShippingStreet = OrderRules.ValidateAddress(shippingStreet, "Shipping street"),
-            ShippingCity = OrderRules.ValidateAddress(shippingCity, "Shipping city"),
-            ShippingState = OrderRules.ValidateAddress(shippingState, "Shipping state"),
+            ShippingStreet = OrderRules.ValidateAddress(shippingStreet, "Shipping street", 200),
+            ShippingNumber = OrderRules.ValidateAddress(shippingNumber, "Shipping number", 20),
+            ShippingComplement = OrderRules.ValidateAddress(shippingComplement, "Shipping complement", 100),
+            ShippingNeighborhood = OrderRules.ValidateAddress(shippingNeighborhood, "Shipping neighborhood", 100),
+            ShippingCity = OrderRules.ValidateAddress(shippingCity, "Shipping city", 200),
+            ShippingState = OrderRules.ValidateAddress(shippingState, "Shipping state", 100),
             ShippingZipCode = OrderRules.ValidateZipCode(shippingZipCode),
+            ShippingRecipient = OrderRules.ValidateAddress(shippingRecipient, "Shipping recipient", 100),
             Status = OrderRules.PendingStatus,
             CreatedAt = now,
             UpdatedAt = now,
@@ -144,12 +157,48 @@ public sealed class Order : AggregateRoot
             throw new DomainException($"Order cannot be cancelled from status '{Status}'.");
         if (Status == OrderRules.CancelledStatus)
             throw new DomainException("Order is already cancelled.");
+        if (PaidAt.HasValue)
+            throw new DomainException("Paid orders require a provider-confirmed refund before cancellation.");
 
         Status = OrderRules.CancelledStatus;
         CancellationReason = reason;
         CancelledAt = now;
         Touch(now);
         Raise(new OrderCancelledDomainEvent(Guid.NewGuid(), Id, reason, now));
+    }
+
+    public void RequestRefund(string reason, DateTimeOffset now)
+    {
+        if (Status == OrderRules.RefundPendingStatus) return;
+        if (Status != OrderRules.PaidStatus || ShippedAt.HasValue)
+            throw new ConflictException("Após o envio, o cancelamento deve ser tratado pelo atendimento.");
+        if (string.IsNullOrWhiteSpace(reason) || reason.Trim().Length > 500)
+            throw new DomainException("Informe o motivo do cancelamento, com até 500 caracteres.");
+        Status = OrderRules.RefundPendingStatus;
+        CancellationReason = reason.Trim();
+        Touch(now);
+    }
+
+    public void MarkRefunded(DateTimeOffset now)
+    {
+        if (Status == OrderRules.RefundedStatus) return;
+        if (!PaidAt.HasValue) throw new ConflictException("Pedido sem pagamento confirmado.");
+        Status = OrderRules.RefundedStatus;
+        CancelledAt = now;
+        Touch(now);
+    }
+
+    public void RecordPaymentAfterCancellation(string paymentId, DateTimeOffset now)
+    {
+        if (Status != OrderRules.CancelledStatus || ShippedAt.HasValue || string.IsNullOrWhiteSpace(paymentId)
+            || PaymentId is not null && PaymentId != paymentId)
+            throw new ConflictException("Late payment does not match the cancelled order.");
+        // Keep the terminal reservation status: a later purchase of this listing
+        // must not be displaced by a delayed confirmation of the old charge.
+        if (PaidAt.HasValue) return;
+        PaymentId = paymentId;
+        PaidAt = now;
+        Touch(now);
     }
 
     private void Touch(DateTimeOffset now)

@@ -23,6 +23,66 @@ namespace Vaulta.Payments.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Vaulta.Payments.Domain.BuyerCustomer", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("AsaasCustomerId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("asaas_customer_id");
+
+                    b.Property<string>("Document")
+                        .IsRequired()
+                        .HasMaxLength(14)
+                        .HasColumnType("character varying(14)")
+                        .HasColumnName("document");
+
+                    b.Property<string>("ExternalReference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("external_reference");
+
+                    b.Property<string>("LegalName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("legal_name");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset?>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("submitted_at");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("UserId");
+
+                    b.HasIndex("AsaasCustomerId")
+                        .IsUnique()
+                        .HasFilter("asaas_customer_id IS NOT NULL");
+
+                    b.HasIndex("ExternalReference")
+                        .IsUnique();
+
+                    b.ToTable("buyer_customers", "payments");
+                });
+
             modelBuilder.Entity("Vaulta.Payments.Domain.PaymentSplit", b =>
                 {
                     b.Property<Guid>("PaymentId")
@@ -128,9 +188,54 @@ namespace Vaulta.Payments.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("order_id");
 
+                    b.Property<string>("PayoutHoldReason")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("payout_hold_reason");
+
+                    b.Property<string>("PixExpirationDate")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("pix_expiration_date");
+
                     b.Property<string>("PixQrCode")
                         .HasColumnType("text")
                         .HasColumnName("pix_qr_code");
+
+                    b.Property<DateTimeOffset?>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<DateTimeOffset?>("RefundNextCheckAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("refund_next_check_at");
+
+                    b.Property<string>("RefundReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("refund_reason");
+
+                    b.Property<string>("RefundRequestUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("refund_request_url");
+
+                    b.Property<DateTimeOffset?>("RefundRequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("refund_requested_at");
+
+                    b.Property<Guid?>("RefundRequestedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("refund_requested_by");
+
+                    b.Property<string>("RefundStatus")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("refund_status");
+
+                    b.Property<DateTimeOffset?>("RefundSubmittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("refund_submitted_at");
 
                     b.Property<Guid>("SellerId")
                         .HasColumnType("uuid")
@@ -165,10 +270,250 @@ namespace Vaulta.Payments.Infrastructure.Migrations
                     b.HasIndex("BuyerId", "Status")
                         .HasDatabaseName("ix_payments_transaction_buyer_status");
 
+                    b.HasIndex("RefundStatus", "RefundNextCheckAt");
+
                     b.HasIndex("SellerId", "Status")
                         .HasDatabaseName("ix_payments_transaction_seller_status");
 
                     b.ToTable("payment_transactions", "payments");
+                });
+
+            modelBuilder.Entity("Vaulta.Payments.Domain.SellerPayout", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("AmountBrl")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount_brl");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<string>("DestinationEvidenceReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("destination_evidence_reference");
+
+                    b.Property<string>("DestinationHolderDocument")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("destination_holder_document");
+
+                    b.Property<string>("DestinationHolderName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("destination_holder_name");
+
+                    b.Property<DateTimeOffset?>("DestinationVerifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("destination_verified_at");
+
+                    b.Property<Guid?>("DestinationVerifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("destination_verified_by");
+
+                    b.Property<Guid?>("DestinationVersion")
+                        .HasColumnType("uuid")
+                        .HasColumnName("destination_version");
+
+                    b.Property<string>("ExternalReference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("external_reference");
+
+                    b.Property<decimal>("ItemPriceBrl")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("item_price_brl");
+
+                    b.Property<DateTimeOffset>("NextCheckAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_check_at");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<decimal?>("PaymentFeeBrl")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("payment_fee_brl");
+
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payment_id");
+
+                    b.Property<string>("PixKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("pix_key");
+
+                    b.Property<string>("PixKeyType")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("pix_key_type");
+
+                    b.Property<decimal>("PlatformFeeBrl")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("platform_fee_brl");
+
+                    b.Property<Guid>("SellerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("seller_id");
+
+                    b.Property<decimal?>("SellerNetBrl")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("seller_net_brl");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset?>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("submitted_at");
+
+                    b.Property<decimal?>("TransferFeeBrl")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("transfer_fee_brl");
+
+                    b.Property<string>("TransferId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("transfer_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExternalReference")
+                        .IsUnique();
+
+                    b.HasIndex("OrderId")
+                        .IsUnique();
+
+                    b.HasIndex("PaymentId")
+                        .IsUnique();
+
+                    b.HasIndex("TransferId")
+                        .IsUnique()
+                        .HasFilter("transfer_id IS NOT NULL");
+
+                    b.HasIndex("SellerId", "CreatedAt");
+
+                    b.HasIndex("Status", "NextCheckAt");
+
+                    b.ToTable("seller_payouts", "payments");
+                });
+
+            modelBuilder.Entity("Vaulta.Payments.Domain.SellerPixDestination", b =>
+                {
+                    b.Property<Guid>("SellerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("seller_id");
+
+                    b.Property<string>("HolderDocument")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("holder_document");
+
+                    b.Property<string>("HolderName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("holder_name");
+
+                    b.Property<string>("IdentityEvidenceReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("identity_evidence_reference");
+
+                    b.Property<bool>("IsVerified")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_verified");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("key");
+
+                    b.Property<string>("KeyType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("key_type");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateTimeOffset?>("VerifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("verified_at");
+
+                    b.Property<Guid?>("VerifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("verified_by");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("SellerId");
+
+                    b.ToTable("seller_pix_destinations", "payments");
+                });
+
+            modelBuilder.Entity("Vaulta.Payments.Domain.TransferWebhookReceipt", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("PayoutId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payout_id");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PayoutId");
+
+                    b.ToTable("transfer_webhook_receipts", "payments");
                 });
 
             modelBuilder.Entity("Vaulta.Payments.Domain.WebhookEvent", b =>
@@ -271,6 +616,15 @@ namespace Vaulta.Payments.Infrastructure.Migrations
                         .WithMany("Splits")
                         .HasForeignKey("PaymentId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Vaulta.Payments.Domain.TransferWebhookReceipt", b =>
+                {
+                    b.HasOne("Vaulta.Payments.Domain.SellerPayout", null)
+                        .WithMany()
+                        .HasForeignKey("PayoutId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

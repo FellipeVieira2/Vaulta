@@ -26,9 +26,16 @@ services:
       Jwt__Secret: ${JWT_SECRET:?Configure a random JWT_SECRET in .env}
       Jwt__Issuer: ${JWT_ISSUER:-vaulta}
       Jwt__Audience: ${JWT_AUDIENCE:-vaulta-app}
+      Asaas__BaseUrl: ${ASAAS_BASE_URL:-https://api-sandbox.asaas.com/}
+      Asaas__ApiKey: ${ASAAS_API_KEY:-}
+      Asaas__WebhookToken: ${ASAAS_WEBHOOK_TOKEN:-}
+      Payouts__TransfersEnabled: ${PAYOUTS_TRANSFERS_ENABLED:-false}
+      Refunds__RequestsEnabled: ${REFUNDS_REQUESTS_ENABLED:-false}
+      Payouts__IdentityReviewerUserIds__0: ${PAYOUTS_IDENTITY_REVIEWER_USER_ID:-}
       Database__ApplyMigrations: "true"
       Assets__S3__Bucket: ${ASSETS_BUCKET:-vaulta-assets}
       Assets__S3__ServiceUrl: http://minio:9000
+      Assets__S3__PublicServiceUrl: ${ASSETS_PUBLIC_SERVICE_URL:-http://localhost:9000}
       Assets__S3__Region: us-east-1
       Assets__S3__ForcePathStyle: "true"
       Assets__S3__AccessKey: ${MINIO_ROOT_USER:?Configure .env}
@@ -69,10 +76,11 @@ services:
       minio:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
-    command: >-
-      mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" &&
-      mc mb --ignore-existing "local/$${ASSETS_BUCKET}" &&
-      mc anonymous set none "local/$${ASSETS_BUCKET}"
+    command:
+      - >-
+        mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" &&
+        mc mb --ignore-existing "local/$${ASSETS_BUCKET}" &&
+        mc anonymous set none "local/$${ASSETS_BUCKET}"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Configure .env}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Configure .env}

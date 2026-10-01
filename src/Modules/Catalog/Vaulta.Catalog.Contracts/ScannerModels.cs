@@ -13,6 +13,21 @@ public sealed record CardScanCandidateDto(
     string? Currency,
     IReadOnlyList<string> VariantCodes,
     double ConfidenceScore,
-    string? ExternalPrintingId = null);
+    string? ExternalPrintingId = null,
+    bool HasCollectorNumberMatch = false);
 
 public sealed record CardScanResultDto(IReadOnlyList<CardScanCandidateDto> Candidates);
+
+public sealed record ScannerCardDetailsDto(
+    CatalogPrintingDetails Printing,
+    IReadOnlyDictionary<string, string> Information,
+    IReadOnlyList<CardMarketQuoteDto> MarketQuotes,
+    string? Notice);
+
+public sealed record CardMarketQuoteDto(
+    Guid VariantId, string VariantName, decimal MarketValueBrl,
+    decimal OriginalValue, string OriginalCurrency, string Source,
+    DateTimeOffset UpdatedAt, decimal ExchangeRate, DateTimeOffset ExchangeRateAt,
+    IReadOnlyList<CardMarketComparisonDto> Comparisons);
+
+public sealed record CardMarketComparisonDto(int Days, decimal AverageBrl, decimal DifferenceBrl, decimal DifferencePercent);

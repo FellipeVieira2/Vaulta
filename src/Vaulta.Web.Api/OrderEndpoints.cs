@@ -33,11 +33,12 @@ public static class OrderEndpoints
             .WithName("GetUserOrders").Produces<OrderPageDto>().ProducesProblem(401);
 
         orders.MapPost("/{orderId:guid}/confirm-payment", async (Guid orderId, ConfirmPaymentRequest request,
-            OrderCommandHandlers handler, CancellationToken ct) =>
+            ClaimsPrincipal principal, OrderCommandHandlers handler, CancellationToken ct) =>
         {
-            await handler.Handle(new ConfirmPaymentCommand(orderId, request.PaymentId), ct);
+            await handler.Handle(new ConfirmPaymentCommand(UserId(principal), orderId, request.PaymentId), ct);
             return Results.NoContent();
-        }).WithName("ConfirmPayment").Produces(204).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404);
+        }).WithName("ConfirmPayment").WithSummary("Manual payment confirmation is disabled; only the payment provider can confirm a charge.")
+            .ProducesProblem(400).ProducesProblem(401).ProducesProblem(403);
 
         orders.MapPost("/{orderId:guid}/ship", async (Guid orderId, MarkShippedRequest request,
             ClaimsPrincipal principal, OrderCommandHandlers handler, CancellationToken ct) =>
@@ -46,18 +47,33 @@ public static class OrderEndpoints
             return Results.NoContent();
         }).WithName("MarkShipped").Produces(204).ProducesProblem(400).ProducesProblem(401).ProducesProblem(403).ProducesProblem(404);
 
-        orders.MapPost("/{orderId:guid}/deliver", async (Guid orderId, OrderCommandHandlers handler, CancellationToken ct) =>
+        orders.MapPost("/{orderId:guid}/deliver", async (Guid orderId, ClaimsPrincipal principal,
+            OrderCommandHandlers handler, CancellationToken ct) =>
         {
-            await handler.Handle(new MarkDeliveredCommand(orderId), ct);
+            await handler.Handle(new MarkDeliveredCommand(UserId(principal), orderId), ct);
             return Results.NoContent();
-        }).WithName("MarkDelivered").Produces(204).ProducesProblem(401).ProducesProblem(404);
+        }).WithName("MarkDelivered").Produces(204).ProducesProblem(401).ProducesProblem(403).ProducesProblem(404);
 
         orders.MapPost("/{orderId:guid}/cancel", async (Guid orderId, CancelOrderRequest request,
-            ClaimsPrincipal principal, OrderCommandHandlers handler, CancellationToken ct) =>
+            ClaimsPrincipal principal, OrderCommandHandlers handler, IOrderStore store,
+            Vaulta.Payments.Application.PaymentRefundService refunds, CancellationToken ct) =>
         {
+            var order = await store.FindOrder(orderId, ct);
+            if (order?.PaidAt is not null)
+            {
+                await refunds.Request(UserId(principal), orderId, request.Reason, ct);
+                return Results.Accepted($"/api/v1/orders/{orderId}/refund");
+            }
             await handler.Handle(new CancelOrderCommand(UserId(principal), orderId, request.Reason), ct);
             return Results.NoContent();
-        }).WithName("CancelOrder").Produces(204).ProducesProblem(400).ProducesProblem(401).ProducesProblem(403).ProducesProblem(404);
+        }).WithName("CancelOrder").Produces(204).Produces(202).ProducesProblem(400).ProducesProblem(401).ProducesProblem(403).ProducesProblem(404).ProducesProblem(409);
+
+        orders.MapGet("/{orderId:guid}/refund", async (Guid orderId, ClaimsPrincipal principal,
+            Vaulta.Payments.Application.PaymentRefundService refunds, CancellationToken ct) =>
+        {
+            var result = await refunds.Get(UserId(principal), orderId, ct);
+            return result is null ? Results.NoContent() : Results.Ok(result);
+        }).WithName("GetOrderRefund").Produces<Vaulta.Payments.Contracts.OrderRefundDto>().Produces(204).ProducesProblem(403);
     }
 
     private static Guid UserId(ClaimsPrincipal principal) => Guid.Parse(principal.FindFirstValue("sub")!);

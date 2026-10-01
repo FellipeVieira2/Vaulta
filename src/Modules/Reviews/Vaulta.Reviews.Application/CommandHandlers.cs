@@ -32,12 +32,13 @@ public sealed class ReviewCommandHandlers(
             throw new ConflictException("You have already reviewed this order.");
 
         var now = clock.UtcNow;
-        var review = Review.Create(order.Id, reviewerId, reviewedUserId, command.Request.Rating, command.Request.Comment, now);
+        var reviewedRole = reviewerId == order.BuyerId ? "SELLER" : "BUYER";
+        var review = Review.Create(order.Id, reviewerId, reviewedUserId, reviewedRole, command.Request.Rating, command.Request.Comment, now);
 
         store.Add(review);
         await store.Save(cancellationToken);
 
-        return new ReviewDto(review.Id, review.OrderId, review.ReviewerId, review.ReviewedUserId, review.Rating, review.Comment, review.CreatedAt);
+        return new ReviewDto(review.Id, review.OrderId, review.ReviewerId, review.ReviewedUserId, review.Rating, review.Comment, review.CreatedAt, review.ReviewedRole);
     }
 }
 

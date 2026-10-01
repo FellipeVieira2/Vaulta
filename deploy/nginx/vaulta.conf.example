@@ -12,6 +12,19 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/api.example.com/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     client_max_body_size 1m; # Assets upload directly to S3, not through the API.
+    # Scanner photos pass through the API: 15 MiB image plus multipart overhead.
+    location = /api/v1/scanner/identify {
+        client_max_body_size 16m;
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host "";
+        proxy_set_header Forwarded "";
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 60s;
+    }
     location / {
         proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;

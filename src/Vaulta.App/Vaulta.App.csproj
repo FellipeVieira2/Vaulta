@@ -42,12 +42,27 @@
 	<ItemGroup>
 		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appicon.svg" Color="#030817" />
 		<MauiImage Include="Resources/Images/*.svg" />
-		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.60" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+		<PackageReference Include="CommunityToolkit.Maui.Camera" Version="6.1.0" />
+		<PackageReference Include="Xamarin.AndroidX.Media3.Transformer" Version="1.11.0" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
 	</ItemGroup>
+
+    <ItemGroup>
+        <AndroidJavaSource Include="Platforms/Android/Video/SessionVideoExporter.java" Bind="false" />
+        <ProguardConfiguration Include="Platforms/Android/Video/session-video.pro" />
+    </ItemGroup>
+
+    <!-- Opt-in emulator harness, excluded from regular Debug and all Release builds. -->
+    <PropertyGroup Condition="'$(Configuration)' == 'Debug' AND '$(VaultaVideoValidation)' == 'true'">
+        <DefineConstants>$(DefineConstants);VAULTA_VIDEO_VALIDATION</DefineConstants>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(Configuration)' == 'Debug' AND '$(VaultaVideoValidation)' == 'true'">
+        <Compile Include="../../tests/ScannerVideo.Android/ScannerVideoValidationHarness.cs" Link="Validation/ScannerVideoValidationHarness.cs" />
+    </ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="../Modules/Identity/Vaulta.Identity.Contracts/Vaulta.Identity.Contracts.csproj" />
@@ -61,5 +76,9 @@
 	<ItemGroup>
 		<EmbeddedResource Include="Configuration\appsettings.*.json" />
 	</ItemGroup>
+
+    <ItemGroup Condition="'$(Configuration)' == 'Debug' AND '$(VaultaDevelopmentApiBaseUrl)' != ''">
+        <AssemblyMetadata Include="VaultaDevelopmentApiBaseUrl" Value="$(VaultaDevelopmentApiBaseUrl)" />
+    </ItemGroup>
 
 </Project>

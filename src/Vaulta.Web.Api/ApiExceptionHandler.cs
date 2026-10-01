@@ -2,6 +2,8 @@ using System.Diagnostics;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Vaulta.SharedKernel;
 
 namespace Vaulta.Web.Api;
@@ -14,13 +16,18 @@ public sealed class ApiExceptionHandler(IProblemDetailsService problems, ILogger
         {
             ValidationException or DomainException or BadHttpRequestException => 400,
             UnauthorizedException => 401, ForbiddenException => 403,
-            NotFoundException => 404, ConflictException => 409, _ => 500
+            NotFoundException => 404, ConflictException => 409,
+            DbUpdateConcurrencyException => 409,
+            DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } } => 409,
+            Catalog.Infrastructure.Recognition.OcrUnavailableException => 503, _ => 500
         };
         if (status == 500) logger.LogError("Request {TraceId} failed with {ErrorType}", context.TraceIdentifier, exception.GetType().Name);
         context.Response.StatusCode = status;
         var detail = new ProblemDetails
         {
-            Status = status, Title = status == 500 ? "Unexpected server error." : exception is ValidationException ? "Validation failed." : exception.Message,
+            Status = status, Title = status == 500 ? "Unexpected server error."
+                : exception is DbUpdateException ? "The operation conflicts with an existing or changed record."
+                : exception is ValidationException ? "Validation failed." : exception.Message,
             Instance = context.Request.Path
         };
         if (exception is ValidationException validation)

@@ -13,6 +13,10 @@ public static class CollectionEndpoints
     {
         var collection = app.MapGroup("/api/v1/me/collection").WithTags("Collection").RequireAuthorization();
 
+        collection.MapGet("/valuation", async (Guid? entryId, ClaimsPrincipal principal, CollectionValuationService valuation, CancellationToken ct) =>
+            Results.Ok(await valuation.Get(UserId(principal), entryId, ct)))
+            .WithName("GetCollectionValuation").Produces<CollectionValuationDto>().ProducesProblem(400).ProducesProblem(401).ProducesProblem(404);
+
         collection.MapGet("", async (string? query, string? game, Guid? setId, string? condition, Guid? variantId,
             int? page, int? pageSize, string? sort, ClaimsPrincipal principal, CollectionQueryHandlers handler, CancellationToken ct) =>
         {

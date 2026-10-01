@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using CommunityToolkit.Maui;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Vaulta.App.Core.Assets;
@@ -9,7 +10,6 @@ using Vaulta.App.Core.Http;
 using Vaulta.App.Core.Marketplace;
 using Vaulta.App.Core.Orders;
 using Vaulta.App.Core.Payments;
-using Vaulta.App.Core.Wallets;
 using Vaulta.App.Core.Address;
 using Vaulta.App.Services.Api;
 using Vaulta.App.Services.Authentication;
@@ -27,6 +27,7 @@ public static class MauiProgram
         var builder = MauiApp.CreateBuilder();
         builder
             .UseMauiApp<App>()
+            .UseMauiCommunityToolkitCamera()
             .ConfigureFonts(fonts =>
             {
 #if VAULTA_INTER_REGULAR
@@ -58,6 +59,12 @@ public static class MauiProgram
         using var configurationStream = typeof(MauiProgram).Assembly.GetManifestResourceStream(configurationResourceName)
             ?? throw new InvalidOperationException($"Missing app configuration resource: {configurationResourceName}.");
         builder.Configuration.AddJsonStream(configurationStream);
+#if DEBUG
+        var developmentUrl = typeof(MauiProgram).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false)
+            .Cast<System.Reflection.AssemblyMetadataAttribute>().FirstOrDefault(x => x.Key == "VaultaDevelopmentApiBaseUrl")?.Value;
+        if (!string.IsNullOrWhiteSpace(developmentUrl))
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Api:BaseUrl"] = developmentUrl });
+#endif
 
         builder.Services.AddOptions<VaultaApiOptions>()
             .Bind(builder.Configuration.GetSection("Api"));
@@ -82,6 +89,10 @@ public static class MauiProgram
         builder.Services.AddSingleton<IAccessTokenProvider, AppAccessTokenProvider>();
         builder.Services.AddTransient<AuthorizingHttpMessageHandler>();
 
+        builder.Services.AddHttpClient<IScannerClient, ScannerClient>((serviceProvider, client) =>
+                client.BaseAddress = ResolveBaseAddress(serviceProvider))
+            .AddHttpMessageHandler<AuthorizingHttpMessageHandler>();
+
         // Catalog/Collection/Assets API calls attach a Bearer token and retry once on 401.
         builder.Services.AddHttpClient<ICatalogClient, CatalogClient>((serviceProvider, client) =>
                 client.BaseAddress = ResolveBaseAddress(serviceProvider))
@@ -98,7 +109,7 @@ public static class MauiProgram
         builder.Services.AddHttpClient<IPaymentsClient, PaymentsClient>((serviceProvider, client) =>
                 client.BaseAddress = ResolveBaseAddress(serviceProvider))
             .AddHttpMessageHandler<AuthorizingHttpMessageHandler>();
-        builder.Services.AddHttpClient<IWalletsClient, WalletsClient>((serviceProvider, client) =>
+        builder.Services.AddHttpClient<IPayoutsClient, PayoutsClient>((serviceProvider, client) =>
                 client.BaseAddress = ResolveBaseAddress(serviceProvider))
             .AddHttpMessageHandler<AuthorizingHttpMessageHandler>();
         builder.Services.AddHttpClient<IViaCepClient, ViaCepClient>(client =>
@@ -139,6 +150,14 @@ public static class MauiProgram
         });
 
         builder.Services.AddSingleton<ICameraService, CameraService>();
+        builder.Services.AddSingleton<IScannerSessionStore>(_ => new FileScannerSessionStore(Path.Combine(FileSystem.AppDataDirectory, "scanner-sessions")));
+        builder.Services.AddTransient<ScannerSessionImporter>(sp => new(sp.GetRequiredService<ICollectionClient>(), sp.GetRequiredService<IScannerSessionStore>(),
+            () => sp.GetRequiredService<SessionState>().User?.Id));
+        builder.Services.AddTransient<ScannerSessionPage>();
+        builder.Services.AddSingleton(_ => new SessionVideoStore(Path.Combine(FileSystem.AppDataDirectory, "session-videos"), FileSystem.CacheDirectory));
+#if ANDROID
+        builder.Services.AddSingleton<ISessionVideoExporter, AndroidSessionVideoExporter>();
+#endif
         builder.Services.AddSingleton<AppShell>();
         builder.Services.AddTransient<ExperiencePage>();
         builder.Services.AddTransient<ExperienceViewModel>();

@@ -17,9 +17,16 @@ public sealed class AssetClientTests
     public async Task CreateUploadAsync_PostsRequestAndParsesResponse()
     {
         var expiresAt = DateTimeOffset.UtcNow.AddMinutes(10);
-        var apiHandler = new FakeHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        CreateAssetUploadRequest? sent = null;
+        var apiHandler = new FakeHttpMessageHandler(async request =>
         {
-            Content = JsonContent.Create(new CreateAssetUploadResponse(Guid.NewGuid(), "https://s3.test/bucket/key?sig=abc", expiresAt, "collection-item/key.jpg"))
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal("/api/v1/assets/uploads", request.RequestUri!.AbsolutePath);
+            sent = await request.Content!.ReadFromJsonAsync<CreateAssetUploadRequest>();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new CreateAssetUploadResponse(Guid.NewGuid(), "https://s3.test/bucket/key?sig=abc", expiresAt, "collection-item/key.jpg"))
+            };
         });
         var client = new AssetClient(CreateClient(apiHandler), new HttpClient(new FakeHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK))));
 
@@ -27,6 +34,9 @@ public sealed class AssetClientTests
 
         Assert.Equal("collection-item/key.jpg", response.ObjectKey);
         Assert.Equal(expiresAt, response.ExpiresAt);
+        Assert.Equal("collection-item", sent!.Purpose);
+        Assert.Equal("image/jpeg", sent.ContentType);
+        Assert.Equal(1024, sent.ContentLength);
     }
 
     [Fact]

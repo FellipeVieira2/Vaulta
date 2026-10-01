@@ -19,6 +19,11 @@
 **/node_modules
 **/npm-debug.log
 **/obj
+**/artifacts
+**/.arena
+**/.agents
+**/.codex
+**/.aws
 **/secrets.dev.yaml
 **/values.dev.yaml
 LICENSE

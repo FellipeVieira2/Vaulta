@@ -9,19 +9,31 @@ namespace Vaulta.Identity.IntegrationTests;
 
 public sealed class ApiFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
+    // Optional isolated database supplied by the test runner; avoids mounting the
+    // Docker socket into a container merely to run HTTP/database tests.
+    private readonly string? _externalPostgres = Environment.GetEnvironmentVariable("VAULTA_TEST_POSTGRES");
+    private readonly PostgreSqlContainer? _postgres = string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("VAULTA_TEST_POSTGRES"))
+        ? new PostgreSqlBuilder("postgres:17-alpine").Build() : null;
+    private readonly string _jwtSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
+    public string WebhookToken { get; } = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
     public async Task InitializeAsync()
     {
-        await _postgres.StartAsync();
+        if (_postgres is not null) await _postgres.StartAsync();
         Factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:Vaulta"] = _postgres.GetConnectionString(),
-                ["Jwt:Secret"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48)),
+                ["ConnectionStrings:Vaulta"] = _postgres?.GetConnectionString() ?? _externalPostgres!,
+                ["Jwt:Secret"] = _jwtSecret,
                 ["Jwt:Issuer"] = "vaulta-test", ["Jwt:Audience"] = "vaulta-test-client",
+                ["Asaas:WebhookToken"] = WebhookToken,
+                ["Payouts:WorkerEnabled"] = "false",
+                ["Refunds:WorkerEnabled"] = "false",
+                ["Orders:ReleaseWorkerEnabled"] = "false",
+                ["Orders:CollectionWorkerEnabled"] = "false",
+                ["Marketplace:CollectionWorkerEnabled"] = "false",
                 ["Assets:S3:ServiceUrl"] = "http://127.0.0.1:9000",
                 ["Assets:S3:AccessKey"] = "test-access-key",
                 ["Assets:S3:SecretKey"] = "test-secret-key",
@@ -33,7 +45,7 @@ public sealed class ApiFixture : IAsyncLifetime
         if (!readiness.IsSuccessStatusCode)
             throw new InvalidOperationException($"Readiness probe returned {(int)readiness.StatusCode}: {await readiness.Content.ReadAsStringAsync()}");
     }
-    public async Task DisposeAsync() { await Factory.DisposeAsync(); await _postgres.DisposeAsync(); }
+    public async Task DisposeAsync() { if (Factory is not null) await Factory.DisposeAsync(); if (_postgres is not null) await _postgres.DisposeAsync(); }
 }
 [CollectionDefinition("api")]
 public sealed class ApiCollection : ICollectionFixture<ApiFixture>;

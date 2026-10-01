@@ -82,6 +82,8 @@ public sealed class S3ClientFactoryTests
         Assert.Contains("X-Amz-Signature=", get);
         Assert.Contains("X-Amz-Expires=300", get);
         Assert.NotEqual(put, get);
+        Assert.Equal("http", new Uri(put).Scheme);
+        Assert.Equal("http", new Uri(get).Scheme);
     }
 
     [Fact]
@@ -89,8 +91,9 @@ public sealed class S3ClientFactoryTests
     {
         using var client = new AmazonS3Client(new SessionAWSCredentials("test-key", "test-secret", "test-session-token"),
             new AmazonS3Config { RegionEndpoint = Amazon.RegionEndpoint.USEast1, ForcePathStyle = false });
-        var storage = new S3ObjectStorage(client, Options.Create(new S3StorageOptions
-        { Bucket = "vaulta-assets-test", ForcePathStyle = false }));
+        var options = Options.Create(new S3StorageOptions { Bucket = "vaulta-assets-test", ForcePathStyle = false });
+        using var signing = new S3PresigningClient(client, options);
+        var storage = new S3ObjectStorage(client, signing, options);
         foreach (var url in new[]
         {
             await storage.CreateUploadUrl("collection-item/test/image", "image/png", TimeSpan.FromMinutes(10), default),
@@ -100,6 +103,35 @@ public sealed class S3ClientFactoryTests
             Assert.Equal("https", new Uri(url).Scheme);
             Assert.StartsWith("vaulta-assets-test.s3", new Uri(url).Host);
             Assert.Contains("X-Amz-Security-Token=test-session-token", url);
+            Assert.Contains("X-Amz-Signature=", url);
+        }
+    }
+
+    [Theory]
+    [InlineData("http://10.0.2.2:9000", "http", "10.0.2.2", 9000)]
+    [InlineData("https://assets.example.test", "https", "assets.example.test", 443)]
+    public async Task PublicEndpointIsUsedForSignedUrlsWhileServerKeepsItsInternalEndpoint(
+        string endpoint, string scheme, string host, int port)
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Assets:S3:AccessKey"] = "local-test-key", ["Assets:S3:SecretKey"] = "local-test-secret",
+            ["Assets:S3:ServiceUrl"] = "http://minio:9000", ["Assets:S3:PublicServiceUrl"] = endpoint
+        }).Build();
+        using var provider = new ServiceCollection().AddAssetsModule(configuration).BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        Assert.Equal("http://minio:9000", provider.GetRequiredService<IAmazonS3>().Config.ServiceURL.TrimEnd('/'));
+        var storage = scope.ServiceProvider.GetRequiredService<IObjectStorage>();
+        foreach (var url in new[]
+        {
+            await storage.CreateUploadUrl("collection-item/test/image", "image/png", TimeSpan.FromMinutes(10), default),
+            await storage.CreateReadUrl("collection-item/test/image", TimeSpan.FromMinutes(5), default)
+        })
+        {
+            var uri = new Uri(url);
+            Assert.Equal(scheme, uri.Scheme);
+            Assert.Equal(host, uri.Host);
+            Assert.Equal(port, uri.Port);
             Assert.Contains("X-Amz-Signature=", url);
         }
     }

@@ -57,6 +57,10 @@ namespace Vaulta.Collection.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<Guid?>("ListedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("listed_by_id");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -193,6 +197,54 @@ namespace Vaulta.Collection.Infrastructure.Persistence.Migrations
                     b.ToTable("collection_entries", "collection");
                 });
 
+            modelBuilder.Entity("Vaulta.Collection.Domain.ItemOwnershipTransfer", b =>
+                {
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<Guid>("BuyerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("buyer_id");
+
+                    b.Property<Guid>("BuyerItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("buyer_item_id");
+
+                    b.Property<Guid>("ListingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("listing_id");
+
+                    b.Property<decimal>("PriceBrl")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("price_brl");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<Guid>("SellerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("seller_id");
+
+                    b.Property<Guid>("SellerItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("seller_item_id");
+
+                    b.HasKey("OrderId");
+
+                    b.HasIndex("BuyerItemId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_collection_transfer_buyer_item");
+
+                    b.HasIndex("SellerItemId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_collection_transfer_seller_item");
+
+                    b.ToTable("item_ownership_transfers", "collection");
+                });
+
             modelBuilder.Entity("Vaulta.Collection.Infrastructure.CollectionIdempotencyKey", b =>
                 {
                     b.Property<Guid>("Id")
@@ -300,6 +352,21 @@ namespace Vaulta.Collection.Infrastructure.Persistence.Migrations
                         .WithMany("Assets")
                         .HasForeignKey("CollectibleItemId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Vaulta.Collection.Domain.ItemOwnershipTransfer", b =>
+                {
+                    b.HasOne("Vaulta.Collection.Domain.CollectibleItem", null)
+                        .WithMany()
+                        .HasForeignKey("BuyerItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Vaulta.Collection.Domain.CollectibleItem", null)
+                        .WithMany()
+                        .HasForeignKey("SellerItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

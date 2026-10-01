@@ -8,6 +8,7 @@ public static class MarketplaceRules
     public const string SuspendedStatus = "suspended";
     public const string CancelledStatus = "cancelled";
     public const string SoldStatus = "sold";
+    public const string PublishingStatus = "publishing";
 
     public const decimal MinPriceBrl = 1.00m;
     public const decimal MaxPriceBrl = 999_999.99m;

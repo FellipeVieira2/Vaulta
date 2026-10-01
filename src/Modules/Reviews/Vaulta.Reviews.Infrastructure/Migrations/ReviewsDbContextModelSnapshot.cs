@@ -46,6 +46,14 @@ namespace Vaulta.Reviews.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("rating");
 
+                    b.Property<string>("ReviewedRole")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("UNKNOWN")
+                        .HasColumnName("reviewed_role");
+
                     b.Property<Guid>("ReviewedUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("reviewed_user_id");
@@ -65,6 +73,9 @@ namespace Vaulta.Reviews.Infrastructure.Migrations
                     b.HasIndex("OrderId", "ReviewerId")
                         .IsUnique()
                         .HasDatabaseName("ux_reviews_review_order_reviewer");
+
+                    b.HasIndex("ReviewedUserId", "ReviewedRole")
+                        .HasDatabaseName("ix_reviews_review_user_role");
 
                     b.ToTable("reviews", "reviews");
                 });

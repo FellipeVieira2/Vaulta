@@ -32,11 +32,27 @@ public static class DependencyInjection
         services.AddScoped<ICardSearchProvider>(p => p.GetRequiredService<PokemonTcgRecognitionProvider>());
         services.AddScoped<IExternalIdResolver, ExternalIdResolver>();
         services.AddSingleton<Recognition.IOcrService, Recognition.TesseractOcrService>();
+        services.AddOptions<Recognition.OcrOptions>().Bind(configuration.GetSection("Scanner:Ocr"))
+            .Validate(o => !string.IsNullOrWhiteSpace(o.ExecutablePath) && o.TimeoutSeconds is >= 1 and <= 120, "Invalid OCR configuration.")
+            .ValidateOnStart();
         services.AddScoped<Recognition.FuzzyCardSearchService>();
         services.AddScoped<ScannerService>();
+        services.AddMemoryCache();
+        services.AddHttpClient<IBrlExchangeRateProvider, BcbExchangeRateProvider>(client =>
+        {
+            client.BaseAddress = new Uri("https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/");
+            client.Timeout = TimeSpan.FromSeconds(15);
+        });
+        services.AddHttpClient<IScannerCardDetailsReader, TcgDexScannerDetailsReader>((provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<TcgDexOptions>>().Value;
+            client.BaseAddress = new Uri(options.BaseAddress.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(options.Timeout);
+        });
         services.AddScoped<ICatalogSync, CatalogSyncService>();
         services.AddScoped<CatalogQueries>();
         services.AddScoped<ICatalogSearch>(provider => provider.GetRequiredService<CatalogQueries>());
+        services.AddScoped<ICardRecognitionCatalog>(provider => provider.GetRequiredService<CatalogQueries>());
         services.AddScoped<ICatalogCollectionReader>(provider => provider.GetRequiredService<CatalogQueries>());
         return services;
     }

@@ -54,6 +54,7 @@ public partial class AppShell : Shell
         foreach (var definition in ScreenCatalog.All.Where(screen => screen.Id is not ("welcome" or "home" or "collection" or "market" or "profile")))
             Routing.RegisterRoute(definition.Id, typeof(ExperiencePage));
         Routing.RegisterRoute("experience", typeof(ExperiencePage));
+        Routing.RegisterRoute("scanner-session", typeof(ScannerSessionPage));
 
 #if DEBUG
         Routing.RegisterRoute("design-system-gallery", typeof(DesignSystemGalleryPage));

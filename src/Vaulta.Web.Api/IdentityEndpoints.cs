@@ -48,7 +48,7 @@ public static class IdentityEndpoints
             .Produces(204).ProducesProblem(400).ProducesProblem(401).ProducesProblem(409);
         me.MapPut("/shipping-address", async (UpdateShippingAddressRequest request, HttpContext context, CommandHandlers handler, CancellationToken ct) =>
         {
-            await handler.Handle(new UpdateShippingAddressCommand(UserId(context.User), request.Street, request.City, request.State, request.ZipCode), ct);
+            await handler.Handle(new UpdateShippingAddressCommand(UserId(context.User), request.Street, request.Number, request.Complement, request.Neighborhood, request.City, request.State, request.ZipCode, request.Recipient), ct);
             return Results.NoContent();
         }).WithName("UpdateShippingAddress").Produces(204).ProducesProblem(400).ProducesProblem(401);
         me.MapPost("/change-password", async (ChangePasswordRequest request, ClaimsPrincipal principal, CommandHandlers handler, CancellationToken ct) =>
@@ -65,4 +65,4 @@ public static class IdentityEndpoints
         ? id : throw new DomainException("Send the current ETag from GET /me in the If-Match header.");
 }
 
-public sealed record UpdateShippingAddressRequest(string? Street, string? City, string? State, string? ZipCode);
+public sealed record UpdateShippingAddressRequest(string? Street, string? Number, string? Complement, string? Neighborhood, string? City, string? State, string? ZipCode, string? Recipient);

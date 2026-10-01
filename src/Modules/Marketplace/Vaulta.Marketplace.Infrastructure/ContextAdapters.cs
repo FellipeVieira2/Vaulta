@@ -14,10 +14,13 @@ public sealed class MarketplaceCatalogAdapter(ICatalogCollectionReader catalog) 
         catalog.GetVariant(variantId, cancellationToken);
 }
 
-public sealed class MarketplaceCollectionAdapter(ICollectionQueries collection) : IMarketplaceCollection
+public sealed class MarketplaceCollectionAdapter(ICollectionQueries collection, ICollectionMarketplace commerce) : IMarketplaceCollection
 {
     public Task<Collection.Contracts.CollectibleItemDto?> GetCollectibleItem(Guid userId, Guid itemId, CancellationToken cancellationToken) =>
         collection.GetItem(userId, itemId, cancellationToken);
+    public Task ReserveListingItem(Domain.Listing listing, CancellationToken ct) => commerce.Reserve(
+        new(listing.SellerUserId, listing.CollectibleItemId, listing.Id, listing.PrintingId, listing.VariantId, listing.Condition), ct);
+    public Task ReleaseListingItem(Domain.Listing listing, CancellationToken ct) => commerce.Release(listing.SellerUserId, listing.CollectibleItemId, listing.Id, ct);
 }
 
 public sealed class MarketplaceAssetsAdapter(IAssetService assets) : IMarketplaceAssets
@@ -25,6 +28,6 @@ public sealed class MarketplaceAssetsAdapter(IAssetService assets) : IMarketplac
     public Task<Assets.Contracts.CollectionAssetAccess?> GetAccess(Guid userId, Guid assetId, CancellationToken cancellationToken) =>
         assets.GetCollectionAssetAccess(userId, assetId, cancellationToken);
 
-    public Task<Assets.Contracts.CollectionAssetUrl?> GetUrl(Guid assetId, CancellationToken cancellationToken) =>
-        assets.CreatePrivateReadUrl(Guid.Empty, assetId, cancellationToken);
+    public Task<Assets.Contracts.CollectionAssetUrl?> GetUrl(Guid ownerId, Guid assetId, CancellationToken cancellationToken) =>
+        assets.CreatePrivateReadUrl(ownerId, assetId, cancellationToken);
 }

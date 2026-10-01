@@ -12,7 +12,7 @@ public sealed class ExternalIdResolver(CatalogDbContext db) : IExternalIdResolve
             return new Dictionary<string, Guid>();
 
         return await db.ExternalIds
-            .Where(e => e.EntityType == "printing" && externalIds.Contains(e.ExternalId))
+            .Where(e => e.Provider == "pokemontcg" && e.EntityType == "printing" && externalIds.Contains(e.ExternalId))
             .ToDictionaryAsync(e => e.ExternalId, e => e.EntityId, cancellationToken);
     }
 }

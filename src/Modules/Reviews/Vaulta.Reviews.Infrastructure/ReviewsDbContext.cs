@@ -21,12 +21,14 @@ public sealed class ReviewsDbContext(DbContextOptions<ReviewsDbContext> options)
             b.Property(x => x.OrderId).IsRequired();
             b.Property(x => x.ReviewerId).IsRequired();
             b.Property(x => x.ReviewedUserId).IsRequired();
+            b.Property(x => x.ReviewedRole).HasMaxLength(10).HasDefaultValue("UNKNOWN").IsRequired();
             b.Property(x => x.Rating).IsRequired();
             b.Property(x => x.Comment).HasMaxLength(2000);
             b.Ignore(x => x.DomainEvents);
 
             b.HasIndex(x => new { x.OrderId, x.ReviewerId }).IsUnique().HasDatabaseName("ux_reviews_review_order_reviewer");
             b.HasIndex(x => x.ReviewedUserId).HasDatabaseName("ix_reviews_review_reviewed_user");
+            b.HasIndex(x => new { x.ReviewedUserId, x.ReviewedRole }).HasDatabaseName("ix_reviews_review_user_role");
             b.HasIndex(x => x.OrderId).HasDatabaseName("ix_reviews_review_order");
         });
 

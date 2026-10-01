@@ -22,5 +22,11 @@ public sealed class OrderStore(OrdersDbContext db) : IOrderStore
 
     public void AddOrder(Order order) => db.Orders.Add(order);
 
+    public async Task<IReadOnlyList<Order>> ReleasableOrders(int offset, CancellationToken cancellationToken) =>
+        await db.Orders.AsNoTracking().Where(x => x.ShippedAt == null
+            && (x.Status == OrderRules.CancelledStatus || x.Status == OrderRules.RefundedStatus))
+            .OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).Skip(Math.Max(0, offset)).Take(50).ToArrayAsync(cancellationToken);
+
+
     public Task Save(CancellationToken cancellationToken) => db.SaveChangesAsync(cancellationToken);
 }
