@@ -14,6 +14,7 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
     public DbSet<Variant> Variants => Set<Variant>();
     public DbSet<CatalogExternalId> ExternalIds => Set<CatalogExternalId>();
     public DbSet<CatalogSyncRun> SyncRuns => Set<CatalogSyncRun>();
+    public DbSet<DailyCardMarketSnapshot> DailyMarketSnapshots => Set<DailyCardMarketSnapshot>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

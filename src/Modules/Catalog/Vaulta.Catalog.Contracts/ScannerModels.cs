@@ -22,7 +22,9 @@ public sealed record ScannerCardDetailsDto(
     CatalogPrintingDetails Printing,
     IReadOnlyDictionary<string, string> Information,
     IReadOnlyList<CardMarketQuoteDto> MarketQuotes,
-    string? Notice);
+    string? Notice,
+    DateTimeOffset? FetchedAt = null,
+    DateTimeOffset? NextRefreshAt = null);
 
 public sealed record CardMarketQuoteDto(
     Guid VariantId, string VariantName, decimal MarketValueBrl,

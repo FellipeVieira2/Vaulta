@@ -1,52 +1,96 @@
 using System.Globalization;
+using System.Buffers.Binary;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Vaulta.Catalog.Application;
 using Vaulta.Catalog.Contracts;
+using Vaulta.SharedKernel;
 
 namespace Vaulta.Catalog.Infrastructure;
 
 public sealed class TcgDexScannerDetailsReader(HttpClient httpClient, CatalogDbContext db, ICatalogSearch catalog,
-    IBrlExchangeRateProvider exchangeRates, IMemoryCache cache, ILogger<TcgDexScannerDetailsReader> logger) : IScannerCardDetailsReader
+    IBrlExchangeRateProvider exchangeRates, IClock clock, ILogger<TcgDexScannerDetailsReader> logger) : IScannerCardDetailsReader
 {
     public async Task<ScannerCardDetailsDto?> GetAsync(Guid printingId, CancellationToken cancellationToken)
     {
         var printing = await catalog.GetPrinting(printingId, cancellationToken);
         if (printing is null) return null;
+        var day = MarketPriceDay.At(clock.UtcNow);
+        var cached = await ReadSnapshot(printing, day, cancellationToken);
+        if (cached is not null) return cached;
+
+        // Database locks also coordinate separate API processes. Waiting readers
+        // recheck the committed snapshot rather than querying the provider again.
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var lockKey = BinaryPrimitives.ReadInt64BigEndian(SHA256.HashData(Encoding.UTF8.GetBytes($"Vaulta:catalog:market:{printingId}")));
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({lockKey})", cancellationToken);
+        day = MarketPriceDay.At(clock.UtcNow);
+        cached = await ReadSnapshot(printing, day, cancellationToken);
+        if (cached is not null) return cached;
         var externalId = await db.ExternalIds.AsNoTracking()
             .Where(x => x.Provider == "tcgdex" && x.EntityType == "printing" && x.EntityId == printingId)
             .Select(x => x.ExternalId).SingleOrDefaultAsync(cancellationToken);
         if (externalId is null) return new(printing, new Dictionary<string, string>(), [], "Informações adicionais indisponíveis para esta carta.");
         var language = TcgDexProvider.NormalizeLanguage(printing.Language);
-        var key = $"scanner-card:{language}:{externalId}";
         try
         {
-            if (!cache.TryGetValue(key, out JsonElement card))
-            {
-                using var response = await httpClient.GetAsync($"{Uri.EscapeDataString(language)}/cards/{Uri.EscapeDataString(externalId)}", cancellationToken);
-                response.EnsureSuccessStatusCode();
-                await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-                card = document.RootElement.Clone();
-                if (card.ValueKind != JsonValueKind.Object || card.GetProperty("id").GetString() != externalId) throw new JsonException("Provider returned a different card.");
-                cache.Set(key, card, TimeSpan.FromMinutes(10));
-            }
+            using var response = await httpClient.GetAsync($"{Uri.EscapeDataString(language)}/cards/{Uri.EscapeDataString(externalId)}", cancellationToken);
+            response.EnsureSuccessStatusCode();
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            var card = document.RootElement;
+            if (card.ValueKind != JsonValueKind.Object || !card.TryGetProperty("id", out var id)
+                || id.ValueKind != JsonValueKind.String || id.GetString() != externalId) throw new JsonException("Provider returned a different card.");
             if (card.TryGetProperty("image", out var image) && image.ValueKind == JsonValueKind.String)
                 printing = printing with { ArtworkUrl = TcgDexProvider.ArtworkUrl(image.GetString()) ?? printing.ArtworkUrl };
-            var rates = (await Task.WhenAll(new[] { "EUR", "USD" }.Select(currency => exchangeRates.GetAsync(currency, cancellationToken))))
+            var identityRates = new Dictionary<string, BrlExchangeRate>
+            {
+                ["EUR"] = new("EUR", 1, clock.UtcNow), ["USD"] = new("USD", 1, clock.UtcNow)
+            };
+            var sourceQuotes = ReadQuotes(card, printing.Variants, identityRates);
+            var currencies = sourceQuotes.Concat(ReadQuotes(card, printing.Variants,
+                new Dictionary<string, BrlExchangeRate> { ["USD"] = identityRates["USD"] }))
+                .Select(x => x.OriginalCurrency).Distinct();
+            var rates = (await Task.WhenAll(currencies.Select(currency => exchangeRates.GetAsync(currency, cancellationToken))))
                 .Where(x => x is not null).Select(x => x!).ToDictionary(x => x.Currency);
             var quotes = ReadQuotes(card, printing.Variants, rates);
-            return new(printing, ReadInformation(card), quotes, quotes.Count == 0
+            var result = new ScannerCardDetailsDto(printing, ReadInformation(card), quotes, quotes.Count == 0
                 ? "Preço em reais indisponível. Não há preço ou cotação válida para esta variante."
                 : "Referência internacional convertida para reais pela PTAX. As comparações usam médias do período e a mesma cotação de câmbio.");
+            // Missing FX is a transient failure, not an unpriced card for the day.
+            // Probe eligible source quotes with identity rates to distinguish them.
+            if (sourceQuotes.Any(x => quotes.All(q => q.VariantId != x.VariantId))) return result;
+            result = result with { FetchedAt = clock.UtcNow, NextRefreshAt = day.RefreshAfter };
+            var snapshot = new DailyCardMarketSnapshot
+            {
+                PrintingId = printingId, MarketDay = day.Date, FetchedAt = result.FetchedAt.Value,
+                RefreshAfter = day.RefreshAfter, Payload = JsonSerializer.Serialize(result)
+            };
+            db.DailyMarketSnapshots.Add(snapshot);
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            // The reader is scoped but can be called repeatedly by collection valuation.
+            db.Entry(snapshot).State = EntityState.Detached;
+            return result;
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException or KeyNotFoundException || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
         {
             logger.LogWarning("Scanner details unavailable for {PrintingId}: {ErrorType}", printingId, ex.GetType().Name);
             return new(printing, new Dictionary<string, string>(), [], "Não foi possível atualizar as informações e os preços. Tente novamente.");
         }
+    }
+
+    private async Task<ScannerCardDetailsDto?> ReadSnapshot(CatalogPrintingDetails printing, MarketPriceDay day, CancellationToken ct)
+    {
+        var snapshot = await db.DailyMarketSnapshots.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.PrintingId == printing.PrintingId && x.MarketDay == day.Date, ct);
+        if (snapshot is null || snapshot.RefreshAfter <= clock.UtcNow) return null;
+        var result = JsonSerializer.Deserialize<ScannerCardDetailsDto>(snapshot.Payload)
+            ?? throw new JsonException("Invalid persisted market snapshot.");
+        return result with { Printing = printing with { ArtworkUrl = result.Printing.ArtworkUrl ?? printing.ArtworkUrl } };
     }
 
     internal static IReadOnlyDictionary<string, string> ReadInformation(JsonElement card)

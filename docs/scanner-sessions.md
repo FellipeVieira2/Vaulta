@@ -49,7 +49,7 @@ As referências atuais são por variante; não são ajustadas automaticamente pe
 5. Validar a atualização da avaliação no app ao voltar do scanner. O teste HTTP/PostgreSQL já passou. Histórico temporal do acervo continua pendente; não usar gráficos demonstrativos como prova de valorização real.
 6. Testar a exportação longa no aparelho: sincronização voz/efeitos, espaço insuficiente, interrupção, consumo de memória/bateria, compartilhamento e preservação das sessões.
 
-A API pública ainda retornou 404 nas novas rotas `/api/v1/scanner/printings/{id}` e `/api/v1/me/collection/valuation` em 01/10/2026. O usuário confirmou que ainda não fez o deploy. O APK usa a URL pública configurada; testar cotações e estoque após publicar a API. A atualização diária após 05h continua pendente no goal; o cache atual dura dez minutos. Instruções do aparelho em `docs/scanner-phone-test.md`.
+A API pública retornou 404 nas novas rotas em uma verificação anterior de 01/10/2026. Uma nova consulta pública à rota de detalhes passou a retornar 401 (autenticação exigida); isso não comprova o comportamento autenticado. O APK usa a URL pública configurada. A atualização diária após 05h foi implementada e testada localmente com persistência em PostgreSQL e proteção contra consultas simultâneas; veja `docs/daily-market-prices.md`. Essa alteração ainda requer publicação. Instruções do aparelho em `docs/scanner-phone-test.md`.
 
 APK normal para o celular gerado: `artifacts/apk/Vaulta-scanner-2026-10-01.apk`, ARM64 e `com.vaulta.app`, sem o teste automático do emulador. Compilação sem avisos/erros em `artifacts/scanner/scanner-phone-apk-build.log`; não houve instalação em aparelho físico ou deploy da API.
 
