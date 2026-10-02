@@ -43,3 +43,9 @@ O detalhe consultou dados reais e persistiu snapshot com `fetchedAt=2026-10-02T1
 Comando SSM do diagnóstico final: `e30178ca-5bd9-4098-8650-0011f3ad640a`, saída 0. A primeira tentativa não executou a inferência porque o arquivo temporário de diagnóstico não era legível pelo usuário do contêiner; a permissão do arquivo de código foi corrigida e ele foi removido após executar. O diagnóstico percorreu os serviços reais, não o endpoint HTTP/autenticação; esses contratos são cobertos pelos testes de integração.
 
 APK SHA-256: `F6D63E0DC794DBB4F4F72A7A49FF8EC6A16E484CF65CEFEF4DDB45C0608CC9BC`. Assinaturas v2/v3 verificadas. É um build Debug para teste Android ARM64.
+
+Health e readiness da imagem implantada responderam HTTP 200/Healthy. Provedor OpenAI e chave presente no runtime, refresh habilitado em Production; arquivo de diagnóstico removido após executar. SSM `e0e54a84-987f-4583-a700-3535a3dbb8be`, sucesso.
+
+## Continuidade do código
+
+Branch local `codex/scanner-fast-identification`, base `d6e01c0`. A publicação Git foi interrompida por ausência de autenticação local, e o plugin GitHub respondeu HTTP 403 / `Resource not accessible by integration` ao tentar criar a árvore. Nenhuma branch/PR remota foi criada por essas tentativas. A implementação foi salva em commits locais e implantada no servidor; a publicação do código no GitHub continua pendente de autenticação/permissão de escrita. O pacote `artifacts/Vaulta-scanner-fast-identification-2026-10-02.bundle` preserva os commits posteriores à base para importar em uma cópia do mesmo repositório.
