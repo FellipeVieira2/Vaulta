@@ -18,6 +18,7 @@ public sealed partial class ScannerSessionPage
     private ProgressBar? _costProgress;
     private Border? _identificationPanel;
     private ActivityIndicator? _identificationSpinner;
+    private Label? _identificationText;
     private readonly Label _revealTitle = Text("", 12, Color.FromArgb("#FFDA77"), true);
     private readonly Label _revealValue = Text("", 44, Colors.White, true);
     private readonly Label _revealName = Text("", 18, Colors.White, true);
@@ -26,7 +27,7 @@ public sealed partial class ScannerSessionPage
     private void ShowLive()
     {
         StopReveal(); StopCamera(); DetachSharedViews(); ClearResults();
-        _status.Text = "Enquadre a carta inteira e evite reflexos.";
+        _status.Text = "Enquadre a carta inteira por 1 segundo para tirar a foto.";
         _camera = new CameraView { ImageCaptureResolution = new Size(1920, 1080) };
         var camera = _camera;
         camera.Loaded += async (_, _) =>
@@ -70,8 +71,9 @@ public sealed partial class ScannerSessionPage
         var center = new Grid { InputTransparent = true };
         center.Children.Add(new GraphicsView { Drawable = new SessionFrameDrawable(), InputTransparent = true });
         _identificationSpinner = new ActivityIndicator { Color = Color.FromArgb("#C8FFDD"), WidthRequest = 22, HeightRequest = 22 };
+        _identificationText = Text("Tirando a foto…", 13, Colors.White, true);
         var identifying = new HorizontalStackLayout { Spacing = 10, VerticalOptions = LayoutOptions.Center,
-            Children = { _identificationSpinner, Text("Identificando… aguarde", 13, Colors.White, true) } };
+            Children = { _identificationSpinner, _identificationText } };
         _identificationPanel = Surface(identifying, "#E8111520");
         _identificationPanel.IsVisible = false;
         _identificationPanel.HorizontalOptions = LayoutOptions.Center;
@@ -199,10 +201,14 @@ public sealed partial class ScannerSessionPage
         _revealDrawing.Visible = false; _revealCanvas?.Invalidate(); _total.TextColor = Colors.White; _total.Scale = 1;
     }
 
-    private void SetIdentificationLoading(bool loading)
+    private void SetIdentificationLoading(bool loading, bool captured = false)
     {
         if (_identificationSpinner is not null) _identificationSpinner.IsRunning = loading;
         if (_identificationPanel is not null) _identificationPanel.IsVisible = loading;
+        if (_identificationText is not null) _identificationText.Text = captured ? "Foto capturada · identificando…" : "Tirando a foto…";
+        if (_identificationPanel is not null) SemanticProperties.SetDescription(_identificationPanel,
+            captured ? "Foto capturada. Pode retirar a carta. Identificando; aguarde para iniciar a próxima leitura."
+                : "Tirando a foto. Mantenha a carta até a captura terminar.");
     }
 
     private sealed class SessionFrameDrawable : IDrawable

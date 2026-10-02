@@ -31,6 +31,9 @@ public sealed class OpenAiCardEvidenceExtractor : ICardEvidenceExtractor, IDispo
     }
 
     public async Task<CardEvidence?> ExtractAsync(byte[] imageData, CancellationToken cancellationToken)
+        => (await ExtractWithOutcomeAsync(imageData, cancellationToken)).Evidence;
+
+    public async Task<CardEvidenceExtraction> ExtractWithOutcomeAsync(byte[] imageData, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         using var activity = ScannerTelemetry.Activities.StartActivity("scanner.evidence.extract");
@@ -43,15 +46,15 @@ public sealed class OpenAiCardEvidenceExtractor : ICardEvidenceExtractor, IDispo
         deadline.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
         try
         {
-            if (!_options.Enabled || string.IsNullOrWhiteSpace(_options.ApiKey)) { outcome = "not_configured"; return null; }
-            if (imageData.Length is 0 or > MaxInputBytes) { outcome = "invalid_image"; return null; }
+            if (!_options.Enabled || string.IsNullOrWhiteSpace(_options.ApiKey)) { outcome = "not_configured"; return new(null, outcome); }
+            if (imageData.Length is 0 or > MaxInputBytes) { outcome = "invalid_image"; return new(null, null); }
             // Fail fast under load, before decoding. No accumulating image/request queue.
-            if (!await _capacity.WaitAsync(0, deadline.Token)) { outcome = "capacity"; return null; }
+            if (!await _capacity.WaitAsync(0, deadline.Token)) { outcome = "capacity"; return new(null, outcome); }
             entered = true;
             byte[]? image;
             using (var preprocessing = ScannerTelemetry.Activities.StartActivity("scanner.image.prepare"))
                 image = await PrepareImage(imageData, deadline.Token);
-            if (image is null) { outcome = "invalid_image"; return null; }
+            if (image is null) { outcome = "invalid_image"; return new(null, null); }
             for (var attempt = 0; ; attempt++)
             {
                 try
@@ -66,7 +69,7 @@ public sealed class OpenAiCardEvidenceExtractor : ICardEvidenceExtractor, IDispo
                         ["model"] = _options.Model, ["store"] = false, ["max_output_tokens"] = _options.MaxOutputTokens,
                         ["instructions"] = CardEvidenceOpenAiProtocol.Prompt,
                         ["input"] = new[] { new { role = "user", content = new[] { new { type = "input_image", image_url = "data:image/jpeg;base64," + Convert.ToBase64String(image), detail = _options.ImageDetail } } } },
-                        ["text"] = new { format = new { type = "json_schema", name = "card_evidence_v1", strict = true, schema = CardEvidenceOpenAiProtocol.Schema } }
+                        ["text"] = new { format = new { type = "json_schema", name = "card_evidence_v2", strict = true, schema = CardEvidenceOpenAiProtocol.Schema } }
                     };
                     // Focused visual extraction: avoid the default medium reasoning consuming
                     // the small output budget. Keep overrides for older models compatible.
@@ -79,30 +82,34 @@ public sealed class OpenAiCardEvidenceExtractor : ICardEvidenceExtractor, IDispo
                     if (!response.IsSuccessStatusCode)
                     {
                         callActivity?.Dispose();
+                        if (response.StatusCode == HttpStatusCode.TooManyRequests && await HasExhaustedCredits(response.Content, deadline.Token))
+                        { outcome = "credits_exhausted"; return new(null, outcome); }
+                        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+                        { outcome = "authentication"; return new(null, outcome); }
                         var transient = IsTransient(response.StatusCode);
                         if (transient && attempt < _options.RetryCount)
                         {
                             var retryAfter = response.Headers.RetryAfter;
                             var delay = retryAfter?.Delta ?? (retryAfter?.Date is { } date ? date - DateTimeOffset.UtcNow : TimeSpan.FromMilliseconds(_options.RetryDelayMilliseconds * (1 << attempt)));
                             // Do not violate long provider backoffs or hold capacity indefinitely.
-                            if (delay > TimeSpan.FromSeconds(1)) { outcome = "throttled"; return null; }
+                            if (delay > TimeSpan.FromSeconds(1)) { outcome = "throttled"; return new(null, outcome); }
                             ScannerTelemetry.Retries.Add(1, tags);
                             await Task.Delay(delay < TimeSpan.Zero ? TimeSpan.Zero : delay, deadline.Token);
                             continue;
                         }
                         outcome = response.StatusCode == HttpStatusCode.TooManyRequests ? "throttled" : "unavailable";
-                        return null;
+                        return new(null, outcome);
                     }
                     var json = await ReadBounded(response.Content, deadline.Token);
                     callActivity?.Dispose();
-                    if (json is null) { outcome = "invalid_response"; return null; }
+                    if (json is null) { outcome = "invalid_response"; return new(null, outcome); }
                     using var document = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 16 });
                     var root = document.RootElement;
                     RecordTokens(root, "input_tokens", "input", tags); RecordTokens(root, "output_tokens", "output", tags);
-                    if (!TryOutput(root, out var text)) { outcome = "invalid_response"; return null; }
+                    if (!TryOutput(root, out var text)) { outcome = "invalid_response"; return new(null, outcome); }
                     var evidence = CardEvidenceJsonParser.Parse(text!, PromptVersion, _options.Model);
                     outcome = evidence is null ? "invalid_response" : "success";
-                    return evidence;
+                    return new(evidence, evidence is null ? outcome : null);
                 }
                 catch (HttpRequestException) when (attempt < _options.RetryCount)
                 {
@@ -111,15 +118,15 @@ public sealed class OpenAiCardEvidenceExtractor : ICardEvidenceExtractor, IDispo
                 }
             }
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { outcome = "timeout"; return null; }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { outcome = "timeout"; return new(null, outcome); }
         catch (OperationCanceledException) { outcome = "cancelled"; throw; }
-        catch (Exception ex) when (ex is UnknownImageFormatException or InvalidImageContentException) { outcome = "invalid_image"; return null; }
-        catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException or KeyNotFoundException) { outcome = "invalid_response"; return null; }
+        catch (Exception ex) when (ex is UnknownImageFormatException or InvalidImageContentException) { outcome = "invalid_image"; return new(null, null); }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException or KeyNotFoundException) { outcome = "invalid_response"; return new(null, outcome); }
         catch (Exception ex) when (ex is HttpRequestException or IOException)
         {
             // Never pass provider exception/body/image to logging.
             _logger.LogWarning("Scanner evidence service unavailable; using configured fallback.");
-            return null;
+            return new(null, outcome);
         }
         finally
         {
@@ -129,6 +136,21 @@ public sealed class OpenAiCardEvidenceExtractor : ICardEvidenceExtractor, IDispo
             ScannerTelemetry.Extractions.Add(1, measurements);
             ScannerTelemetry.Duration.Record(timer.Elapsed.TotalMilliseconds, measurements);
         }
+    }
+
+    private static async Task<bool> HasExhaustedCredits(HttpContent content, CancellationToken ct)
+    {
+        var body = await ReadBounded(content, ct);
+        if (body is null || body.Length == 0) return false;
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            if (document.RootElement.ValueKind != JsonValueKind.Object || !document.RootElement.TryGetProperty("error", out var error)
+                || error.ValueKind != JsonValueKind.Object) return false;
+            return new[] { "code", "type" }.Any(key => error.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String
+                && value.GetString() is "credit_balance_exhausted" or "insufficient_quota" or "billing_hard_limit_reached");
+        }
+        catch (JsonException) { return false; }
     }
 
     private async Task<byte[]?> PrepareImage(byte[] bytes, CancellationToken ct)

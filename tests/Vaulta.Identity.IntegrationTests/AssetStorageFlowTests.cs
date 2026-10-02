@@ -28,27 +28,30 @@ public sealed class AssetStorageFlowTests(ApiFixture fixture)
     [Fact]
     public async Task PresignedUploadConfirmAttachAndListingPhotoReadWorkWithRealMinio()
     {
-        var secret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        var externalEndpoint = Environment.GetEnvironmentVariable("VAULTA_TEST_MINIO_ENDPOINT");
+        var secret = string.IsNullOrWhiteSpace(externalEndpoint) ? Convert.ToHexString(RandomNumberGenerator.GetBytes(32))
+            : Environment.GetEnvironmentVariable("VAULTA_TEST_MINIO_PASSWORD") ?? throw new InvalidOperationException("The isolated MinIO test password is required.");
         // Use the same pinned image as local Compose; the original MinIO registry image is unavailable.
-        await using var minio = new ContainerBuilder("bitnamilegacy/minio:2025.7.23-debian-12-r5")
+        await using var minio = string.IsNullOrWhiteSpace(externalEndpoint) ? new ContainerBuilder("bitnamilegacy/minio:2025.7.23-debian-12-r5")
             .WithEnvironment("MINIO_ROOT_USER", "vaulta-test")
             .WithEnvironment("MINIO_ROOT_PASSWORD", secret)
             .WithEnvironment("MINIO_API_PORT_NUMBER", "9000")
             .WithPortBinding(9000, true)
             .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(r =>
                 r.ForPort(9000).ForPath("/minio/health/live")))
-            .Build();
-        await minio.StartAsync();
-        var endpoint = $"http://{minio.Hostname}:{minio.GetMappedPublicPort(9000)}";
+            .Build() : null;
+        if (minio is not null) await minio.StartAsync();
+        var endpoint = externalEndpoint ?? $"http://{minio!.Hostname}:{minio.GetMappedPublicPort(9000)}";
         using var s3 = new AmazonS3Client(new BasicAWSCredentials("vaulta-test", secret),
             new AmazonS3Config { ServiceURL = endpoint, ForcePathStyle = true, AuthenticationRegion = "us-east-1" });
-        await s3.PutBucketAsync(new PutBucketRequest { BucketName = "vaulta-assets-test" });
+        var bucket = "vaulta-assets-test-" + Guid.NewGuid().ToString("N");
+        await s3.PutBucketAsync(new PutBucketRequest { BucketName = bucket });
         await using var factory = fixture.Factory.WithWebHostBuilder(builder =>
             builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Assets:S3:ServiceUrl"] = endpoint, ["Assets:S3:AccessKey"] = "vaulta-test",
                 ["Assets:S3:PublicServiceUrl"] = endpoint,
-                ["Assets:S3:SecretKey"] = secret, ["Assets:S3:Bucket"] = "vaulta-assets-test",
+                ["Assets:S3:SecretKey"] = secret, ["Assets:S3:Bucket"] = bucket,
                 ["Assets:S3:ForcePathStyle"] = "true"
             })));
         using var client = factory.CreateClient();

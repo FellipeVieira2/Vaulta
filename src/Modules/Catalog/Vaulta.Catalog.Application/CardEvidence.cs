@@ -12,12 +12,20 @@ public sealed record CardEvidence(
     CardEvidenceField Language,
     CardEvidenceField Variant,
     string PromptVersion,
-    string ModelVersion);
+    string ModelVersion,
+    CardEvidenceField? Hp = null);
 
 public interface ICardEvidenceExtractor
 {
     Task<CardEvidence?> ExtractAsync(byte[] imageData, CancellationToken cancellationToken);
+    async Task<CardEvidenceExtraction> ExtractWithOutcomeAsync(byte[] imageData, CancellationToken cancellationToken)
+    {
+        var evidence = await ExtractAsync(imageData, cancellationToken);
+        return new(evidence, evidence is null ? "unavailable" : null);
+    }
 }
+
+public sealed record CardEvidenceExtraction(CardEvidence? Evidence, string? ServiceIssue);
 
 public enum CardEvidenceMatchStatus { NoMatch, NeedsReview, Ambiguous, Matched }
 

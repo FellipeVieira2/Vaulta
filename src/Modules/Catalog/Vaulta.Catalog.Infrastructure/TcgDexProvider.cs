@@ -78,6 +78,8 @@ internal sealed partial class TcgDexProvider(HttpClient httpClient, IOptions<Tcg
                 throw ContractError("TCGdex card does not match the requested card/set.");
             if (card.Variants is null) throw ContractError("TCGdex variants object is missing.");
             var number = CollectorNumber(card.LocalId);
+            if (card.Set?.CardCount?.Official is > 0 and <= 9999)
+                number += "/" + card.Set.CardCount.Official.Value.ToString(CultureInfo.InvariantCulture);
             var variants = card.Variants.Where(x => x.Value)
                 .Select(x => new ProviderVariant(VariantCode(x.Key), VariantName(x.Key), x.Key))
                 .OrderBy(x => x.Code, StringComparer.Ordinal).ToArray();
@@ -158,13 +160,13 @@ internal sealed partial class TcgDexProvider(HttpClient httpClient, IOptions<Tcg
     {
         if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name)) throw ContractError("TCGdex identity/name is missing.");
     }
-    private static string VariantCode(string raw)
+    internal static string VariantCode(string raw)
     {
         var code = Domain.CatalogNormalizer.NormalizeName(CamelBoundary().Replace(raw, "$1 $2")).Replace(' ', '-');
         if (code.Length is 0 or > 80) throw ContractError("TCGdex treatment code is invalid.");
         return code;
     }
-    private static string VariantName(string raw) => raw switch
+    internal static string VariantName(string raw) => raw switch
     {
         "normal" => "Normal", "reverse" => "Reverse", "holo" => "Holo", "firstEdition" => "First edition", "wPromo" => "W promo",
         _ => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(VariantCode(raw).Replace('-', ' '))
@@ -173,7 +175,8 @@ internal sealed partial class TcgDexProvider(HttpClient httpClient, IOptions<Tcg
     [GeneratedRegex("([a-z0-9])([A-Z])")]
     private static partial Regex CamelBoundary();
 
-    private sealed record TcgDexSetDto(string Id, string Name);
+    private sealed record TcgDexSetDto(string Id, string Name, TcgDexCardCountDto? CardCount);
+    private sealed record TcgDexCardCountDto(int? Official);
     private sealed record TcgDexSetDetailsDto(string Id, string Name, string? ReleaseDate, TcgDexCardBriefDto[]? Cards);
     private sealed record TcgDexCardBriefDto(string Id, string Name, JsonElement LocalId, string? Image);
     // Dictionary models the real boolean object and accepts future treatment keys without leaking them to the app.

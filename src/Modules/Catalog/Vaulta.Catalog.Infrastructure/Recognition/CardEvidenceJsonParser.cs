@@ -15,8 +15,9 @@ public static class CardEvidenceJsonParser
         {
             using var document = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 4 });
             var root = document.RootElement;
-            if (!HasExactProperties(root, RootFields)
-                || !root.GetProperty("schemaVersion").TryGetInt32(out var schema) || schema != 1) return null;
+            if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("schemaVersion", out var version)
+                || !version.TryGetInt32(out var schema) || schema is not (1 or 2)
+                || !HasExactProperties(root, schema == 2 ? [.. RootFields, "hp"] : RootFields)) return null;
             var game = ReadField(root, "gameCode", 32);
             var name = ReadField(root, "name", 160);
             var number = ReadField(root, "collectorNumber", 32);
@@ -24,13 +25,15 @@ public static class CardEvidenceJsonParser
             var setName = ReadField(root, "setName", 160);
             var language = ReadField(root, "language", 12);
             var variant = ReadField(root, "variant", 32);
+            var hp = schema == 2 ? ReadField(root, "hp", 4) : new CardEvidenceField(null, 0);
             if (game?.Value is not (null or "pokemon")
                 || number?.Value is { } n && !Regex.IsMatch(n, @"^(?:[A-Z]{0,4}\s*)?\d{1,4}[A-Z]{0,2}(?:\s*/\s*(?:[A-Z]{0,4}\s*)?\d{1,4}[A-Z]{0,2})?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
                 || setCode?.Value is { } s && !Regex.IsMatch(s, @"^[a-zA-Z0-9][a-zA-Z0-9-]{0,39}$", RegexOptions.CultureInvariant)
                 || language?.Value is { } l && !Regex.IsMatch(l, @"^[a-z]{2}(?:-[A-Z]{2})?$", RegexOptions.CultureInvariant)
-                || variant?.Value is not (null or "normal" or "holo" or "reverse")) return null;
-            if (game is null || name is null || number is null || setCode is null || setName is null || language is null || variant is null) return null;
-            return new(game, name, number, setCode, setName, language, variant, promptVersion, modelVersion);
+                || variant?.Value is not (null or "normal" or "holo" or "reverse")
+                || hp?.Value is { } h && (!int.TryParse(h, out var points) || points is < 1 or > 9999)) return null;
+            if (game is null || name is null || number is null || setCode is null || setName is null || language is null || variant is null || hp is null) return null;
+            return new(game, name, number, setCode, setName, language, variant, promptVersion, modelVersion, hp);
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
         {

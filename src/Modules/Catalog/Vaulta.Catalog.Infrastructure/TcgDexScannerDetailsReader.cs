@@ -153,7 +153,9 @@ public sealed class TcgDexScannerDetailsReader(HttpClient httpClient, CatalogDbC
                         var averageBrl = ConvertBrl(average, eur.Rate);
                         if (averageBrl > 0) comparisons.Add(new(days, averageBrl, brl - averageBrl, Math.Round((brl - averageBrl) / averageBrl * 100, 2)));
                     }
-                    quotes.Add(new(variant.Id, variant.Name, brl, value, "EUR", "Cardmarket", date, eur.Rate, eur.UpdatedAt, comparisons));
+                    var weeklyAverage = comparisons.FirstOrDefault(x => x.Days == 7);
+                    quotes.Add(new(variant.Id, variant.Name, brl, value, "EUR", "Cardmarket", date, eur.Rate, eur.UpdatedAt, comparisons,
+                        weeklyAverage?.AverageBrl, weeklyAverage?.Days));
                     continue;
                 }
             }

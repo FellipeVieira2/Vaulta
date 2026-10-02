@@ -1,5 +1,7 @@
 # Scanner OpenAI — implementação de 02/10/2026
 
+Este documento registra a etapa inicial. A [evolução posterior](scanner-fast-identification-2026-10-02.md) substitui o refinamento automático por uma foto, atualiza o prompt para v2 com HP/PS, acrescenta descoberta local/TCGdex e atualização diária. As afirmações abaixo de “sem deploy/inferência paga” se referem à etapa inicial.
+
 Branch local: `codex/scanner-openai`. Especificação: integrar GPT como extração visual no scanner existente. Sem deploy, inferência paga, nova infraestrutura ou migration.
 
 ## Implementado e arquitetura final

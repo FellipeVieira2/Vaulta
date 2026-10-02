@@ -23,8 +23,11 @@ public sealed class CardEvidenceCatalogMatcher(ICardRecognitionCatalog catalog)
             var card = match.Card;
             if (card.PrintingId == Guid.Empty || !string.Equals(card.GameCode, gameCode, StringComparison.OrdinalIgnoreCase)) continue;
             if (Usable(evidence.Language) && !string.Equals(evidence.Language.Value!.Split('-')[0], card.Language.Split('-')[0], StringComparison.OrdinalIgnoreCase)) continue;
-            if (Usable(evidence.SetCode) && !string.Equals(evidence.SetCode.Value, match.ProviderSetId, StringComparison.OrdinalIgnoreCase)) continue;
-            if (Usable(evidence.SetName) && CatalogNormalizer.NormalizeName(evidence.SetName.Value!) != CatalogNormalizer.NormalizeName(card.SetName)) continue;
+            // Provider IDs are not printed set codes. Without authoritative physical
+            // code metadata, preserve candidates but require the user to review them.
+            var unverifiedSetCode = Usable(evidence.SetCode);
+            if (Usable(evidence.SetName) && CatalogNormalizer.NormalizeName(evidence.SetName.Value!) != CatalogNormalizer.NormalizeName(card.SetName)
+                && !(match.NormalizedSetNameAliases?.Contains(CatalogNormalizer.NormalizeName(evidence.SetName.Value!), StringComparer.Ordinal) ?? false)) continue;
             var nameScore = Fuzz.Ratio(CatalogNormalizer.NormalizeName(evidence.Name.Value!), CatalogNormalizer.NormalizeName(card.CardName)) / 100.0;
             if (nameScore < 0.65) continue;
             var numberMatch = hasNumber && NumberMatches(evidence.CollectorNumber.Value!, card.CollectorNumber);
@@ -32,6 +35,7 @@ public sealed class CardEvidenceCatalogMatcher(ICardRecognitionCatalog catalog)
             var score = hasNumber && Usable(evidence.Name) && Usable(evidence.GameCode) && Usable(evidence.Language) && nameScore >= 0.85
                 ? Math.Min(0.95, (nameScore + evidence.Name.Confidence + evidence.CollectorNumber.Confidence) / 3)
                 : Math.Min(0.7, nameScore * evidence.Name.Confidence);
+            if (unverifiedSetCode) score = Math.Min(0.7, score);
             ranked.Add(new(card.PrintingId.ToString(), card.CardName, card.SetName, card.CollectorNumber, card.Rarity,
                 card.ArtworkUrl, null, null, match.VariantCodes, Math.Round(score, 3), numberMatch));
         }
@@ -53,7 +57,7 @@ public sealed class CardEvidenceCatalogMatcher(ICardRecognitionCatalog catalog)
         var seen = evidence.Split('/');
         var stored = catalogNumber.Split('/');
         if (NormalizeNumber(seen[0]) != NormalizeNumber(stored[0])) return false;
-        return seen.Length < 2 || stored.Length < 2 || NormalizeNumber(seen[1]) == NormalizeNumber(stored[1]);
+        return seen.Length < 2 || stored.Length >= 2 && NormalizeNumber(seen[1]) == NormalizeNumber(stored[1]);
     }
 
     private static string NormalizeNumber(string value) => Regex.Replace(

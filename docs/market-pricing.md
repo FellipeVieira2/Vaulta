@@ -8,6 +8,8 @@ Sem preço ou conversão válida, apresentar valor indisponível. Nunca apenas t
 
 O detalhe do scanner consulta os dados e a imagem da TCGdex e preços por variante da Cardmarket/TCGplayer. Valores em EUR/USD são convertidos pela PTAX de venda do Banco Central. A tela informa fonte, data e cotação; sem conversão válida, não apresenta preço.
 
+Quando a Cardmarket fornece `avg7` positivo para a variante, o scanner mostra “Média de 7 dias” convertida pela mesma PTAX e identificada como referência internacional em reais. Esse campo é opcional (`averageMarketValueBrl` / `averagePeriodDays`); fontes sem média não recebem uma média estimada pelo GPT.
+
 As comparações do scanner são com médias de 1, 7 e 30 dias fornecidas pela Cardmarket, convertidas pela mesma cotação atual. Não são uma série diária nem a diferença exata contra o preço de dias anteriores. Variantes sem essas médias não recebem comparações inventadas. O histórico sem origem real está indisponível; o adapter legado JustTCG retorna listas vazias e não consulta o provedor. Veja [integridade do histórico](design/price-history-integrity-2026-10-02.md).
 
 A extração visual OpenAI não consulta preços. A identificação retorna candidatos canônicos e o detalhe separado usa [snapshots diários PostgreSQL](daily-market-prices.md). JustTCG não participa do caminho síncrono do scanner. A cotação diária e sua proteção concorrente foram preservadas na integração OpenAI.

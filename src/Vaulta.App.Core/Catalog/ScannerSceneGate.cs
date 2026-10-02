@@ -17,7 +17,7 @@ public sealed class ScannerSceneGate
         {
             _stable = signature.ToArray(); _stableSince = timeMs; return false;
         }
-        return timeMs - _stableSince >= 900 && (_consumed is null || _changed);
+        return timeMs - _stableSince >= 1000 && (_consumed is null || _changed);
     }
 
     public void Consume(byte[] signature)

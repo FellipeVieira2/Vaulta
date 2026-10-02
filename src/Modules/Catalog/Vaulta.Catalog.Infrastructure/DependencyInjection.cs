@@ -92,7 +92,8 @@ public static class DependencyInjection
                 // Compatibility wrapper for legacy callers; same shared matching implementation.
                 return name == "nova" && next is not null && fallback == "ocr"
                     ? new Recognition.NovaCardRecognitionProvider(extractor, provider.GetRequiredService<Recognition.CardEvidenceCatalogMatcher>(), next)
-                    : new Recognition.EvidenceCardRecognitionProvider(extractor, provider.GetRequiredService<Recognition.CardEvidenceCatalogMatcher>(), next, name, isPrimary ? fallback : null);
+                    : new Recognition.EvidenceCardRecognitionProvider(extractor, provider.GetRequiredService<Recognition.CardEvidenceCatalogMatcher>(), next, name, isPrimary ? fallback : null,
+                        enricher: provider.GetRequiredService<ICardEvidenceCatalogEnricher>());
             }
             return Create(primary, fallback is null ? null : Create(fallback, null, false), true);
         });
@@ -116,7 +117,18 @@ public static class DependencyInjection
             client.BaseAddress = new Uri(options.BaseAddress.TrimEnd('/') + "/");
             client.Timeout = TimeSpan.FromSeconds(options.Timeout);
         });
-        services.AddScoped<ICatalogSync, CatalogSyncService>();
+        services.AddOptions<MarketPriceRefreshOptions>().Bind(configuration.GetSection("Catalog:MarketPrices:Refresh"))
+            .Validate(o => o.IsValid(), "Invalid daily market refresh limits.").ValidateOnStart();
+        services.AddSingleton<DailyMarketPriceRefreshJob>();
+        services.AddHostedService<DailyMarketPriceRefreshWorker>();
+        services.AddScoped<CatalogSyncService>();
+        services.AddScoped<ICatalogSync>(p => p.GetRequiredService<CatalogSyncService>());
+        services.AddScoped<ICatalogDiscoveryImporter>(p => p.GetRequiredService<CatalogSyncService>());
+        services.AddHttpClient<ICardEvidenceCatalogEnricher, TcgDexScannerCatalogEnricher>(client =>
+        {
+            client.BaseAddress = new Uri("https://api.tcgdex.net/v2/");
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        }).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
         services.AddScoped<CatalogQueries>();
         services.AddScoped<ICatalogSearch>(provider => provider.GetRequiredService<CatalogQueries>());
         services.AddScoped<ICardRecognitionCatalog>(provider => provider.GetRequiredService<CatalogQueries>());

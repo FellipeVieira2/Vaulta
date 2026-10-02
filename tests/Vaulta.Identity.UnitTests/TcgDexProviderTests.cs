@@ -28,7 +28,7 @@ public sealed class TcgDexProviderTests
         var set = await provider.GetSetDetails("base1", default);
         Assert.Equal(new DateOnly(1999, 1, 9), set.Set.ReleaseDate);
         var card = Assert.Single(set.Printings);
-        Assert.Equal("058", card.CollectorNumber);
+        Assert.Equal("058/102", card.CollectorNumber);
         Assert.Equal("Common", card.Rarity);
         Assert.Equal("en", card.Language);
         Assert.Equal("https://assets.tcgdex.net/en/base/base1/58/high.png", card.ImageUrl);

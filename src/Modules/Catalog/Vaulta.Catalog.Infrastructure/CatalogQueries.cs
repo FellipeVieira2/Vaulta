@@ -24,7 +24,12 @@ internal sealed class CatalogQueries(CatalogDbContext db) : ICatalogSearch, ICat
                 ProviderSetId = db.ExternalIds.Where(e => e.Provider == "tcgdex" && e.EntityType == "set" && e.EntityId == x.SetId).Select(e => e.ExternalId).SingleOrDefault(),
                 Variants = x.Variants.Where(v => v.IsActive).OrderBy(v => v.Code).Select(v => v.Code).ToArray()
             }).ToArrayAsync(cancellationToken);
-        return matches.Select(x => new RecognitionCatalogCard(x.Card, x.Variants, x.ProviderSetId)).ToArray();
+        var setIds = matches.Select(x => x.Card.SetId).Distinct().ToArray();
+        var aliases = await db.ExternalIds.AsNoTracking().Where(x => x.Provider == "tcgdex" && x.EntityType == "set-name" && setIds.Contains(x.EntityId))
+            .OrderBy(x => x.ExternalId).Take(1000).Select(x => new { x.EntityId, x.ExternalId }).ToArrayAsync(cancellationToken);
+        return matches.Select(x => new RecognitionCatalogCard(x.Card, x.Variants, x.ProviderSetId,
+            aliases.Where(a => a.EntityId == x.Card.SetId && a.ExternalId.StartsWith(a.EntityId.ToString("D") + ":", StringComparison.Ordinal))
+                .Select(a => a.ExternalId[37..]).ToArray())).ToArray();
     }
 
     public async Task<CatalogSearchPage> Search(string query, string? gameCode, int page, int pageSize, CancellationToken cancellationToken)

@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using Vaulta.Catalog.Application;
 using Vaulta.Catalog.Contracts;
 using Vaulta.Catalog.Infrastructure;
@@ -18,6 +20,32 @@ namespace Vaulta.Identity.IntegrationTests;
 [Collection("api")]
 public sealed class DailyMarketPriceFlowTests(ApiFixture fixture)
 {
+    [Fact]
+    public async Task DailyRefreshJobUpdatesKnownCardWithoutAUserRequestOrNewVisionCall()
+    {
+        var provider = new Provider(); var handler = new CardHandler(provider.CardId);
+        var clock = new Clock(); var rates = new Rates();
+        await using var database = await TestPostgresDatabase.Start();
+        await using var factory = CreateFactory(handler, clock, rates).WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, config) =>
+            config.AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:Vaulta"] = database.ConnectionString })));
+        var printing = await Seed(factory.Services, provider);
+        using var client = factory.CreateClient(); await Authenticate(client);
+        Assert.Equal(60m, Assert.Single((await Get(client, printing)).MarketQuotes).MarketValueBrl);
+        var job = new DailyMarketPriceRefreshJob(factory.Services.GetRequiredService<IServiceScopeFactory>(), clock,
+            Options.Create(new MarketPriceRefreshOptions { Enabled = true }), NullLogger<DailyMarketPriceRefreshJob>.Instance);
+        clock.UtcNow = DateTimeOffset.Parse("2026-10-02T07:59:59Z");
+        Assert.Equal(0, await job.RunAsync(default));
+        handler.Price = 20;
+        clock.UtcNow = DateTimeOffset.Parse("2026-10-02T08:00:00Z");
+        Assert.True(await job.RunAsync(default) >= 1);
+        await using var scope = factory.Services.CreateAsyncScope();
+        var snapshot = await scope.ServiceProvider.GetRequiredService<CatalogDbContext>().DailyMarketSnapshots.AsNoTracking()
+            .SingleAsync(x => x.PrintingId == printing && x.MarketDay == new DateOnly(2026, 10, 2));
+        Assert.Equal(120m, Assert.Single(JsonSerializer.Deserialize<ScannerCardDetailsDto>(snapshot.Payload)!.MarketQuotes).MarketValueBrl);
+        Assert.Equal(0, await job.RunAsync(default));
+        Assert.Equal(2, handler.Calls);
+    }
+
     [Fact]
     public async Task DailyBrlSnapshotSurvivesNewScopesAndRefreshesOnceForConcurrentRequestsAfterFiveAm()
     {

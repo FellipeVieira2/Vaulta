@@ -8,6 +8,25 @@ namespace Vaulta.Identity.UnitTests;
 
 public sealed class CardEvidenceTests
 {
+    [Fact]
+    public async Task MatcherDoesNotConfirmDenominatorMissingFromCatalog()
+    {
+        var matcher = new CardEvidenceCatalogMatcher(new Catalog([Card(Guid.NewGuid(), "Pikachu", "58", "en")]));
+        Assert.Empty((await matcher.MatchAsync(Evidence(), "pokemon", default)).Candidates);
+    }
+
+    [Fact]
+    public void ParserReadsVisibleHpInVersionTwoWithoutInferringItFromName()
+    {
+        var json = JsonNode.Parse(ValidJson)!;
+        json["schemaVersion"] = 2;
+        json["hp"] = new JsonObject { ["value"] = "140", ["confidence"] = .98 };
+        var result = Assert.IsType<CardEvidence>(CardEvidenceJsonParser.Parse(json.ToJsonString(), "p", "m"));
+        Assert.Equal("140", result.Hp!.Value);
+        json["hp"]!["value"] = "guessed 140";
+        Assert.Null(CardEvidenceJsonParser.Parse(json.ToJsonString(), "p", "m"));
+    }
+
     internal const string ValidJson = """
         {"schemaVersion":1,"gameCode":{"value":"pokemon","confidence":0.98},"name":{"value":"Pikachu","confidence":0.97},"collectorNumber":{"value":"058/102","confidence":0.96},"setCode":{"value":null,"confidence":0},"setName":{"value":null,"confidence":0},"language":{"value":"en","confidence":0.95},"variant":{"value":null,"confidence":0}}
         """;
@@ -79,7 +98,7 @@ public sealed class CardEvidenceTests
     public async Task Matcher_UnknownGameOrLanguageCannotAuthorizeAutomaticAddition(bool game)
     {
         var evidence = game ? Evidence() with { GameCode = new(null, 0) } : Evidence() with { Language = new(null, 0) };
-        var result = await new CardEvidenceCatalogMatcher(new Catalog([Card(Guid.NewGuid(), "Pikachu", "58", "en")])).MatchAsync(evidence, "pokemon", default);
+        var result = await new CardEvidenceCatalogMatcher(new Catalog([Card(Guid.NewGuid(), "Pikachu", "58/102", "en")])).MatchAsync(evidence, "pokemon", default);
         Assert.Equal(CardEvidenceMatchStatus.NeedsReview, result.Status);
         Assert.True(Assert.Single(result.Candidates).ConfidenceScore <= .7);
     }
@@ -88,7 +107,7 @@ public sealed class CardEvidenceTests
     public async Task Matcher_UsesCanonicalCatalogIdAndDoesNotInventPriceOrVariant()
     {
         var canonicalId = Guid.NewGuid();
-        var matcher = new CardEvidenceCatalogMatcher(new Catalog([Card(canonicalId, "Pikachu", "58", "en")]));
+        var matcher = new CardEvidenceCatalogMatcher(new Catalog([Card(canonicalId, "Pikachu", "58/102", "en")]));
         var result = await matcher.MatchAsync(Evidence(), "pokemon", default);
         var candidate = Assert.Single(result.Candidates);
         Assert.Equal(canonicalId.ToString(), candidate.PrintingId);
@@ -124,7 +143,7 @@ public sealed class CardEvidenceTests
     public async Task Matcher_SameNameAndNumberAcrossSetsRequiresReview()
     {
         var matcher = new CardEvidenceCatalogMatcher(new Catalog([
-            Card(Guid.NewGuid(), "Pikachu", "58", "en", "base1"), Card(Guid.NewGuid(), "Pikachu", "58", "en", "base2")]));
+            Card(Guid.NewGuid(), "Pikachu", "58/102", "en", "base1"), Card(Guid.NewGuid(), "Pikachu", "58/102", "en", "base2")]));
         var result = await matcher.MatchAsync(Evidence(), "pokemon", default);
         Assert.Equal(CardEvidenceMatchStatus.Ambiguous, result.Status);
         Assert.Equal(2, result.Candidates.Count);
@@ -132,13 +151,24 @@ public sealed class CardEvidenceTests
     }
 
     [Fact]
-    public async Task Matcher_ConfidentVisibleSetCodeRejectsOtherPrintings()
+    public async Task Matcher_ProviderIdCannotConfirmAnUnverifiedPrintedSetCode()
     {
         var matcher = new CardEvidenceCatalogMatcher(new Catalog([
-            Card(Guid.NewGuid(), "Pikachu", "58", "en", "base1"), Card(Guid.NewGuid(), "Pikachu", "58", "en", "base2")]));
+            Card(Guid.NewGuid(), "Pikachu", "58/102", "en", "base1"), Card(Guid.NewGuid(), "Pikachu", "58/102", "en", "base2")]));
         var result = await matcher.MatchAsync(Evidence() with { SetCode = new("base1", 0.9) }, "pokemon", default);
-        Assert.Single(result.Candidates);
-        Assert.Equal(CardEvidenceMatchStatus.Matched, result.Status);
+        Assert.Equal(2, result.Candidates.Count);
+        Assert.Equal(CardEvidenceMatchStatus.Ambiguous, result.Status);
+        Assert.All(result.Candidates, x => Assert.True(x.ConfidenceScore <= .7));
+    }
+
+    [Fact]
+    public async Task Matcher_UnverifiedPrintedCodeReturnsCandidateForReviewInsteadOfLosingTheRead()
+    {
+        var card = Card(Guid.NewGuid(), "Golisopod", "026/86", "pt", "me04");
+        var evidence = Evidence() with { Name = new("Golisopod", 1), CollectorNumber = new("026/086", 1), Language = new("pt-BR", 1), SetCode = new("CR", .99) };
+        var result = await new CardEvidenceCatalogMatcher(new Catalog([card])).MatchAsync(evidence, "pokemon", default);
+        Assert.Equal(CardEvidenceMatchStatus.NeedsReview, result.Status);
+        Assert.True(Assert.Single(result.Candidates).ConfidenceScore <= .7);
     }
 
     [Fact]

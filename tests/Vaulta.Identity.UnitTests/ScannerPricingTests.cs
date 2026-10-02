@@ -23,6 +23,8 @@ public sealed class ScannerPricingTests
         Assert.Equal(60m, quote.MarketValueBrl);
         Assert.Equal(10m, quote.OriginalValue);
         Assert.Equal("EUR", quote.OriginalCurrency);
+        Assert.Equal(48m, quote.AverageMarketValueBrl);
+        Assert.Equal(7, quote.AveragePeriodDays);
         var week = Assert.Single(quote.Comparisons, x => x.Days == 7);
         Assert.Equal(48m, week.AverageBrl);
         Assert.Equal(12m, week.DifferenceBrl);

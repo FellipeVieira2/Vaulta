@@ -140,7 +140,7 @@ public sealed class NovaScannerTests
         var id = Guid.NewGuid();
         var fallback = new Fallback([]);
         var provider = new NovaCardRecognitionProvider(new EvidenceExtractor(CardEvidenceTests.Evidence()),
-            new(new Catalog([CardEvidenceTests.Card(id, "Pikachu", "58", "en")])), fallback);
+            new(new Catalog([CardEvidenceTests.Card(id, "Pikachu", "58/102", "en")])), fallback);
         var result = Assert.Single(await provider.IdentifyAsync([1], default));
         Assert.Equal(id.ToString(), result.PrintingId);
         Assert.Equal(0, fallback.Calls);
@@ -178,7 +178,7 @@ public sealed class NovaScannerTests
         };
         ActivitySource.AddActivityListener(listener);
         var provider = new NovaCardRecognitionProvider(new EvidenceExtractor(CardEvidenceTests.Evidence()),
-            new(new Catalog([CardEvidenceTests.Card(Guid.NewGuid(), "Pikachu", "58", "en")])), new Fallback([]));
+            new(new Catalog([CardEvidenceTests.Card(Guid.NewGuid(), "Pikachu", "58/102", "en")])), new Fallback([]));
         await provider.IdentifyAsync([5, 6, 7], default);
         var trace = Assert.Single(traces);
         Assert.Equal("p", trace.GetTagItem("scanner.prompt.version"));

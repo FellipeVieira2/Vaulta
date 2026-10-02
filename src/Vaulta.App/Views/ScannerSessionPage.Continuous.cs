@@ -16,7 +16,7 @@ public sealed partial class ScannerSessionPage
     {
         StopContinuous(); _sceneGate = new();
         _continuousTimer = Dispatcher.CreateTimer();
-        _continuousTimer.Interval = TimeSpan.FromMilliseconds(600);
+        _continuousTimer.Interval = TimeSpan.FromMilliseconds(250);
         _continuousTimer.Tick += ContinuousTick; _continuousTimer.Start();
     }
 
@@ -29,21 +29,24 @@ public sealed partial class ScannerSessionPage
     private async void ContinuousTick(object? sender, EventArgs e)
     {
         if (!_continuousEnabled || !_visible || !_cameraReady || _camera is null ||
-            _session?.Phase != ScannerSessionPhase.Scanning || _continuousInFlight) return;
+            _session?.Phase != ScannerSessionPhase.Scanning) return;
+        var captureStarted = false;
         try
         {
-            if (_busy || _resultPanel?.IsVisible == true) return;
             var observation = CameraSceneSampler.ReadObservation(_camera);
             if (observation is null) return;
             var signature = observation.Signature;
             var ready = _sceneGate.Observe(signature, Environment.TickCount64, observation.CardPresent);
+            // Observe removals while the saved photo is being identified. This
+            // rearms another identical copy without starting a concurrent scan.
+            if (_busy || _continuousInFlight || _resultPanel?.IsVisible == true) return;
             if (!observation.CardPresent)
             {
                 _status.Text = "Enquadre a carta inteira. Se não detectar, use Opções → Capturar novamente.";
                 return;
             }
             if (!ready) return;
-            _sceneGate.Consume(signature); _continuousInFlight = true; _busy = true; SetActionsEnabled(false);
+            _sceneGate.Consume(signature); captureStarted = true; _continuousInFlight = true; _busy = true; SetActionsEnabled(false);
             await CaptureCard(true, signature);
         }
         catch (OperationCanceledException) { }
@@ -51,29 +54,20 @@ public sealed partial class ScannerSessionPage
         finally
         {
             // Ticks that only observe motion must not unlock another button action.
-            if (_continuousInFlight) { _continuousInFlight = false; _busy = false; SetActionsEnabled(true); }
+            if (captureStarted) { _continuousInFlight = false; _busy = false; SetActionsEnabled(true); }
         }
     }
 
-    private async Task HandleContinuousResult(CardScanResultDto result, byte[] signature, ScannerOperation operation, bool refinement, Guid? previousPrintingId, ScannerRefinementBudget budget)
+    private async Task HandleContinuousResult(CardScanResultDto result, ScannerOperation operation)
     {
-        var current = _camera is null ? null : CameraSceneSampler.ReadObservation(_camera);
-        var sameCard = current is { CardPresent: true } && ScannerSceneGate.IsSameScene(signature, current.Signature);
         var candidates = result.Candidates.OrderByDescending(x => x.ConfidenceScore).ToArray();
-        var first = ScannerAutomaticRecognition.Select(result, previousPrintingId);
-        if (first is null && sameCard && !refinement && budget.TryRefine(result))
-        {
-            _status.Text = "Validando a leitura… mantenha a carta.";
-            await Task.Delay(250, operation.Context.Token); RequireScannerOperation(operation);
-            current = _camera is null ? null : CameraSceneSampler.ReadObservation(_camera);
-            if (!_visible || current is null || !current.CardPresent || !ScannerSceneGate.IsSameScene(signature, current.Signature))
-            { ShowCandidates(result); return; }
-            await CaptureCard(true, signature, refinement: true, candidates.FirstOrDefault()?.PrintingId, budget);
-            return;
-        }
+        var first = ScannerAutomaticRecognition.Select(result);
         if (candidates.Length == 0)
         {
-            _status.Text = "Não consegui ler. Ajuste a carta e mantenha por um instante.";
+            _status.Text = result.VisualIdentification is { } visual
+                ? $"Li {DescribeVisual(visual)}, mas a edição ainda não foi confirmada."
+                : result.ServiceIssue is not null ? "O serviço de identificação está indisponível. Use Opções → Buscar pelo nome."
+                : "Não consegui identificar esta foto. Tente outra captura ou busque pelo nome.";
             return;
         }
         if (first is null) { ShowCandidates(result); return; }

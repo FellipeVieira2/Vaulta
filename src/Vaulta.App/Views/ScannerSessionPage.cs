@@ -141,7 +141,7 @@ public sealed partial class ScannerSessionPage : ContentPage
 
     private Task CaptureCard() => CaptureCard(false, null);
 
-    private async Task CaptureCard(bool continuous, byte[]? signature, bool refinement = false, Guid? previousPrintingId = null, ScannerRefinementBudget? budget = null)
+    private async Task CaptureCard(bool continuous, byte[]? signature)
     {
         var operation = BeginScannerOperation();
         if (!_cameraReady || _camera is null) throw new InvalidOperationException("Aguarde a câmera ou use a busca pelo nome.");
@@ -150,11 +150,13 @@ public sealed partial class ScannerSessionPage : ContentPage
         { _status.Text = "Enquadre a carta inteira e mantenha por um instante."; return; }
         if (!continuous && Vaulta.App.Services.Camera.CameraSceneSampler.Read(_camera) is { } currentScene) _sceneGate.Consume(currentScene);
         SetIdentificationLoading(true);
-        _status.Text = "Identificando esta carta… aguarde antes de mostrar a próxima.";
+        _status.Text = "Tirando a foto… mantenha a carta só até capturar.";
         try
         {
             using var stream = await operation.Camera!.CaptureImage(operation.Context.Token);
             RequireScannerOperation(operation);
+            SetIdentificationLoading(true, captured: true);
+            _status.Text = "Foto capturada — pode retirar a carta. Identificando…";
             using var data = new MemoryStream();
             var buffer = new byte[81920]; int read;
             while ((read = await stream.ReadAsync(buffer, operation.Context.Token)) > 0)
@@ -165,10 +167,8 @@ public sealed partial class ScannerSessionPage : ContentPage
                 RequireScannerOperation(operation);
             }
             RequireScannerOperation(operation);
-            if (continuous && !HasCurrentCard(signature))
-            { _status.Text = "A carta saiu do enquadramento. Mostre novamente."; return; }
             var result = await _scanner.ScanCardAsync(data.ToArray(), "pokemon", operation.Context.Token); RequireScannerOperation(operation);
-            if (continuous) await HandleContinuousResult(result, signature!, operation, refinement, previousPrintingId, budget ?? new()); else ShowCandidates(result);
+            if (continuous) await HandleContinuousResult(result, operation); else ShowCandidates(result);
         }
         finally { SetIdentificationLoading(false); }
     }
@@ -197,7 +197,10 @@ public sealed partial class ScannerSessionPage : ContentPage
             _status.Text = "Li o nome, mas não confirmei a edição. Aproxime o rodapé com o número da carta ou use a busca.";
             return;
         }
-        _status.Text = result.Candidates.Count == 0 ? "Não confirmei esta edição. Mostre nome e número nítidos ou busque a carta." : "Confira a edição para somar o valor correto.";
+        _status.Text = result.Candidates.Count == 0 && result.VisualIdentification is { } visual
+            ? $"Li {DescribeVisual(visual)}, mas ainda não confirmei a edição."
+            : result.Candidates.Count == 0 && result.ServiceIssue is not null ? "O serviço de identificação está indisponível. Use a busca pelo nome."
+            : result.Candidates.Count == 0 ? "Não confirmei esta edição. Mostre nome e número nítidos ou busque a carta." : "Confira a edição para somar o valor correto.";
         foreach (var candidate in result.Candidates.Where(x => !requireNumber || x.HasCollectorNumberMatch).Take(3).Where(x => x.PrintingId != Guid.Empty))
             _result.Children.Add(Action($"{candidate.Name} · {candidate.SetName} · {candidate.CollectorNumber}", () => ShowCard(candidate.PrintingId)));
         if (_result.Children.Count > 0) _result.Children.Add(Action("Pular carta", () => { ClearResults(); _status.Text = "Mostre a próxima carta."; return Task.CompletedTask; }));
@@ -214,9 +217,15 @@ public sealed partial class ScannerSessionPage : ContentPage
         var conditions = new[] { "UNKNOWN", "MINT", "NEAR_MINT", "LIGHTLY_PLAYED", "MODERATELY_PLAYED", "HEAVILY_PLAYED", "DAMAGED" };
         var condition = new Picker { Title = "Condição da carta", TitleColor = Color.FromArgb("#D2BFFF"), BackgroundColor = Color.FromArgb("#211C30"), ItemsSource = new[] { "Não avaliada", "Mint", "Near mint", "Pouco jogada", "Jogada", "Muito jogada", "Danificada" }, SelectedIndex = 0, TextColor = Colors.White };
         var valueLabel = Text("Escolha a variante para consultar o valor.", 20, Colors.White, true);
+        var averageLabel = Text("", 12, Color.FromArgb("#B4B5C8"));
         CardMarketQuoteDto? SelectedQuote() => variant.SelectedIndex >= 0
             ? details.MarketQuotes.Where(x => x.VariantId == variants[variant.SelectedIndex].Id).OrderBy(x => x.Source.Contains("TCGplayer", StringComparison.OrdinalIgnoreCase) ? 0 : 1).FirstOrDefault() : null;
-        void Price() { var quote = SelectedQuote(); valueLabel.Text = quote is null ? "Cotação indisponível" : $"{Money(quote.MarketValueBrl)} · {quote.Source}"; }
+        void Price()
+        {
+            var quote = SelectedQuote(); valueLabel.Text = quote is null ? "Cotação indisponível" : $"{Money(quote.MarketValueBrl)} · {quote.Source}";
+            averageLabel.IsVisible = quote?.AverageMarketValueBrl is not null;
+            averageLabel.Text = quote?.AverageMarketValueBrl is { } average ? $"Média de {quote.AveragePeriodDays} dias: {Money(average)} · referência internacional em reais" : "";
+        }
         variant.SelectedIndexChanged += (_, _) => Price(); Price();
         var identity = new VerticalStackLayout { Spacing = 5, Children = { Text(details.Printing.CardName, 22, Colors.White, true),
             Text($"{details.Printing.SetName} · {details.Printing.CollectorNumber}", 12, Color.FromArgb("#B4B5C8")) } };
@@ -228,7 +237,7 @@ public sealed partial class ScannerSessionPage : ContentPage
         }
         heading.Add(identity, 1, 0); _result.Children.Add(heading);
         if (variants.Length > 0) _result.Children.Add(variant);
-        _result.Children.Add(valueLabel); _result.Children.Add(condition);
+        _result.Children.Add(valueLabel); _result.Children.Add(averageLabel); _result.Children.Add(condition);
         _result.Children.Add(Text("Referência da variante em reais, sem ajuste pela condição. Confira antes de adicionar.", 12, Color.FromArgb("#B4B5C8")));
         var scanId = Guid.NewGuid(); var scannedAt = DateTimeOffset.UtcNow;
         _result.Children.Add(Action("Somar à sessão", async () =>
@@ -240,6 +249,10 @@ public sealed partial class ScannerSessionPage : ContentPage
         _result.Children.Add(Action("Pular carta", () => { ClearResults(); _status.Text = "Mostre a próxima carta."; return Task.CompletedTask; }));
         if (_resultPanel is not null) _resultPanel.IsVisible = true;
     }
+
+    private static string DescribeVisual(CardVisualIdentificationDto visual) => visual.Name
+        + (visual.Hp is { } hp ? $" · {hp} PS" : "")
+        + (visual.CollectorNumber is { } number ? $" · {number}" : "");
 
     private async Task Finish()
     {

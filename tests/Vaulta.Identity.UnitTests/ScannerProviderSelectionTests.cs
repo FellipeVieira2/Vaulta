@@ -8,6 +8,7 @@ using Vaulta.Catalog.Infrastructure.Recognition;
 using Xunit;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
+using Vaulta.SharedKernel;
 
 namespace Vaulta.Identity.UnitTests;
 
@@ -104,14 +105,15 @@ public sealed class ScannerProviderSelectionTests
     private static IServiceCollection Services(Dictionary<string, string?> values)
     {
         values["ConnectionStrings:Vaulta"] = "Host=localhost;Database=test;Username=test;Password=test";
-        return new ServiceCollection().AddLogging().AddCatalogModule(new ConfigurationBuilder().AddInMemoryCollection(values).Build());
+        return new ServiceCollection().AddSingleton<IClock, Clock>().AddLogging().AddCatalogModule(new ConfigurationBuilder().AddInMemoryCollection(values).Build());
     }
+    private sealed class Clock : IClock { public DateTimeOffset UtcNow => DateTimeOffset.UtcNow; }
     private sealed class EmptyExtractor : ICardEvidenceExtractor
     { public Task<CardEvidence?> ExtractAsync(byte[] bytes, CancellationToken ct) => Task.FromResult<CardEvidence?>(null); }
     private sealed class Extractor(bool evidence) : ICardEvidenceExtractor
     { public Task<CardEvidence?> ExtractAsync(byte[] bytes, CancellationToken ct) => Task.FromResult(evidence ? CardEvidenceTests.Evidence() : null); }
     private sealed class Catalog(Guid? id) : ICardRecognitionCatalog
-    { public Task<IReadOnlyList<RecognitionCatalogCard>> FindCandidatesAsync(string name, string? number, string game, CancellationToken ct) => Task.FromResult<IReadOnlyList<RecognitionCatalogCard>>(id is { } guid ? [CardEvidenceTests.Card(guid, "Pikachu", "58", "en")] : []); }
+    { public Task<IReadOnlyList<RecognitionCatalogCard>> FindCandidatesAsync(string name, string? number, string game, CancellationToken ct) => Task.FromResult<IReadOnlyList<RecognitionCatalogCard>>(id is { } guid ? [CardEvidenceTests.Card(guid, "Pikachu", "58/102", "en")] : []); }
     private sealed class Fallback : ICardRecognitionProvider
     {
         public string GameCode => "pokemon";

@@ -17,12 +17,29 @@ public interface ICardRecognitionCatalog
     Task<IReadOnlyList<RecognitionCatalogCard>> FindCandidatesAsync(string name, string? collectorNumber, string gameCode, CancellationToken cancellationToken);
 }
 
-public sealed record RecognitionCatalogCard(Vaulta.Catalog.Contracts.CatalogSearchResult Card, IReadOnlyList<string> VariantCodes, string? ProviderSetId = null);
+public sealed record RecognitionCatalogCard(Vaulta.Catalog.Contracts.CatalogSearchResult Card, IReadOnlyList<string> VariantCodes, string? ProviderSetId = null,
+    IReadOnlyList<string>? NormalizedSetNameAliases = null);
 
 public interface ICardRecognitionProvider
 {
     string GameCode { get; }
     Task<IReadOnlyList<CardRecognitionCandidate>> IdentifyAsync(byte[] imageData, CancellationToken cancellationToken);
+}
+
+public sealed record CardRecognitionReading(IReadOnlyList<CardRecognitionCandidate> Candidates, CardEvidence? Evidence, string? ServiceIssue = null);
+public interface IVisualCardRecognitionProvider : ICardRecognitionProvider
+{
+    Task<CardRecognitionReading> IdentifyWithEvidenceAsync(byte[] imageData, CancellationToken cancellationToken);
+}
+
+public interface ICardEvidenceCatalogEnricher
+{
+    Task<bool> EnrichAsync(CardEvidence evidence, string gameCode, CancellationToken cancellationToken);
+}
+
+public interface ICatalogDiscoveryImporter
+{
+    Task<bool> ImportAsync(IReadOnlyList<ProviderSetDetails> sets, CancellationToken cancellationToken);
 }
 
 public sealed record CardRecognitionCandidate(

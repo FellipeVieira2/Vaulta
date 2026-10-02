@@ -17,6 +17,18 @@ namespace Vaulta.Identity.UnitTests;
 public sealed class OpenAiScannerTests
 {
     [Fact]
+    public async Task ExhaustedCreditsReturnActionableIssueWithoutRetryingTheSamePhoto()
+    {
+        using var handler = new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.TooManyRequests)
+        { Content = new StringContent("""{"error":{"type":"insufficient_quota","code":"credit_balance_exhausted"}}""") }));
+        using var extractor = Extractor(handler);
+        var result = await extractor.ExtractWithOutcomeAsync(ImageBytes(), default);
+        Assert.Null(result.Evidence);
+        Assert.Equal("credits_exhausted", result.ServiceIssue);
+        Assert.Equal(1, handler.Calls);
+    }
+
+    [Fact]
     public async Task Responses_UsesImageStrictSchemaNoToolsAndPreservesEvidence()
     {
         using var handler = new Handler(async (request, ct) =>
@@ -34,7 +46,12 @@ public sealed class OpenAiScannerTests
             Assert.True(format.GetProperty("strict").GetBoolean());
             var schema = format.GetProperty("schema");
             Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
-            Assert.Equal(8, schema.GetProperty("required").GetArrayLength());
+            Assert.Equal(9, schema.GetProperty("required").GetArrayLength());
+            var languages = schema.GetProperty("properties").GetProperty("language").GetProperty("properties").GetProperty("value").GetProperty("enum")
+                .EnumerateArray().Select(x => x.ValueKind == JsonValueKind.Null ? null : x.GetString()).ToArray();
+            Assert.Contains("pt-BR", languages);
+            Assert.DoesNotContain("Portuguese", languages);
+            Assert.Contains((string?)null, languages);
             Assert.False(schema.GetProperty("properties").GetProperty("name").GetProperty("additionalProperties").GetBoolean());
             var image = root.GetProperty("input")[0].GetProperty("content")[0];
             Assert.Equal("input_image", image.GetProperty("type").GetString());
@@ -48,7 +65,7 @@ public sealed class OpenAiScannerTests
         Assert.Equal("058/102", evidence.CollectorNumber.Value);
         Assert.Equal("en", evidence.Language.Value);
         Assert.Null(evidence.Variant.Value);
-        Assert.Equal("card-evidence-openai-v1", evidence.PromptVersion);
+        Assert.Equal("card-evidence-openai-v2", evidence.PromptVersion);
         Assert.Equal("gpt-6-luna", evidence.ModelVersion);
         Assert.Equal(1, handler.Calls);
     }

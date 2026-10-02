@@ -9,12 +9,41 @@ using Vaulta.SharedKernel;
 
 namespace Vaulta.Catalog.Infrastructure;
 
-public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalogProvider> providers, IClock clock, ILogger<CatalogSyncService> logger) : ICatalogSync
+public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalogProvider> providers, IClock clock, ILogger<CatalogSyncService> logger) : ICatalogSync, ICatalogDiscoveryImporter
 {
     private const string GameCode = "pokemon";
     private const string EntitySet = "set";
     private const string EntityCard = "card";
     private const string EntityPrinting = "printing";
+
+    public async Task<bool> ImportAsync(IReadOnlyList<ProviderSetDetails> sets, CancellationToken cancellationToken)
+    {
+        if (sets.Count == 0 || sets.Sum(x => x.Printings.Count) is 0 or > 5) return false;
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        // The same lock identity as full synchronization prevents overlapping upserts.
+        var key = AdvisoryKey("tcgdex", "catalog");
+        var acquired = await db.Database.SqlQuery<bool>($"SELECT pg_try_advisory_xact_lock({key}) AS \"Value\"").SingleAsync(cancellationToken);
+        if (!acquired) return false;
+        try
+        {
+            var game = await db.Games.SingleAsync(x => x.Code == GameCode, cancellationToken);
+            var run = new CatalogSyncRun { Id = Guid.NewGuid(), Provider = "tcgdex", Scope = "scanner-discovery",
+                StartedAt = clock.UtcNow, Status = "completed", RecordsRead = sets.Sum(x => x.Printings.Count) };
+            db.SyncRuns.Add(run);
+            foreach (var details in sets)
+            {
+                var set = await UpsertSet("tcgdex", game, details.Set, run, cancellationToken, partial: true);
+                foreach (var printing in details.Printings)
+                    await UpsertPrinting("tcgdex", game, set, printing, run, cancellationToken);
+                // This is a partial discovery: omitted printings remain active.
+            }
+            run.CompletedAt = clock.UtcNow;
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return true;
+        }
+        finally { db.ChangeTracker.Clear(); }
+    }
 
     public async Task<Guid> Synchronize(string provider, string scope, CancellationToken cancellationToken)
     {
@@ -131,7 +160,7 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
         return run.Id;
     }
 
-    private async Task<Set> UpsertSet(string providerCode, Game game, ProviderSet input, CatalogSyncRun run, CancellationToken ct)
+    private async Task<Set> UpsertSet(string providerCode, Game game, ProviderSet input, CatalogSyncRun run, CancellationToken ct, bool partial = false)
     {
         var external = await db.ExternalIds.SingleOrDefaultAsync(x => x.Provider == providerCode && x.EntityType == EntitySet && x.ExternalId == input.ExternalId, ct);
         var normalizedName = CatalogNormalizer.NormalizeName(input.Name);
@@ -147,15 +176,36 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
             external = NewExternal(providerCode, EntitySet, set.Id, input.ExternalId, input);
             db.ExternalIds.Add(external);
         }
-        var changed = set.Name != input.Name || set.NormalizedName != normalizedName || set.ReleaseDate != input.ReleaseDate?.ToString("yyyy-MM-dd");
+        await AddSetNameAlias(providerCode, set, set.Name, run, ct);
+        await AddSetNameAlias(providerCode, set, input.Name, run, ct);
+        if (!created && partial)
+        {
+            // A localized discovery must not rename every other language's printing.
+            UpdateExternal(external, input);
+            return set;
+        }
+        var releaseDate = partial && input.ReleaseDate is null ? set.ReleaseDate : input.ReleaseDate?.ToString("yyyy-MM-dd");
+        var changed = set.Name != input.Name || set.NormalizedName != normalizedName || set.ReleaseDate != releaseDate;
         if (!created && changed)
         {
-            set.Name = input.Name; set.NormalizedName = normalizedName; set.ReleaseDate = input.ReleaseDate?.ToString("yyyy-MM-dd");
+            set.Name = input.Name; set.NormalizedName = normalizedName; set.ReleaseDate = releaseDate;
             run.RecordsUpdated++;
         }
         else if (created) run.RecordsCreated++;
         UpdateExternal(external, input);
         return set;
+    }
+
+    private async Task AddSetNameAlias(string providerCode, Set set, string name, CatalogSyncRun run, CancellationToken ct)
+    {
+        if (providerCode != "tcgdex") return;
+        var normalized = CatalogNormalizer.NormalizeName(name);
+        var aliasId = $"{set.Id:D}:{normalized}";
+        if (normalized.Length == 0 || aliasId.Length > 200) return;
+        if (db.ExternalIds.Local.Any(x => x.Provider == providerCode && x.EntityType == "set-name" && x.ExternalId == aliasId)
+            || await db.ExternalIds.AnyAsync(x => x.Provider == providerCode && x.EntityType == "set-name" && x.ExternalId == aliasId, ct)) return;
+        db.ExternalIds.Add(NewExternal(providerCode, "set-name", set.Id, aliasId, new { Name = normalized }));
+        run.RecordsCreated++;
     }
 
     private async Task<Guid> UpsertPrinting(string providerCode, Game game, Set set, ProviderPrinting input, CatalogSyncRun run, CancellationToken ct)

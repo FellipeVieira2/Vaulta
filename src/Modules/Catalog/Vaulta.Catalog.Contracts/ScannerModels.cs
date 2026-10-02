@@ -16,7 +16,11 @@ public sealed record CardScanCandidateDto(
     string? ExternalPrintingId = null,
     bool HasCollectorNumberMatch = false);
 
-public sealed record CardScanResultDto(IReadOnlyList<CardScanCandidateDto> Candidates);
+// Visual reading is provisional: it never authorizes collection/marketplace writes.
+public sealed record CardVisualIdentificationDto(string Name, string? CollectorNumber, string? Language, string? SetName, double Confidence,
+    string? GameCode = null, int? Hp = null);
+public sealed record CardScanResultDto(IReadOnlyList<CardScanCandidateDto> Candidates, CardVisualIdentificationDto? VisualIdentification = null,
+    string? ServiceIssue = null);
 
 public sealed record ScannerCardDetailsDto(
     CatalogPrintingDetails Printing,
@@ -30,6 +34,8 @@ public sealed record CardMarketQuoteDto(
     Guid VariantId, string VariantName, decimal MarketValueBrl,
     decimal OriginalValue, string OriginalCurrency, string Source,
     DateTimeOffset UpdatedAt, decimal ExchangeRate, DateTimeOffset ExchangeRateAt,
-    IReadOnlyList<CardMarketComparisonDto> Comparisons);
+    IReadOnlyList<CardMarketComparisonDto> Comparisons,
+    decimal? AverageMarketValueBrl = null,
+    int? AveragePeriodDays = null);
 
 public sealed record CardMarketComparisonDto(int Days, decimal AverageBrl, decimal DifferenceBrl, decimal DifferencePercent);

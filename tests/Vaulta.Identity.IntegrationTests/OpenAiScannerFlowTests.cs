@@ -116,6 +116,6 @@ public sealed class OpenAiScannerFlowTests(ApiFixture fixture)
         private ProviderSet Set => new(SetId, "OpenAI test set", null, null);
         public Task<IReadOnlyList<ProviderSet>> GetSets(CancellationToken ct) => Task.FromResult<IReadOnlyList<ProviderSet>>([Set]);
         public Task<ProviderSetDetails> GetSetDetails(string id, CancellationToken ct) => Task.FromResult(new ProviderSetDetails(Set,
-            [new(CardId, "OpenAi Scanner Test Card", "58", "en", "Common", null, [new("normal", "Normal", "normal"), new("holo", "Holo", "holo")])]));
+            [new(CardId, "OpenAi Scanner Test Card", "58/102", "en", "Common", null, [new("normal", "Normal", "normal"), new("holo", "Holo", "holo")])]));
     }
 }

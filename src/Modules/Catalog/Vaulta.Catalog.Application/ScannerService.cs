@@ -19,17 +19,28 @@ public sealed class ScannerService(
         if (gameCode is not null && !recognitionProviders.Any(p => p.GameCode.Equals(gameCode, StringComparison.OrdinalIgnoreCase)))
             throw new Vaulta.SharedKernel.DomainException("O scanner ainda não suporta este jogo.");
         var candidates = new List<CardRecognitionCandidate>();
+        CardVisualIdentificationDto? visual = null;
+        string? serviceIssue = null;
 
         foreach (var provider in recognitionProviders)
         {
             if (gameCode is not null && !string.Equals(provider.GameCode, gameCode, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            var results = await provider.IdentifyAsync(Convert.FromBase64String(request.ImageBase64), cancellationToken);
-            candidates.AddRange(results);
+            var image = Convert.FromBase64String(request.ImageBase64);
+            if (provider is IVisualCardRecognitionProvider vision)
+            {
+                var reading = await vision.IdentifyWithEvidenceAsync(image, cancellationToken);
+                candidates.AddRange(reading.Candidates);
+                serviceIssue ??= reading.ServiceIssue;
+                if (reading.Evidence is { Name.Value: { } name, Name.Confidence: >= .65 } evidence)
+                    visual ??= new(name, evidence.CollectorNumber.Value, evidence.Language.Value, evidence.SetName.Value, evidence.Name.Confidence,
+                        evidence.GameCode.Value, evidence.Hp is { Confidence: >= .8, Value: { } hp } && int.TryParse(hp, out var value) ? value : null);
+            }
+            else candidates.AddRange(await provider.IdentifyAsync(image, cancellationToken));
         }
 
-        return await MapResult(candidates, cancellationToken);
+        return (await MapResult(candidates, cancellationToken)) with { VisualIdentification = visual, ServiceIssue = serviceIssue };
     }
 
     public async Task<CardScanResultDto> SearchByNameAsync(string query, string? gameCode, CancellationToken cancellationToken)
