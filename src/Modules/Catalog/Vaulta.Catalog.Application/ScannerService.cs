@@ -35,7 +35,9 @@ public sealed class ScannerService(
                 serviceIssue ??= reading.ServiceIssue;
                 if (reading.Evidence is { Name.Value: { } name, Name.Confidence: >= .65 } evidence)
                     visual ??= new(name, evidence.CollectorNumber.Value, evidence.Language.Value, evidence.SetName.Value, evidence.Name.Confidence,
-                        evidence.GameCode.Value, evidence.Hp is { Confidence: >= .8, Value: { } hp } && int.TryParse(hp, out var value) ? value : null);
+                        evidence.GameCode.Value, evidence.Hp is { Confidence: >= .8, Value: { } hp } && int.TryParse(hp, out var value) ? value : null,
+                        evidence.Finish is { Confidence: >= .7, Value: { } finish } ? finish : null,
+                        evidence.Condition is { Confidence: >= .7, Value: { } condition } ? condition : null);
             }
             else candidates.AddRange(await provider.IdentifyAsync(image, cancellationToken));
         }

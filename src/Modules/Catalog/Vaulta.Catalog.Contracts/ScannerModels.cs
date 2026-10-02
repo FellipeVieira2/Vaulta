@@ -18,7 +18,7 @@ public sealed record CardScanCandidateDto(
 
 // Visual reading is provisional: it never authorizes collection/marketplace writes.
 public sealed record CardVisualIdentificationDto(string Name, string? CollectorNumber, string? Language, string? SetName, double Confidence,
-    string? GameCode = null, int? Hp = null);
+    string? GameCode = null, int? Hp = null, string? Finish = null, string? Condition = null);
 public sealed record CardScanResultDto(IReadOnlyList<CardScanCandidateDto> Candidates, CardVisualIdentificationDto? VisualIdentification = null,
     string? ServiceIssue = null);
 

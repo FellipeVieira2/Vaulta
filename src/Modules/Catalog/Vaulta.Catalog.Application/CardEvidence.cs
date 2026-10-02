@@ -13,7 +13,9 @@ public sealed record CardEvidence(
     CardEvidenceField Variant,
     string PromptVersion,
     string ModelVersion,
-    CardEvidenceField? Hp = null);
+    CardEvidenceField? Hp = null,
+    CardEvidenceField? Finish = null,
+    CardEvidenceField? Condition = null);
 
 public interface ICardEvidenceExtractor
 {

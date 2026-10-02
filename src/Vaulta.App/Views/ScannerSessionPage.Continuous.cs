@@ -10,7 +10,6 @@ public sealed partial class ScannerSessionPage
     private ScannerSceneGate _sceneGate = new();
     private bool _continuousEnabled = true;
     private bool _continuousInFlight;
-    private string? _continuousVariantCode;
 
     private void StartContinuous()
     {
@@ -75,11 +74,17 @@ public sealed partial class ScannerSessionPage
         // Identity belongs to the captured photo. Moving the physical card while
         // awaiting the response must not discard a valid completed recognition.
         var variants = details.Printing.Variants;
-        var selected = _continuousVariantCode is { } code ? variants.SingleOrDefault(x => x.Code == code)
-            : variants.Count == 1 ? variants[0] : null;
+        // Use GPT-detected finish when confident; fall back to session preset or single-variant auto-select.
+        // Never block the continuous flow on a picker — the goal is point-and-shoot with zero interaction.
+        var detectedFinish = result.VisualIdentification?.Finish;
+        CatalogVariantDto? selected = null;
+        if (!string.IsNullOrWhiteSpace(detectedFinish))
+            selected = variants.FirstOrDefault(x => string.Equals(x.Code, detectedFinish, StringComparison.OrdinalIgnoreCase));
+        selected ??= variants.Count == 1 ? variants[0] : null;
         if (selected is null && variants.Count > 0) { await ShowCard(first.PrintingId); return; }
+        var condition = !string.IsNullOrWhiteSpace(result.VisualIdentification?.Condition) ? result.VisualIdentification!.Condition! : "UNKNOWN";
         var quote = ChooseQuote(details, selected?.Id);
-        await AddIdentifiedCard(details, selected, "UNKNOWN", quote, Guid.NewGuid(), DateTimeOffset.UtcNow, operation);
+        await AddIdentifiedCard(details, selected, condition, quote, Guid.NewGuid(), DateTimeOffset.UtcNow, operation);
     }
 
     private static CardMarketQuoteDto? ChooseQuote(ScannerCardDetailsDto details, Guid? variantId) =>

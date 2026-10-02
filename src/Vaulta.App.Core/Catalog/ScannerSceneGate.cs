@@ -11,13 +11,16 @@ public sealed class ScannerSceneGate
     public bool Observe(byte[] signature, long timeMs, bool cardPresent = true)
     {
         if (signature.Length == 0) return false;
-        if (_consumed is not null && Distance(signature, _consumed) >= 22) _changed = true;
+        // Lower change threshold so the gate resets faster when a new card enters.
+        if (_consumed is not null && Distance(signature, _consumed) >= 16) _changed = true;
         if (!cardPresent) { _stable = null; return false; }
-        if (_stable is null || Distance(signature, _stable) > 9)
+        // Tighter stability band and shorter dwell: trigger capture sooner
+        // so the user can point-and-shoot without holding still for a full second.
+        if (_stable is null || Distance(signature, _stable) > 7)
         {
             _stable = signature.ToArray(); _stableSince = timeMs; return false;
         }
-        return timeMs - _stableSince >= 1000 && (_consumed is null || _changed);
+        return timeMs - _stableSince >= 550 && (_consumed is null || _changed);
     }
 
     public void Consume(byte[] signature)

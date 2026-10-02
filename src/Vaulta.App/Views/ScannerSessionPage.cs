@@ -57,7 +57,6 @@ public sealed partial class ScannerSessionPage : ContentPage
                 _session = null;
                 _loaded = false;
                 _videoClips = [];
-                _continuousVariantCode = null;
                 ClearResults();
             }
             if (!_loaded)
@@ -107,15 +106,11 @@ public sealed partial class ScannerSessionPage : ContentPage
         var cost = new Entry { Placeholder = "Valor em reais (opcional)", Keyboard = Keyboard.Numeric, TextColor = Colors.White,
             Text = editing ? _session!.EnteredCostBrl?.ToString("F2", Br) : null };
         var mode = new Picker { Title = "Custo dos pacotes", ItemsSource = new[] { "Não informar custo", "Valor por pacote", "Valor total" }, SelectedIndex = editing ? (int)_session!.CostMode : 0, TextColor = Colors.White };
-        var finishes = new[] { "Confirmar acabamento quando necessário", "Normal · cartas sem brilho", "Holo · cartas brilhantes", "Reverse · brilho fora da ilustração" };
-        var finishCodes = new string?[] { null, "normal", "holo", "reverse" };
-        var finish = new Picker { Title = "Acabamento do montinho", ItemsSource = finishes, TextColor = Colors.White,
-            SelectedIndex = Math.Max(0, Array.IndexOf(finishCodes, _continuousVariantCode)) };
         cost.IsVisible = mode.SelectedIndex != 0; mode.SelectedIndexChanged += (_, _) => cost.IsVisible = mode.SelectedIndex != 0;
         var body = new VerticalStackLayout { Padding = 28, Spacing = 22,
             Children = { Text("VAULTA / ABERTURA", 12, Color.FromArgb("#BBA4FF"), true), Text("Sua próxima\ngrande descoberta.", 34, Colors.White, true),
-                Text("Mostre o montinho e retire cada carta depois da identificação. A leitura é contínua.", 17, Color.FromArgb("#B4B5C8")), finish,
-                Text("Escolha um acabamento somente se todas as cartas do montinho tiverem esse acabamento. Cartas ou edições incertas pedem confirmação.", 12, Color.FromArgb("#B4B5C8")), packs, mode, cost,
+                Text("Mostre o montinho e retire cada carta depois da identificação. A leitura é contínua.", 17, Color.FromArgb("#B4B5C8")),
+                Text("O acabamento e a condição são detectados automaticamente pela câmera. Aponte e aguarde o valor.", 12, Color.FromArgb("#B4B5C8")), packs, mode, cost,
                 Text("Grave só se quiser: toque em Gravar com voz e efeitos durante a sessão.", 13, Color.FromArgb("#BBA4FF")),
                 Text("O custo é opcional. Se informar, a sessão mostrará a diferença estimada em relação ao valor das cartas.", 13, Color.FromArgb("#B4B5C8")) } };
         body.Children.Add(Action(editing ? "Salvar e continuar" : "Iniciar sessão", async () =>
@@ -133,7 +128,6 @@ public sealed partial class ScannerSessionPage : ContentPage
             var started = (editing ? _session! : ScannerSession.Start(owner, DateTimeOffset.UtcNow)).ConfigureCost(count, (PackCostMode)mode.SelectedIndex, amount);
             await _store.Save(started, _lifetime.Token);
             if (!_visible || owner != _account.User?.Id) return;
-            _continuousVariantCode = finishCodes[Math.Max(0, finish.SelectedIndex)];
             _session = started; ShowLive();
         }));
         body.Children.Add(Action(editing ? "Continuar sem alterar" : "Voltar", () => editing ? ReturnToLive() : Shell.Current.GoToAsync(".."))); body.Children.Add(_status); Content = new ScrollView { Content = body };

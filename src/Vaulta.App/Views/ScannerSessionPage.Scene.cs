@@ -213,15 +213,24 @@ public sealed partial class ScannerSessionPage
 
     private sealed class SessionFrameDrawable : IDrawable
     {
+        // Fixed card aspect ratio guide that never shrinks after the first scan.
+        // The previous layout tied the frame to the overlay row height, which
+        // collapsed when result panels appeared. We now anchor to the full
+        // camera preview bounds so the guide stays stable across captures.
         public void Draw(ICanvas canvas, RectF bounds)
         {
-            var height = Math.Min(bounds.Height * 0.85f, bounds.Width * 0.95f); var width = height * 0.715f;
-            if (height < 30) return;
-            var left = (bounds.Width - width) / 2; var top = (bounds.Height - height) / 2;
+            const float CardRatio = 0.715f;
+            var availableHeight = bounds.Height * 0.92f;
+            var availableWidth = bounds.Width * 0.96f;
+            var height = Math.Min(availableHeight, availableWidth / CardRatio);
+            var width = height * CardRatio;
+            if (height < 60 || width < 40) return;
+            var left = (bounds.Width - width) / 2f;
+            var top = (bounds.Height - height) / 2f;
             canvas.StrokeColor = Color.FromArgb("#D2BFFF"); canvas.StrokeSize = 1.2f;
             canvas.Alpha = 0.45f; canvas.DrawRoundedRectangle(left, top, width, height, 18);
             canvas.Alpha = 1; canvas.StrokeSize = 3;
-            var corner = Math.Min(22, width * 0.15f);
+            var corner = Math.Min(28, width * 0.18f);
             foreach (var x in new[] { left, left + width })
                 foreach (var y in new[] { top, top + height })
                 {
