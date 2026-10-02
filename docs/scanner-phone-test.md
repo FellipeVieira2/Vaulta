@@ -1,21 +1,16 @@
 # Teste do scanner no celular
 
-Atualização de 02/10: instalar `artifacts/Vaulta-scanner-result-fixes-2026-10-02-arm64.apk`. Guia e estabilidade corrigidos, prompt GPT v4 com leitura do selo, resultado por acabamento com confirmação/soma em um botão. Protocolo e validação em [correções do resultado](design/scanner-result-fixes-2026-10-02.md). As instruções antigas de preset de acabamento abaixo pertencem ao APK anterior; o novo fluxo usa a leitura visual ou confirma o acabamento no resultado.
+Versão atual: `artifacts/Vaulta-scanner-automatic-2026-10-02-arm64.apk`. O app de teste é Android ARM64, Debug assinado, e usa `https://api.vaultatcg.com.br/`. Consulte [fluxo automático e validação](design/scanner-automatic-flow-2026-10-02.md). Não há gravação na tela ao vivo nem seleção obrigatória de acabamento antes de começar.
 
-Verificar no aparelho: câmera vazia não dispara captura automática; carta no guia por cerca de um segundo dispara uma foto; após “Foto capturada” pode retirar a carta; não inicia outra identificação durante o carregamento; cada acabamento mostra o próprio preço e soma uma única vez; segunda cópia física pode contar novamente após retirar e reenquadrar. Para selo visível, conferir empresa/nota/número e valor pendente de certificação. Testar também rotação horizontal e retomada após abrir opções de custo.
+1. Entre na conta e abra o scanner. Deve abrir a câmera diretamente. Pacotes e custo são opcionais nas opções da sessão.
+2. Deixe a câmera vazia: nenhuma captura, chamada de identificação ou soma deve ocorrer. Não deve pedir microfone nem mostrar controles de gravação.
+3. Coloque a carta inteira no guia por cerca de um segundo. A foto deve ser automática, sem tocar em botão. Após “Foto capturada”, retire a carta; a animação de identificação continua na mesma tela.
+4. Durante a identificação, mostre outras cartas rapidamente: não devem iniciar chamadas concorrentes nem substituir a foto salva. Aguarde a identificação anterior antes de apresentar a próxima.
+5. Com identificação/normal/holo/reverse aceitos a partir de 80%, o valor aparece brevemente, some e permanece somado no total. Nenhum painel da última carta ou botão “Próxima carta” deve ficar bloqueando a câmera.
+6. Deixe a mesma carta parada após a revelação: não deve somar novamente. Retire por pelo menos duas amostras da prévia (~250 ms entre elas) e coloque outra cópia: ela deve contar como nova ocorrência após estabilizar.
+7. Teste carta normal, holo e reverse com corpo/ilustração visíveis. A classificação é do GPT; confiança abaixo de 80% deve pedir confirmação. Full art e textura não podem substituir a leitura de foil. Reflexos intensos podem exigir outra foto pelo menu de opções.
+8. Finalize a sessão. Confira cartas, variantes, total e itens sem cotação. Uma etiqueta de PSA/CGC/BGS deve aparecer com empresa, nota e número, como leitura não verificada; não deve receber o preço da carta comum.
+9. Adicione as cartas revisadas ao estoque ou abra a venda pela revisão. Uma carta sem cotação não entra como zero no preço; o total permanece parcial. Preço de referência não é custo de aquisição.
+10. Retome a sessão, altere custo opcional, gire o aparelho, teste fonte ampliada, conexão lenta e permissões negadas. Retomar deve abrir a câmera sem ações da última carta. A detecção e animação no telefone ainda precisam de conferência física.
 
-APK gerado em 01/10/2026: `artifacts/apk/Vaulta-scanner-2026-10-01.apk` (56.968.499 bytes), `com.vaulta.app`, ARM64, compilação Debug assinada para teste. O teste automático do emulador não está incluído. Compilação sem avisos/erros: `artifacts/scanner/scanner-phone-apk-build.log`. SHA-256: `DE576420AC8E19E201FFECDD2E6669A57FC8314498D980D6F2D4C8B77BF90EA4`.
-
-O APK de teste usa `https://api.vaultatcg.com.br/`. Publique a API atualizada antes de testar informações, cotações e avaliação do estoque. As novas rotas ainda retornavam 404 em 01/10/2026, antes do deploy informado pelo usuário.
-
-1. Entre na conta e abra uma sessão do scanner. Quantidade e custo dos pacotes são opcionais. Para um montinho com o mesmo acabamento, escolha Normal, Holo ou Reverse; caso contrário, mantenha a confirmação de acabamento.
-2. Primeiro use uma sessão **sem tocar em Gravar**. A câmera deve identificar normalmente, sem pedir microfone, iniciar contador de gravação ou criar um clipe.
-3. Mostre uma carta e mantenha-a enquanto aparece “Mantenha a carta…”. Depois de “Pode retirar a carta”, retire-a e mostre a próxima. Confira nome, edição, variante, soma em reais e som da revelação.
-4. Deixe a mesma carta parada: não deve somar novamente. Outra cópia da última carta pede confirmação para evitar duplicação por movimento da mão/câmera. Uma edição ou variante incerta também pede confirmação. Você pode pular, pausar a leitura ou identificar manualmente.
-5. Inicie **Gravar com voz e efeitos** somente se quiser um vídeo. Agora permita o microfone, fale durante a sessão, identifique algumas cartas e pare a gravação. A voz, os sons, as revelações e os valores devem aparecer no MP4 exportado verticalmente. Teste também com fones.
-6. Revise/finalize e exporte/compartilhe o vídeo. Confira o total no canto superior direito, a última revelação, a sincronia e a legibilidade ao abrir no aplicativo de destino. Compartilhar abre o seletor do Android; não publica sozinho.
-7. Adicione as cartas revisadas ao estoque e volte à coleção. Confira quantidades e avaliação real, incluindo cartas sem preço marcadas como total parcial. O preço de mercado não deve aparecer como custo de aquisição da unidade.
-
-A referência atual é internacional, convertida pela PTAX para reais e sem ajuste automático pela condição física. O valor menos o custo dos pacotes é uma diferença estimada, não lucro de uma venda realizada.
-
-Também precisam de conferência no aparelho: reflexos, mão passando rapidamente sobre o montinho, câmera inclinada, fonte ampliada, permissões negadas, conexão lenta, saída/retorno à tela e gravações longas. A validação do emulador usa cartas/valores sintéticos e não substitui esses testes.
+Os valores disponíveis são referências internacionais convertidas para reais, sem ajuste automático de condição. Jogos sem catálogo local e certificações sem integração própria de preço ficam pendentes. Gravações antigas podem continuar disponíveis na revisão, mas não se inicia gravação nova no scanner atual.
