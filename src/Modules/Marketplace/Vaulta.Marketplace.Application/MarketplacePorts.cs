@@ -9,12 +9,17 @@ public interface IMarketplaceStore
     Task<Listing?> FindListing(Guid sellerUserId, Guid listingId, CancellationToken cancellationToken);
     Task<Listing?> FindActiveListing(Guid listingId, CancellationToken cancellationToken);
     void AddListing(Listing listing);
+    Task<Listing?> FindDraftByKey(Guid sellerUserId, string clientDraftKey, CancellationToken cancellationToken);
+    Task<Listing> CreateDraft(Listing listing, CancellationToken cancellationToken);
+    Task<IAsyncDisposable> LockPublication(Guid listingId, CancellationToken cancellationToken);
+    Task RefreshListing(Listing listing, CancellationToken cancellationToken);
     Task<IReadOnlyList<Listing>> CollectionSyncListings(int offset, CancellationToken cancellationToken);
     Task Save(CancellationToken cancellationToken);
 }
 
 public interface IMarketplaceQueries
 {
+    Task<Contracts.ListingPageDto> BrowseListings(Queries.BrowseListingsQuery query, CancellationToken cancellationToken);
     Task<Contracts.SellerProfileDto?> GetSellerProfile(Guid userId, CancellationToken cancellationToken);
     Task<Contracts.ListingPageDto> ListActiveListings(Guid? sellerUserId, Guid? printingId, Guid? variantId, int page, int pageSize, string sort, CancellationToken cancellationToken);
     Task<Contracts.ListingDto?> GetListingById(Guid listingId, CancellationToken cancellationToken);
@@ -28,6 +33,9 @@ public interface IMarketplaceReputation
 
 public interface IMarketplaceCatalog
 {
+    Task<IReadOnlyList<Catalog.Contracts.CollectionPrintingDetails>> GetPrintings(IReadOnlyCollection<Guid> printingIds, CancellationToken cancellationToken);
+    Task<IReadOnlyList<Catalog.Contracts.CollectionVariantDetails>> GetVariants(IReadOnlyCollection<Guid> variantIds, CancellationToken cancellationToken);
+    Task<IReadOnlyList<Guid>> SearchPrintingIds(string? query, string? gameCode, CancellationToken cancellationToken);
     Task<Catalog.Contracts.CollectionPrintingDetails?> GetPrinting(Guid printingId, CancellationToken cancellationToken);
     Task<Catalog.Contracts.CollectionVariantDetails?> GetVariant(Guid variantId, CancellationToken cancellationToken);
 }
@@ -37,7 +45,10 @@ public interface IMarketplaceCollection
     Task<Collection.Contracts.CollectibleItemDto?> GetCollectibleItem(Guid userId, Guid itemId, CancellationToken cancellationToken);
     Task ReserveListingItem(Listing listing, CancellationToken cancellationToken);
     Task ReleaseListingItem(Listing listing, CancellationToken cancellationToken);
+    Task<MarketplaceItemIdentity?> GetItemIdentity(Guid userId, Guid entryId, CancellationToken cancellationToken);
 }
+
+public sealed record MarketplaceItemIdentity(Guid PrintingId, Guid? VariantId);
 
 public interface IMarketplaceAssets
 {

@@ -166,7 +166,7 @@ public partial class ExperienceViewModel : ObservableObject
         SelectedTcgs = ["Pokémon"];
     }
 
-    [ObservableProperty] private string screenId = "home";
+    [ObservableProperty] private string screenId = "login";
     [ObservableProperty] private string email = string.Empty;
     [ObservableProperty] private string password = string.Empty;
     [ObservableProperty] private string username = string.Empty;
@@ -302,6 +302,25 @@ public partial class ExperienceViewModel : ObservableObject
     }
 
     partial void OnCurrentPaymentChanged(PaymentDto? value) => OnPropertyChanged(nameof(Screen));
+
+    public void PrepareCheckout(ListingDto listing)
+    {
+        if (listing.Status != "active" || listing.SellerUserId == _sessionState.User?.Id) return;
+        if (CurrentOrder?.ListingId != listing.Id) { CurrentOrder = null; CurrentPayment = null; }
+        SelectedListing = listing;
+        SelectedListingId = listing.Id;
+        var savedAddress = _currentProfile?.DefaultShippingAddress;
+        ShippingStreet = savedAddress?.Street ?? string.Empty;
+        ShippingNumber = savedAddress?.Number ?? string.Empty;
+        ShippingComplement = savedAddress?.Complement ?? string.Empty;
+        ShippingNeighborhood = savedAddress?.Neighborhood ?? string.Empty;
+        ShippingCity = savedAddress?.City ?? string.Empty;
+        ShippingState = savedAddress?.State ?? string.Empty;
+        ShippingZipCode = savedAddress?.ZipCode ?? string.Empty;
+        ShippingRecipient = savedAddress?.Recipient ?? string.Empty;
+        StatusMessage = null;
+        ScreenId = "checkout";
+    }
 
     public void ContinueOrderPayment(OrderDto order)
     {
@@ -1370,21 +1389,23 @@ public partial class ExperienceViewModel : ObservableObject
             return;
         }
 
-        if (route is "home" or "collection" or "market" or "profile")
+        if (route == "market") route = "home";
+        if (route is "home" or "collection" or "profile")
         {
             await Shell.Current.GoToAsync($"//main/{route}/{route}-page");
             return;
         }
 
-        if (route == "scanner")
+        if (route is "scanner" or "sell")
         {
-            await Shell.Current.GoToAsync("scanner-session");
+            if (Shell.Current is AppShell appShell) await appShell.OpenSellAsync();
             return;
         }
 
         if (route is "welcome" or "login")
         {
-            await Shell.Current.GoToAsync("experience?screen=login");
+            if (Shell.Current is AppShell appShell) await appShell.ShowLoginAsync();
+            else await Shell.Current.GoToAsync("login");
             return;
         }
 

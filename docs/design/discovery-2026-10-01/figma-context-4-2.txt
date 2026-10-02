@@ -1,0 +1,321 @@
+const imgGroup = "https://www.figma.com/api/mcp/asset/c40a512d-8c10-4f57-b903-7251f4928693.svg";
+const imgGroup1 = "https://www.figma.com/api/mcp/asset/40bc13a1-61b3-4681-859e-12c944104fc6.svg";
+const imgFrame = "https://www.figma.com/api/mcp/asset/4438814f-9d3d-4539-9811-e3f0f9f709e7.svg";
+const imgFrame1 = "https://www.figma.com/api/mcp/asset/b92732d7-c761-4dec-8f68-d639be1a3415.svg";
+const imgGroup2 = "https://www.figma.com/api/mcp/asset/d96c474b-e68b-4dc2-9f77-9affb66a4bca.svg";
+const imgFrame2 = "https://www.figma.com/api/mcp/asset/2485ced1-c49c-41fc-b94c-50b9aec9c873.svg";
+const imgArtwork = "https://www.figma.com/api/mcp/asset/249adadd-df2d-4fcb-9cad-71377da217b8.png";
+const imgArtwork1 = "https://www.figma.com/api/mcp/asset/59008ff0-4585-455a-b1f3-b4ed36d6931c.png";
+const imgArtwork2 = "https://www.figma.com/api/mcp/asset/50152b48-a3f9-4b58-96f3-12ea4402ebb7.png";
+const imgArtwork3 = "https://www.figma.com/api/mcp/asset/08780cc3-0fb9-4c80-9391-fda7e1e1f78e.png";
+
+function IconTabProfile({ className }: { className?: string }) {
+  return (
+    <div className={className || "relative size-[24px]"} data-node-id="10:21" data-name="Icon / tab_profile">
+      <div className="absolute left-0 overflow-clip size-[24px] top-0" data-node-id="10:22" data-name="Frame">
+        <div className="absolute inset-[12.5%_16.67%]" data-node-id="10:23" data-name="Group">
+          <div className="absolute inset-[-5%_-5.62%]">
+            <img alt="" className="block max-w-none size-full" src={imgGroup} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IconTabCollection({ className }: { className?: string }) {
+  return (
+    <div className={className || "relative size-[24px]"} data-node-id="10:30" data-name="Icon / tab_collection">
+      <div className="absolute left-0 overflow-clip size-[24px] top-0" data-node-id="10:31" data-name="Frame">
+        <div className="absolute inset-[12.5%]" data-node-id="10:32" data-name="Group">
+          <div className="absolute inset-[-5%]">
+            <img alt="" className="block max-w-none size-full" src={imgGroup1} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IconIconPlus({ className }: { className?: string }) {
+  return (
+    <div className={className || "relative size-[24px]"} data-node-id="10:53" data-name="Icon / icon-plus">
+      <div className="absolute left-0 size-[24px] top-0" data-node-id="10:54" data-name="Frame">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgFrame} />
+      </div>
+    </div>
+  );
+}
+
+function IconIconSearch({ className }: { className?: string }) {
+  return (
+    <div className={className || "relative size-[24px]"} data-node-id="10:57" data-name="Icon / icon-search">
+      <div className="absolute left-0 size-[24px] top-0" data-node-id="10:58" data-name="Frame">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgFrame1} />
+      </div>
+    </div>
+  );
+}
+
+function IconTabHome({ className }: { className?: string }) {
+  return (
+    <div className={className || "relative size-[24px]"} data-node-id="10:35" data-name="Icon / tab_home">
+      <div className="absolute left-0 overflow-clip size-[24px] top-0" data-node-id="10:36" data-name="Frame">
+        <div className="absolute inset-[12.5%]" data-node-id="10:37" data-name="Group">
+          <div className="absolute inset-[-5%]">
+            <img alt="" className="block max-w-none size-full" src={imgGroup2} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NavigationBottomMarketplace({ className }: { className?: string }) {
+  return (
+    <div className={className || "bg-[var(--vaulta-surface-default,#121217)] border-[var(--vaulta-border-default,#2e3038)] border-solid border-t content-stretch flex h-[78px] items-center justify-between pb-[20px] pt-[8px] px-[8px] relative w-[390px]"} data-node-id="3:41" data-name="Navigation / Bottom / Marketplace">
+      <div className="content-stretch flex flex-col gap-[4px] h-[48px] items-center justify-center overflow-clip relative shrink-0 w-[64px]" data-node-id="10:65" data-name="Nav / Início">
+        <IconTabHome className="relative shrink-0 size-[20px]" />
+        <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-text-primary,white)] whitespace-nowrap" data-node-id="10:70">
+          Início
+        </p>
+      </div>
+      <div className="content-stretch flex flex-col gap-[4px] h-[48px] items-center justify-center overflow-clip relative shrink-0 w-[64px]" data-node-id="10:71" data-name="Nav / Buscar">
+        <IconIconSearch className="relative shrink-0 size-[20px]" />
+        <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] whitespace-nowrap" data-node-id="10:76">
+          Buscar
+        </p>
+      </div>
+      <div className="bg-[var(--vaulta-brand-primary,#7d6bf0)] content-stretch flex flex-col gap-[4px] h-[48px] items-center justify-center overflow-clip relative rounded-[var(--vaulta-radius-8,8px)] shrink-0 w-[64px]" data-node-id="10:77" data-name="Nav / Vender">
+        <IconIconPlus className="relative shrink-0 size-[20px]" />
+        <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-background-primary,#0a0a0d)] whitespace-nowrap" data-node-id="10:82">
+          Vender
+        </p>
+      </div>
+      <div className="content-stretch flex flex-col gap-[4px] h-[48px] items-center justify-center overflow-clip relative shrink-0 w-[64px]" data-node-id="10:83" data-name="Nav / Coleção">
+        <IconTabCollection className="relative shrink-0 size-[20px]" />
+        <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] whitespace-nowrap" data-node-id="10:89">
+          Coleção
+        </p>
+      </div>
+      <div className="content-stretch flex flex-col gap-[4px] h-[48px] items-center justify-center overflow-clip relative shrink-0 w-[64px]" data-node-id="10:90" data-name="Nav / Perfil">
+        <IconTabProfile className="relative shrink-0 size-[20px]" />
+        <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] whitespace-nowrap" data-node-id="10:96">
+          Perfil
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function IconIconChevronRight({ className }: { className?: string }) {
+  return (
+    <div className={className || "relative size-[24px]"} data-node-id="10:50" data-name="Icon / icon-chevron-right">
+      <div className="absolute left-0 size-[24px] top-0" data-node-id="10:51" data-name="Frame">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgFrame2} />
+      </div>
+    </div>
+  );
+}
+
+type SearchMarketplaceCompactProps = {
+  className?: string;
+  placeholder?: string;
+};
+
+function SearchMarketplaceCompact({ className, placeholder = "Buscar carta, set ou vendedor" }: SearchMarketplaceCompactProps) {
+  return (
+    <div className={className || "bg-[var(--vaulta-surface-default,#121217)] border border-[var(--vaulta-border-default,#2e3038)] border-solid content-stretch flex gap-[var(--vaulta-space-8,8px)] h-[44px] items-center px-[12px] relative rounded-[var(--vaulta-radius-8,8px)] w-[358px]"} data-node-id="3:29" data-name="Search / Marketplace / Compact">
+      <IconIconSearch className="relative shrink-0 size-[24px]" />
+      <p className="[word-break:break-word] font-['Inter:Regular'] font-normal leading-[20px] not-italic relative shrink-0 text-[13px] text-[color:var(--vaulta-text-secondary,#8c919e)] whitespace-nowrap" data-node-id="3:33">
+        {placeholder}
+      </p>
+    </div>
+  );
+}
+
+export default function Component01HomeMarketplace() {
+  return (
+    <div className="bg-[var(--vaulta-background-primary,#0a0a0d)] content-stretch flex flex-col items-start relative size-full" data-node-id="4:2" data-name="01 — Home Marketplace">
+      <div className="content-stretch flex flex-col gap-[var(--vaulta-space-8,8px)] h-[766px] items-start overflow-clip px-[16px] py-[12px] relative shrink-0 w-[390px]" data-node-id="11:22" data-name="Scrollable content">
+        <div className="content-stretch flex gap-[var(--vaulta-space-4,4px)] h-[44px] items-center justify-between overflow-clip relative shrink-0 w-[358px]" data-node-id="11:23" data-name="Header">
+          <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[26px] not-italic relative shrink-0 text-[20px] text-[color:var(--vaulta-text-primary,white)] whitespace-nowrap" data-node-id="11:24">
+            VAULTA
+          </p>
+          <div className="content-stretch flex gap-[var(--vaulta-space-4,4px)] items-center justify-center overflow-clip relative shrink-0 size-[44px]" data-node-id="11:25" data-name="Perfil">
+            <IconTabProfile className="relative shrink-0 size-[20px]" />
+          </div>
+        </div>
+        <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] whitespace-nowrap" data-node-id="11:31">
+          Protótipo · preços e vendedores ilustrativos
+        </p>
+        <SearchMarketplaceCompact className="bg-[var(--vaulta-surface-default,#121217)] border border-[var(--vaulta-border-default,#2e3038)] border-solid content-stretch flex gap-[var(--vaulta-space-8,8px)] h-[44px] items-center px-[12px] relative rounded-[var(--vaulta-radius-8,8px)] shrink-0 w-[358px]" />
+        <div className="content-stretch flex gap-[var(--vaulta-space-4,4px)] h-[36px] items-center overflow-clip relative shrink-0 w-[358px]" data-node-id="11:38" data-name="TCG filters">
+          <div className="bg-[var(--vaulta-surface-elevated,#1c1f24)] border border-[var(--vaulta-brand-primary,#7d6bf0)] border-solid content-stretch flex gap-[var(--vaulta-space-4,4px)] h-[36px] items-center justify-center overflow-clip relative shrink-0 w-[84px]" data-node-id="11:39" data-name="TCG / Pokémon">
+            <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-text-primary,white)] whitespace-nowrap" data-node-id="11:40">
+              Pokémon
+            </p>
+          </div>
+          <div className="bg-[var(--vaulta-surface-default,#121217)] border border-[var(--vaulta-border-default,#2e3038)] border-solid content-stretch flex gap-[var(--vaulta-space-4,4px)] h-[36px] items-center justify-center overflow-clip relative shrink-0 w-[88px]" data-node-id="11:41" data-name="TCG / Yu-Gi-Oh!">
+            <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] whitespace-nowrap" data-node-id="11:42">
+              Yu-Gi-Oh!
+            </p>
+          </div>
+          <div className="bg-[var(--vaulta-surface-default,#121217)] border border-[var(--vaulta-border-default,#2e3038)] border-solid content-stretch flex gap-[var(--vaulta-space-4,4px)] h-[36px] items-center justify-center overflow-clip relative shrink-0 w-[86px]" data-node-id="11:43" data-name="TCG / One Piece">
+            <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] whitespace-nowrap" data-node-id="11:44">
+              One Piece
+            </p>
+          </div>
+          <div className="bg-[var(--vaulta-surface-default,#121217)] border border-[var(--vaulta-border-default,#2e3038)] border-solid content-stretch flex gap-[var(--vaulta-space-4,4px)] h-[36px] items-center justify-center overflow-clip relative shrink-0 w-[60px]" data-node-id="11:45" data-name="TCG / Magic">
+            <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] whitespace-nowrap" data-node-id="11:46">
+              Magic
+            </p>
+          </div>
+        </div>
+        <div className="[word-break:break-word] content-stretch flex gap-[var(--vaulta-space-4,4px)] h-[24px] items-start justify-between not-italic overflow-clip relative shrink-0 w-[358px] whitespace-nowrap" data-node-id="11:47" data-name="Section title">
+          <p className="font-['Inter:Semi_Bold'] font-semibold leading-[22px] relative shrink-0 text-[16px] text-[color:var(--vaulta-text-primary,white)]" data-node-id="11:48">
+            Recém anunciadas
+          </p>
+          <p className="font-['Inter:Medium'] font-medium leading-[16px] relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)]" data-node-id="11:49">
+            Mais recentes
+          </p>
+        </div>
+        <div className="content-stretch flex gap-[var(--vaulta-space-16,16px)] h-[246px] items-start overflow-clip relative shrink-0 w-[358px]" data-node-id="11:50" data-name="Listings row / 1">
+          <div className="bg-[var(--vaulta-background-primary,#0a0a0d)] content-stretch flex flex-col gap-[var(--vaulta-space-4,4px)] items-start relative shrink-0 w-[171px]" data-node-id="11:51" data-name="Listing Card / Compact">
+            <div className="h-[156px] relative rounded-[var(--vaulta-radius-8,8px)] shrink-0 w-[171px]" data-node-id="I11:51;3:35" data-name="Artwork">
+              <img alt="" className="absolute inset-0 max-w-none object-contain pointer-events-none rounded-[var(--vaulta-radius-8,8px)] size-full" src={imgArtwork} />
+            </div>
+            <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[18px] not-italic relative shrink-0 text-[13px] text-[color:var(--vaulta-text-primary,white)] w-[171px]" data-node-id="I11:51;3:37">
+              Charizard ex
+            </p>
+            <p className="[word-break:break-word] font-['Inter:Bold'] font-bold leading-[24px] not-italic relative shrink-0 text-[18px] text-[color:var(--vaulta-text-primary,white)] w-[171px]" data-node-id="I11:51;3:38">
+              R$ 289,90
+            </p>
+            <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] w-[171px]" data-node-id="I11:51;3:39">
+              NM · Inglês
+            </p>
+            <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] w-[171px]" data-node-id="I11:51;3:40">
+              Fellipe · 4,9 (18)
+            </p>
+          </div>
+          <div className="bg-[var(--vaulta-background-primary,#0a0a0d)] content-stretch flex flex-col gap-[var(--vaulta-space-4,4px)] items-start relative shrink-0 w-[171px]" data-node-id="11:57" data-name="Listing Card / Compact">
+            <div className="h-[156px] relative rounded-[var(--vaulta-radius-8,8px)] shrink-0 w-[171px]" data-node-id="I11:57;3:35" data-name="Artwork">
+              <img alt="" className="absolute inset-0 max-w-none object-contain pointer-events-none rounded-[var(--vaulta-radius-8,8px)] size-full" src={imgArtwork1} />
+            </div>
+            <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[18px] not-italic relative shrink-0 text-[13px] text-[color:var(--vaulta-text-primary,white)] w-[171px]" data-node-id="I11:57;3:37">
+              Umbreon VMAX
+            </p>
+            <p className="[word-break:break-word] font-['Inter:Bold'] font-bold leading-[24px] not-italic relative shrink-0 text-[18px] text-[color:var(--vaulta-text-primary,white)] w-[171px]" data-node-id="I11:57;3:38">
+              R$ 1.249,90
+            </p>
+            <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] w-[171px]" data-node-id="I11:57;3:39">
+              LP · Inglês
+            </p>
+            <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] w-[171px]" data-node-id="I11:57;3:40">
+              CardHouse · 5,0 (42)
+            </p>
+          </div>
+        </div>
+        <div className="content-stretch flex gap-[var(--vaulta-space-16,16px)] h-[246px] items-start overflow-clip relative shrink-0 w-[358px]" data-node-id="11:63" data-name="Listings row / 2">
+          <div className="bg-[var(--vaulta-background-primary,#0a0a0d)] content-stretch flex flex-col gap-[var(--vaulta-space-4,4px)] items-start relative shrink-0 w-[171px]" data-node-id="11:64" data-name="Listing Card / Compact">
+            <div className="h-[156px] relative rounded-[var(--vaulta-radius-8,8px)] shrink-0 w-[171px]" data-node-id="I11:64;3:35" data-name="Artwork">
+              <img alt="" className="absolute inset-0 max-w-none object-contain pointer-events-none rounded-[var(--vaulta-radius-8,8px)] size-full" src={imgArtwork2} />
+            </div>
+            <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[18px] not-italic relative shrink-0 text-[13px] text-[color:var(--vaulta-text-primary,white)] w-[171px]" data-node-id="I11:64;3:37">
+              Gengar VMAX
+            </p>
+            <p className="[word-break:break-word] font-['Inter:Bold'] font-bold leading-[24px] not-italic relative shrink-0 text-[18px] text-[color:var(--vaulta-text-primary,white)] w-[171px]" data-node-id="I11:64;3:38">
+              R$ 485,00
+            </p>
+            <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] w-[171px]" data-node-id="I11:64;3:39">
+              NM · Inglês
+            </p>
+            <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] w-[171px]" data-node-id="I11:64;3:40">
+              João · 4,8 (12)
+            </p>
+          </div>
+          <div className="bg-[var(--vaulta-background-primary,#0a0a0d)] content-stretch flex flex-col gap-[var(--vaulta-space-4,4px)] items-start relative shrink-0 w-[171px]" data-node-id="11:70" data-name="Listing Card / Compact">
+            <div className="h-[156px] relative rounded-[var(--vaulta-radius-8,8px)] shrink-0 w-[171px]" data-node-id="I11:70;3:35" data-name="Artwork">
+              <img alt="" className="absolute inset-0 max-w-none object-contain pointer-events-none rounded-[var(--vaulta-radius-8,8px)] size-full" src={imgArtwork3} />
+            </div>
+            <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[18px] not-italic relative shrink-0 text-[13px] text-[color:var(--vaulta-text-primary,white)] w-[171px]" data-node-id="I11:70;3:37">
+              Pikachu
+            </p>
+            <p className="[word-break:break-word] font-['Inter:Bold'] font-bold leading-[24px] not-italic relative shrink-0 text-[18px] text-[color:var(--vaulta-text-primary,white)] w-[171px]" data-node-id="I11:70;3:38">
+              R$ 159,00
+            </p>
+            <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] w-[171px]" data-node-id="I11:70;3:39">
+              NM · Inglês
+            </p>
+            <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] w-[171px]" data-node-id="I11:70;3:40">
+              Ana · Sem avaliações
+            </p>
+          </div>
+        </div>
+        <div className="content-stretch flex gap-[var(--vaulta-space-4,4px)] h-[40px] items-center justify-between overflow-clip relative shrink-0 w-[358px]" data-node-id="11:76" data-name="Discovery link">
+          <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[18px] not-italic relative shrink-0 text-[13px] text-[color:var(--vaulta-brand-primary,#7d6bf0)] whitespace-nowrap" data-node-id="11:77">
+            Ver todos os anúncios
+          </p>
+          <IconIconChevronRight className="relative shrink-0 size-[20px]" />
+        </div>
+      </div>
+      <NavigationBottomMarketplace className="bg-[var(--vaulta-surface-default,#121217)] border-[var(--vaulta-border-default,#2e3038)] border-solid border-t content-stretch flex h-[78px] items-center justify-between pb-[20px] pt-[8px] px-[8px] relative shrink-0 w-[390px]" />
+    </div>
+  );
+}
+SUPER CRITICAL: The generated React+Tailwind code MUST be converted to match the target project's technology stack and styling system.
+1. Analyze the target codebase to identify: technology stack, styling approach, component patterns, and design tokens
+2. Convert React syntax to the target framework/library
+3. Transform all Tailwind classes to the target styling system while preserving exact visual design
+4. Follow the project's existing patterns and conventions
+DO NOT install any Tailwind as a dependency unless the user instructs you to do so.
+
+Node ids have been added to the code as data attributes, e.g. `data-node-id="1:2"`.
+These styles are contained in the design: Vaulta / Compact / Title: Font(family: "Inter", style: Semi Bold, size: 20, weight: 600, lineHeight: 26, letterSpacing: 0), Vaulta / Compact / Metadata: Font(family: "Inter", style: Medium, size: 11, weight: 500, lineHeight: 16, letterSpacing: 0), Vaulta / Compact / Body: Font(family: "Inter", style: Regular, size: 13, weight: 400, lineHeight: 20, letterSpacing: 0), Vaulta / Compact / Section: Font(family: "Inter", style: Semi Bold, size: 16, weight: 600, lineHeight: 22, letterSpacing: 0), Vaulta / Compact / Product: Font(family: "Inter", style: Semi Bold, size: 13, weight: 600, lineHeight: 18, letterSpacing: 0), Vaulta / Compact / Price: Font(family: "Inter", style: Bold, size: 18, weight: 700, lineHeight: 24, letterSpacing: 0).
+Component descriptions: The following components have usage descriptions or documentation links defined in Figma. These descriptions provide important context about the intended usage, best practices, and any constraints for each component. Follow these guidelines when implementing or using these components.
+
+## Icon / tab_profile
+**Node ID:** 10:21
+
+Source: existing Vaulta MAUI asset. Decorative icon; accessible name on parent action.
+
+## Search / Marketplace / Compact
+**Node ID:** 3:29
+
+Marketplace search. Requires listing text search contract; current catalog lookup is a separate experience.
+
+## Icon / icon-search
+**Node ID:** 10:57
+
+Source: Lucide public icon. Decorative icon; accessible name on parent action.
+
+## Listing Card / Compact
+**Node ID:** 3:34
+
+Artwork, name, listing price BRL, condition/language, seller rating and review count. Illustrative specimen only. No inferred market delta. Zero reviews renders Sem avaliações. Artwork reference never replaces seller photos.
+
+## Icon / icon-chevron-right
+**Node ID:** 10:50
+
+Source: Lucide public icon. Decorative icon; accessible name on parent action.
+
+## Navigation / Bottom / Marketplace
+**Node ID:** 3:41
+
+Five 64×48dp targets. Center action opens sell entry, scanner primary. Includes bottom safe area; fixed outside scrolling content.
+
+## Icon / tab_home
+**Node ID:** 10:35
+
+Source: existing Vaulta MAUI asset. Decorative icon; accessible name on parent action.
+
+## Icon / icon-plus
+**Node ID:** 10:53
+
+Source: Lucide public icon. Decorative icon; accessible name on parent action.
+
+## Icon / tab_collection
+**Node ID:** 10:30
+
+Source: existing Vaulta MAUI asset. Decorative icon; accessible name on parent action.
+Images and SVGs will be stored as constants, e.g. const image = 'https://www.figma.com/api/mcp/asset/550e8400-e29b-41d4-a716-446655440000.png'. These constants will be used in the code as the source for the image, ex: <img src={image} />. Image assets are stored on a remote server for 7 days and can be fetched using the provided URLs until they expire.

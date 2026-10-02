@@ -30,6 +30,7 @@ public sealed partial class ScannerSessionPage : ContentPage
     private bool _busy;
     private bool _loaded;
     private bool _visible;
+    private long _viewGeneration;
     private CancellationTokenSource _lifetime = new();
 
     public ScannerSessionPage(SessionState account, IScannerSessionStore store, IScannerClient scanner, ScannerSessionImporter importer,
@@ -43,25 +44,46 @@ public sealed partial class ScannerSessionPage : ContentPage
 
     protected override async void OnAppearing()
     {
-        base.OnAppearing(); _visible = true;
+        base.OnAppearing(); _visible = true; var activation = ++_viewGeneration;
         _account.PropertyChanged += AccountChanged;
         if (_lifetime.IsCancellationRequested) { _lifetime.Dispose(); _lifetime = new(); }
         try
         {
             if (_videoLeavingTask is not null) { await _videoLeavingTask; _videoLeavingTask = null; }
+            if (!_visible || activation != _viewGeneration) return;
             if (_account.User is not { } owner) { await Shell.Current.GoToAsync(".."); return; }
+            if (_session is { } prior && prior.OwnerId != owner.Id)
+            {
+                _session = null;
+                _loaded = false;
+                _videoClips = [];
+                _continuousVariantCode = null;
+                ClearResults();
+            }
             if (!_loaded)
             {
                 var restored = await _store.Latest(owner.Id, _lifetime.Token);
-                if (!_visible || owner.Id != _account.User?.Id) return;
+                if (!_visible || activation != _viewGeneration || owner.Id != _account.User?.Id) return;
                 _session = restored; _loaded = true;
                 if (_session is not null) await LoadVideoClips(_lifetime.Token);
-                if (!_visible || owner.Id != _account.User?.Id) return;
-                if (_session is null) ShowSetup();
+                if (!_visible || activation != _viewGeneration || owner.Id != _account.User?.Id) return;
+                if (_session is null)
+                {
+                    _session = ScannerSession.Start(owner.Id, DateTimeOffset.UtcNow);
+                    await _store.Save(_session, _lifetime.Token);
+                    if (!_visible || activation != _viewGeneration || owner.Id != _account.User?.Id) return;
+                    ShowLive();
+                }
                 else if (_session.Phase == ScannerSessionPhase.Scanning) ShowLive();
                 else ShowReview();
             }
-            else if (_session?.Phase == ScannerSessionPhase.Scanning) ShowLive();
+            else if (_session is { } existing)
+            {
+                var saved = await _store.Latest(owner.Id, _lifetime.Token);
+                if (!_visible || activation != _viewGeneration || owner.Id != _account.User?.Id) return;
+                if (saved?.Id == existing.Id) _session = saved;
+                if (_session.Phase == ScannerSessionPhase.Scanning) ShowLive(); else ShowReview();
+            }
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
@@ -73,7 +95,7 @@ public sealed partial class ScannerSessionPage : ContentPage
 
     protected override void OnDisappearing()
     {
-        _visible = false; _account.PropertyChanged -= AccountChanged; _lifetime.Cancel(); StopReveal(); StopCamera(); base.OnDisappearing();
+        _visible = false; _viewGeneration++; _account.PropertyChanged -= AccountChanged; _lifetime.Cancel(); StopReveal(); StopCamera(); base.OnDisappearing();
     }
 
     private void ShowSetup()
@@ -119,36 +141,48 @@ public sealed partial class ScannerSessionPage : ContentPage
 
     private Task CaptureCard() => CaptureCard(false, null);
 
-    private async Task CaptureCard(bool continuous, byte[]? signature)
+    private async Task CaptureCard(bool continuous, byte[]? signature, bool refinement = false, Guid? previousPrintingId = null)
     {
-        RequireOwner();
+        var operation = BeginScannerOperation();
         if (!_cameraReady || _camera is null) throw new InvalidOperationException("Aguarde a câmera ou use a busca pelo nome.");
         if (_session?.Phase != ScannerSessionPhase.Scanning) return;
         if (!continuous && Vaulta.App.Services.Camera.CameraSceneSampler.Read(_camera) is { } currentScene) _sceneGate.Consume(currentScene);
         _status.Text = "Mantenha a carta…";
-        using var stream = await _camera.CaptureImage(_lifetime.Token);
+        using var stream = await operation.Camera!.CaptureImage(operation.Context.Token);
+        RequireScannerOperation(operation);
         using var data = new MemoryStream();
         var buffer = new byte[81920]; int read;
-        while ((read = await stream.ReadAsync(buffer, _lifetime.Token)) > 0)
+        while ((read = await stream.ReadAsync(buffer, operation.Context.Token)) > 0)
         {
+            RequireScannerOperation(operation);
             if (data.Length + read > ScannerClient.MaxImageBytes) throw new InvalidOperationException("A foto ficou muito grande. Tente novamente ou busque pelo nome.");
-            await data.WriteAsync(buffer.AsMemory(0, read), _lifetime.Token);
+            await data.WriteAsync(buffer.AsMemory(0, read), operation.Context.Token);
+            RequireScannerOperation(operation);
         }
-        var result = await _scanner.ScanCardAsync(data.ToArray(), "pokemon", _lifetime.Token); RequireOwner();
-        if (continuous) await HandleContinuousResult(result, signature!); else ShowCandidates(result);
+        RequireScannerOperation(operation);
+        var result = await _scanner.ScanCardAsync(data.ToArray(), "pokemon", operation.Context.Token); RequireScannerOperation(operation);
+        if (continuous) await HandleContinuousResult(result, signature!, operation, refinement, previousPrintingId); else ShowCandidates(result);
     }
 
     private async Task Search()
     {
+        var operation = BeginScannerOperation();
         var query = await DisplayPromptAsync("Buscar carta", "Digite o nome da carta.", "Buscar", "Cancelar");
+        RequireScannerOperation(operation);
         if (string.IsNullOrWhiteSpace(query)) return;
-        var result = await _scanner.SearchCardsAsync(query, "pokemon", _lifetime.Token); RequireOwner(); ShowCandidates(result);
+        var result = await _scanner.SearchCardsAsync(query, "pokemon", operation.Context.Token); RequireScannerOperation(operation); ShowCandidates(result, requireNumber: false);
     }
 
-    private void ShowCandidates(CardScanResultDto result)
+    private void ShowCandidates(CardScanResultDto result, bool requireNumber = true)
     {
-        ClearResults(); _status.Text = result.Candidates.Count == 0 ? "Não encontrei a carta. Tente novamente ou busque pelo nome." : "Confira a edição para somar o valor correto.";
-        foreach (var candidate in result.Candidates.Take(3).Where(x => x.PrintingId != Guid.Empty))
+        ClearResults();
+        if (requireNumber && result.Candidates.Count > 0 && result.Candidates.All(x => !x.HasCollectorNumberMatch))
+        {
+            _status.Text = "Li o nome, mas não confirmei a edição. Aproxime o rodapé com o número da carta ou use a busca.";
+            return;
+        }
+        _status.Text = result.Candidates.Count == 0 ? "Não confirmei esta edição. Mostre nome e número nítidos ou busque a carta." : "Confira a edição para somar o valor correto.";
+        foreach (var candidate in result.Candidates.Where(x => !requireNumber || x.HasCollectorNumberMatch).Take(3).Where(x => x.PrintingId != Guid.Empty))
             _result.Children.Add(Action($"{candidate.Name} · {candidate.SetName} · {candidate.CollectorNumber}", () => ShowCard(candidate.PrintingId)));
         if (_result.Children.Count > 0) _result.Children.Add(Action("Pular carta", () => { ClearResults(); _status.Text = "Mostre a próxima carta."; return Task.CompletedTask; }));
         if (_resultPanel is not null) _resultPanel.IsVisible = _result.Children.Count > 0;
@@ -156,11 +190,13 @@ public sealed partial class ScannerSessionPage : ContentPage
 
     private async Task ShowCard(Guid printing)
     {
-        var details = await _scanner.GetCardDetailsAsync(printing, _lifetime.Token); RequireOwner(); ClearResults();
+        var operation = BeginScannerOperation();
+        var details = await _scanner.GetCardDetailsAsync(printing, operation.Context.Token); RequireScannerOperation(operation); ClearResults();
         var variants = details.Printing.Variants.ToArray();
-        var variant = new Picker { Title = "Variante", TextColor = Colors.White, ItemsSource = variants.Select(x => x.Name).ToArray(), SelectedIndex = variants.Length == 1 ? 0 : -1 };
+        var variant = new Picker { Title = "Escolha o acabamento", TitleColor = Color.FromArgb("#D2BFFF"), TextColor = Colors.White,
+            BackgroundColor = Color.FromArgb("#211C30"), ItemsSource = variants.Select(x => x.Name).ToArray(), SelectedIndex = variants.Length == 1 ? 0 : -1 };
         var conditions = new[] { "UNKNOWN", "MINT", "NEAR_MINT", "LIGHTLY_PLAYED", "MODERATELY_PLAYED", "HEAVILY_PLAYED", "DAMAGED" };
-        var condition = new Picker { Title = "Condição da carta", ItemsSource = new[] { "Não avaliada", "Mint", "Near mint", "Pouco jogada", "Jogada", "Muito jogada", "Danificada" }, SelectedIndex = 0, TextColor = Colors.White };
+        var condition = new Picker { Title = "Condição da carta", TitleColor = Color.FromArgb("#D2BFFF"), BackgroundColor = Color.FromArgb("#211C30"), ItemsSource = new[] { "Não avaliada", "Mint", "Near mint", "Pouco jogada", "Jogada", "Muito jogada", "Danificada" }, SelectedIndex = 0, TextColor = Colors.White };
         var valueLabel = Text("Escolha a variante para consultar o valor.", 20, Colors.White, true);
         CardMarketQuoteDto? SelectedQuote() => variant.SelectedIndex >= 0
             ? details.MarketQuotes.Where(x => x.VariantId == variants[variant.SelectedIndex].Id).OrderBy(x => x.Source.Contains("TCGplayer", StringComparison.OrdinalIgnoreCase) ? 0 : 1).FirstOrDefault() : null;
@@ -183,7 +219,7 @@ public sealed partial class ScannerSessionPage : ContentPage
         {
             if (variants.Length > 0 && variant.SelectedIndex < 0) throw new ArgumentException("Escolha a variante da carta.");
             await AddIdentifiedCard(details, variants.Length > 0 ? variants[variant.SelectedIndex] : null,
-                conditions[Math.Max(0, condition.SelectedIndex)], SelectedQuote(), scanId, scannedAt);
+                conditions[Math.Max(0, condition.SelectedIndex)], SelectedQuote(), scanId, scannedAt, operation);
         }));
         _result.Children.Add(Action("Pular carta", () => { ClearResults(); _status.Text = "Mostre a próxima carta."; return Task.CompletedTask; }));
         if (_resultPanel is not null) _resultPanel.IsVisible = true;
@@ -218,6 +254,7 @@ public sealed partial class ScannerSessionPage : ContentPage
                     if (removed.Phase == ScannerSessionPhase.Completed) ShowReview(); else ShowLive();
                 }));
             body.Children.Add(Surface(row, "#151726"));
+            row.Children.Add(Action(card.ListingDraftId.HasValue ? "Retomar anúncio" : "Vender esta carta", () => OpenSale(card.ScanId)));
         }
         if (session.Phase != ScannerSessionPhase.Imported)
             body.Children.Add(Action(session.Phase == ScannerSessionPhase.Importing ? "Retomar adição ao estoque" : "Adicionar todas ao estoque", async () =>
@@ -261,12 +298,23 @@ public sealed partial class ScannerSessionPage : ContentPage
     {
         if (_session is null || _session.OwnerId != _account.User?.Id) throw new InvalidOperationException("Entre na conta que iniciou esta sessão.");
     }
+    private sealed record ScannerOperation(ScannerSession Session, CameraView? Camera, ScannerOperationContext Context);
+    private ScannerOperation BeginScannerOperation()
+    {
+        RequireOwner();
+        return new(_session!, _camera, new(_session!.Id, _session.OwnerId, _viewGeneration, _lifetime.Token));
+    }
+    private void RequireScannerOperation(ScannerOperation operation)
+    {
+        operation.Context.EnsureCurrent(_session, _account.User?.Id, _viewGeneration, _visible);
+        if (!ReferenceEquals(operation.Camera, _camera)) throw new OperationCanceledException("A câmera foi substituída.");
+    }
     private void AccountChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName != nameof(SessionState.User) || _session?.OwnerId == _account.User?.Id) return;
         MainThread.BeginInvokeOnMainThread(() =>
         {
-            _lifetime.Cancel(); StopReveal(); StopCamera(); _session = null; _loaded = false; DetachSharedViews(); _result.Children.Clear();
+            _viewGeneration++; _lifetime.Cancel(); StopReveal(); StopCamera(); _session = null; _loaded = false; DetachSharedViews(); _result.Children.Clear();
             Content = new VerticalStackLayout { Padding = 28, Children = { Text("Entre na conta que iniciou a sessão para retomá-la.", 18, Colors.White), Action("Voltar", () => Shell.Current.GoToAsync("..")) } };
         });
     }

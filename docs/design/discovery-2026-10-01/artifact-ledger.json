@@ -1,0 +1,113 @@
+{
+  "figma": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"createdNodeIds\":[\"18:136\",\"I18:136;12:102\"],\"mutatedNodeIds\":[\"11:135\"],\"removedNodeIds\":[\"11:137\"],\"components\":[{\"id\":\"3:25\",\"name\":\"Button / Primary / Compact\",\"w\":127,\"h\":40},{\"id\":\"3:27\",\"name\":\"Button / Secondary / Compact\",\"w\":111,\"h\":40},{\"id\":\"3:29\",\"name\":\"Search / Marketplace / Compact\",\"w\":358,\"h\":44},{\"id\":\"3:34\",\"name\":\"Listing Card / Compact\",\"w\":171,\"h\":246},{\"id\":\"3:41\",\"name\":\"Navigation / Bottom / Marketplace\",\"w\":390,\"h\":78},{\"id\":\"10:21\",\"name\":\"Icon / tab_profile\",\"w\":24,\"h\":24},{\"id\":\"10:26\",\"name\":\"Icon / icon-arrow-left\",\"w\":24,\"h\":24},{\"id\":\"10:30\",\"name\":\"Icon / tab_collection\",\"w\":24,\"h\":24},{\"id\":\"10:35\",\"name\":\"Icon / tab_home\",\"w\":24,\"h\":24},{\"id\":\"10:39\",\"name\":\"Icon / icon-video\",\"w\":24,\"h\":24},{\"id\":\"10:43\",\"name\":\"Icon / icon-x\",\"w\":24,\"h\":24},{\"id\":\"10:47\",\"name\":\"Icon / icon-heart\",\"w\":24,\"h\":24},{\"id\":\"10:50\",\"name\":\"Icon / icon-chevron-right\",\"w\":24,\"h\":24},{\"id\":\"10:53\",\"name\":\"Icon / icon-plus\",\"w\":24,\"h\":24},{\"id\":\"10:57\",\"name\":\"Icon / icon-search\",\"w\":24,\"h\":24},{\"id\":\"12:91\",\"name\":\"Scanner Result / Compact\",\"w\":358,\"h\":132},{\"id\":\"12:99\",\"name\":\"Condition Badge / Compact\",\"w\":104,\"h\":28},{\"id\":\"12:101\",\"name\":\"Seller Rating / Compact\",\"w\":358,\"h\":24},{\"id\":\"12:103\",\"name\":\"Price / Market Reference\",\"w\":358,\"h\":72},{\"id\":\"12:134\",\"name\":\"Data State / Notice\",\"w\":756,\"h\":436},{\"id\":\"12:107\",\"name\":\"State=Loading\",\"w\":358,\"h\":132},{\"id\":\"12:110\",\"name\":\"State=Empty\",\"w\":358,\"h\":132},{\"id\":\"12:116\",\"name\":\"State=Partial\",\"w\":358,\"h\":132},{\"id\":\"12:122\",\"name\":\"State=Error\",\"w\":358,\"h\":132},{\"id\":\"12:128\",\"name\":\"State=Offline\",\"w\":358,\"h\":132}],\"variables\":[{\"id\":\"VariableID:3:3\",\"name\":\"background/primary\",\"type\":\"COLOR\",\"values\":{\"3:0\":{\"type\":\"VARIABLE_ALIAS\",\"id\":\"VariableID:10:4\"}}},{\"id\":\"VariableID:3:4\",\"name\":\"surface/default\",\"type\":\"COLOR\",\"values\":{\"3:0\":{\"type\":\"VARIABLE_ALIAS\",\"id\":\"VariableID:10:5\"}}},{\"id\":\"VariableID:3:5\",\"name\":\"surface/elevated\",\"type\":\"COLOR\",\"values\":{\"3:0\":{\"type\":\"VARIABLE_ALIAS\",\"id\":\"VariableID:10:6\"}}},{\"id\":\"VariableID:3:6\",\"name\":\"text/primary\",\"type\":\"COLOR\",\"values\":{\"3:0\":{\"type\":\"VARIABLE_ALIAS\",\"id\":\"VariableID:10:7\"}}},{\"id\":\"VariableID:3:7\",\"name\":\"text/secondary\",\"type\":\"COLOR\",\"values\":{\"3:0\":{\"type\":\"VARIABLE_ALIAS\",\"id\":\"VariableID:10:8\"}}},{\"id\":\"VariableID:3:8\",\"name\":\"border/default\",\"type\":\"COLOR\",\"values\":{\"3:0\":{\"type\":\"VARIABLE_ALIAS\",\"id\":\"VariableID:10:9\"}}},{\"id\":\"VariableID:3:9\",\"name\":\"brand/primary\",\"type\":\"COLOR\",\"values\":{\"3:0\":{\"type\":\"VARIABLE_ALIAS\",\"id\":\"VariableID:10:10\"}}},{\"id\":\"VariableID:3:10\",\"name\":\"status/success\",\"type\":\"COLOR\",\"values\":{\"3:0\":{\"type\":\"VARIABLE_ALIAS\",\"id\":\"VariableID:10:11\"}}},{\"id\":\"VariableID:3:11\",\"name\":\"status/error\",\"type\":\"COLOR\",\"values\":{\"3:0\":{\"type\":\"VARIABLE_ALIAS\",\"id\":\"VariableID:10:12\"}}},{\"id\":\"VariableID:3:13\",\"name\":\"space/4\",\"type\":\"FLOAT\",\"values\":{\"3:1\":4}},{\"id\":\"VariableID:3:14\",\"name\":\"space/8\",\"type\":\"FLOAT\",\"values\":{\"3:1\":8}},{\"id\":\"VariableID:3:15\",\"name\":\"space/12\",\"type\":\"FLOAT\",\"values\":{\"3:1\":12}},{\"id\":\"VariableID:3:16\",\"name\":\"space/16\",\"type\":\"FLOAT\",\"values\":{\"3:1\":16}},{\"id\":\"VariableID:3:17\",\"name\":\"space/20\",\"type\":\"FLOAT\",\"values\":{\"3:1\":20}},{\"id\":\"VariableID:3:18\",\"name\":\"space/24\",\"type\":\"FLOAT\",\"values\":{\"3:1\":24}},{\"id\":\"VariableID:3:19\",\"name\":\"space/32\",\"type\":\"FLOAT\",\"values\":{\"3:1\":32}},{\"id\":\"VariableID:3:20\",\"name\":\"space/40\",\"type\":\"FLOAT\",\"values\":{\"3:1\":40}},{\"id\":\"VariableID:3:21\",\"name\":\"space/48\",\"type\":\"FLOAT\",\"values\":{\"3:1\":48}},{\"id\":\"VariableID:10:4\",\"name\":\"primitive/background/primary\",\"type\":\"COLOR\",\"values\":{\"10:0\":{\"r\":0.03921568766236305,\"g\":0.03921568766236305,\"b\":0.05098039284348488,\"a\":1}}},{\"id\":\"VariableID:10:5\",\"name\":\"primitive/surface/default\",\"type\":\"COLOR\",\"values\":{\"10:0\":{\"r\":0.07058823853731155,\"g\":0.07058823853731155,\"b\":0.09019608050584793,\"a\":1}}},{\"id\":\"VariableID:10:6\",\"name\":\"primitive/surface/elevated\",\"type\":\"COLOR\",\"values\":{\"10:0\":{\"r\":0.10980392247438431,\"g\":0.12156862765550613,\"b\":0.1411764770746231,\"a\":1}}},{\"id\":\"VariableID:10:7\",\"name\":\"primitive/text/primary\",\"type\":\"COLOR\",\"values\":{\"10:0\":{\"r\":1,\"g\":1,\"b\":1,\"a\":1}}},{\"id\":\"VariableID:10:8\",\"name\":\"primitive/text/secondary\",\"type\":\"COLOR\",\"values\":{\"10:0\":{\"r\":0.5490196347236633,\"g\":0.5686274766921997,\"b\":0.6196078658103943,\"a\":1}}},{\"id\":\"VariableID:10:9\",\"name\":\"primitive/border/default\",\"type\":\"COLOR\",\"values\":{\"10:0\":{\"r\":0.18039216101169586,\"g\":0.1882352977991104,\"b\":0.21960784494876862,\"a\":1}}},{\"id\":\"VariableID:10:10\",\"name\":\"primitive/brand/primary\",\"type\":\"COLOR\",\"values\":{\"10:0\":{\"r\":0.4901960790157318,\"g\":0.41960784792900085,\"b\":0.9411764740943909,\"a\":1}}},{\"id\":\"VariableID:10:11\",\"name\":\"primitive/status/success\",\"type\":\"COLOR\",\"values\":{\"10:0\":{\"r\":0.20000000298023224,\"g\":0.7803921699523926,\"b\":0.4000000059604645,\"a\":1}}},{\"id\":\"VariableID:10:12\",\"name\":\"primitive/status/error\",\"type\":\"COLOR\",\"values\":{\"10:0\":{\"r\":0.9411764740943909,\"g\":0.3294117748737335,\"b\":0.3294117748737335,\"a\":1}}},{\"id\":\"VariableID:10:13\",\"name\":\"radius/8\",\"type\":\"FLOAT\",\"values\":{\"10:1\":8}},{\"id\":\"VariableID:10:14\",\"name\":\"touch/44\",\"type\":\"FLOAT\",\"values\":{\"10:1\":44}}],\"styles\":[{\"id\":\"S:0534e52dea7e3bea05ebc3292ab7d0fe57c8a1bb,\",\"name\":\"Vaulta / Compact / Title\",\"size\":20},{\"id\":\"S:caa2f9579a8a24a67d64755d75aed58eff7dda7e,\",\"name\":\"Vaulta / Compact / Section\",\"size\":16},{\"id\":\"S:40335c167414c772bb5e0573fa06a3819141f9a5,\",\"name\":\"Vaulta / Compact / Product\",\"size\":13},{\"id\":\"S:129669875ec1d369e0752f795f397a5acf755c9b,\",\"name\":\"Vaulta / Compact / Price\",\"size\":18},{\"id\":\"S:2d55a9c689c584201ac2ddef3c2b01fa016adcc0,\",\"name\":\"Vaulta / Compact / Body\",\"size\":13},{\"id\":\"S:a331d9333da4890a5fdfcbe999c2c63686ebc92f,\",\"name\":\"Vaulta / Compact / Metadata\",\"size\":11}]}"
+      }
+    ],
+    "isError": false
+  },
+  "notion": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"pages\":[{\"id\":\"3ed6ef6d-792d-8163-a4ab-c4142b65b47f\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d8163a4abc4142b65b47f?pvs=204\",\"properties\":{\"title\":\"00 — Visão do produto\"}},{\"id\":\"3ed6ef6d-792d-81a0-916d-de35c994c5b5\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d81a0916dde35c994c5b5?pvs=204\",\"properties\":{\"title\":\"01 — Princípios de produto e UX\"}},{\"id\":\"3ed6ef6d-792d-8155-8a9e-ef5d98848eff\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d81558a9eef5d98848eff?pvs=204\",\"properties\":{\"title\":\"02 — Marketplace\"}},{\"id\":\"3ed6ef6d-792d-818d-962c-d6ac14defa87\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d818d962cd6ac14defa87?pvs=204\",\"properties\":{\"title\":\"03 — Scanner\"}},{\"id\":\"3ed6ef6d-792d-81ed-bbac-f6aaf1d61885\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d81edbbacf6aaf1d61885?pvs=204\",\"properties\":{\"title\":\"04 — Catálogo\"}},{\"id\":\"3ed6ef6d-792d-81e7-813f-e081c0ac4c60\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d81e7813fe081c0ac4c60?pvs=204\",\"properties\":{\"title\":\"05 — Coleção\"}},{\"id\":\"3ed6ef6d-792d-816d-9826-d4381fe7e3ae\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d816d9826d4381fe7e3ae?pvs=204\",\"properties\":{\"title\":\"06 — Precificação\"}},{\"id\":\"3ed6ef6d-792d-811d-bd77-eeebc267e8be\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d811dbd77eeebc267e8be?pvs=204\",\"properties\":{\"title\":\"07 — Pedidos e checkout\"}},{\"id\":\"3ed6ef6d-792d-81e8-92ac-f14663f31ea5\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d81e892acf14663f31ea5?pvs=204\",\"properties\":{\"title\":\"08 — Ofertas\"}},{\"id\":\"3ed6ef6d-792d-81bd-9daa-e1c7b243f8a6\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d81bd9daae1c7b243f8a6?pvs=204\",\"properties\":{\"title\":\"09 — Vendedores\"}},{\"id\":\"3ed6ef6d-792d-81bd-b23d-cde5311775c4\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d81bdb23dcde5311775c4?pvs=204\",\"properties\":{\"title\":\"10 — Pagamentos\"}},{\"id\":\"3ed6ef6d-792d-8194-8f44-fedfc47a3fd9\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d81948f44fedfc47a3fd9?pvs=204\",\"properties\":{\"title\":\"11 — Frete e entrega\"}},{\"id\":\"3ed6ef6d-792d-816a-bd05-faf0293bbab7\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d816abd05faf0293bbab7?pvs=204\",\"properties\":{\"title\":\"12 — Design system\"}},{\"id\":\"3ed6ef6d-792d-8177-ad1d-e7d0292eb47a\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d8177ad1de7d0292eb47a?pvs=204\",\"properties\":{\"title\":\"13 — Arquitetura técnica\"}},{\"id\":\"3ed6ef6d-792d-81df-97ea-d6f64a5a2806\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d81df97ead6f64a5a2806?pvs=204\",\"properties\":{\"title\":\"14 — AWS e IA\"}},{\"id\":\"3ed6ef6d-792d-81e4-ae93-faa70488fbd8\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d81e4ae93faa70488fbd8?pvs=204\",\"properties\":{\"title\":\"15 — Segurança e privacidade\"}},{\"id\":\"3ed6ef6d-792d-8140-9ae4-e547e9e6bf27\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d81409ae4e547e9e6bf27?pvs=204\",\"properties\":{\"title\":\"16 — Analytics\"}},{\"id\":\"3ed6ef6d-792d-8118-b969-c67b039d2ddb\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d8118b969c67b039d2ddb?pvs=204\",\"properties\":{\"title\":\"17 — Decisões\"}},{\"id\":\"3ed6ef6d-792d-812c-9546-f03a1b9fb9d2\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d812c9546f03a1b9fb9d2?pvs=204\",\"properties\":{\"title\":\"18 — Roadmap\"}},{\"id\":\"3ed6ef6d-792d-81a4-8b00-e034d365506c\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d81a48b00e034d365506c?pvs=204\",\"properties\":{\"title\":\"19 — Status de implementação\"}},{\"id\":\"3ed6ef6d-792d-8185-a10f-cc2dfda47194\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d8185a10fcc2dfda47194?pvs=204\",\"properties\":{\"title\":\"20 — Gaps e inconsistências\"}}]}"
+      }
+    ],
+    "isError": false
+  },
+  "gaps": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"pages\":[{\"id\":\"3ed6ef6d-792d-81b5-997d-ee47cab4b1ac\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d81b5997dee47cab4b1ac?pvs=204\",\"properties\":{\"Title\":\"Frete antes da compra\",\"Area\":\"Orders\",\"Type\":\"Product\",\"Severity\":\"P0\",\"Status\":\"Open\",\"Description\":\"Frete antes da compra\",\"Current Behavior\":\"Total atual não inclui frete.\",\"Expected Behavior\":\"Cotação, prazo e total claros antes de pagar.\",\"Dependency\":\"Política de frete e provedor\",\"Target Milestone\":\"Próxima execução P0\",\"GitHub\":\"https://github.com/FellipeVieira2/Vaulta\",\"Figma\":\"https://www.figma.com/design/Ey1vEJNXx1oaSZbODMamWY?node-id=0-1\"}},{\"id\":\"3ed6ef6d-792d-81c8-8c99-ebefe4bbabd0\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d81c88c99ebefe4bbabd0?pvs=204\",\"properties\":{\"Title\":\"Expiração da reserva\",\"Area\":\"Orders\",\"Type\":\"Technical\",\"Severity\":\"P0\",\"Status\":\"Open\",\"Description\":\"Expiração da reserva\",\"Current Behavior\":\"TTL existe; regra operacional incompleta.\",\"Expected Behavior\":\"Liberar unidade de pedido expirado sem corrida.\",\"Dependency\":\"Pedidos, pagamento e idempotência\",\"Target Milestone\":\"Próxima execução P0\",\"GitHub\":\"https://github.com/FellipeVieira2/Vaulta\",\"Figma\":\"https://www.figma.com/design/Ey1vEJNXx1oaSZbODMamWY?node-id=0-1\"}},{\"id\":\"3ed6ef6d-792d-8193-936d-db8d290fe7c3\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d8193936ddb8d290fe7c3?pvs=204\",\"properties\":{\"Title\":\"Scanner → unidade → anúncio\",\"Area\":\"Scanner\",\"Type\":\"Technical\",\"Severity\":\"P0\",\"Status\":\"Open\",\"Description\":\"Scanner → unidade → anúncio\",\"Current Behavior\":\"Identidade não equivale à unidade física do vendedor.\",\"Expected Behavior\":\"Garantir posse e vínculo idempotente ao vender.\",\"Dependency\":\"Collection / Marketplace\",\"Target Milestone\":\"Próxima execução P0\",\"GitHub\":\"https://github.com/FellipeVieira2/Vaulta\",\"Figma\":\"https://www.figma.com/design/Ey1vEJNXx1oaSZbODMamWY?node-id=0-1\"}},{\"id\":\"3ed6ef6d-792d-8130-97d4-f01447affefd\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d813097d4f01447affefd?pvs=204\",\"properties\":{\"Title\":\"Busca e Home enriquecida\",\"Area\":\"Marketplace\",\"Type\":\"Technical\",\"Severity\":\"P0\",\"Status\":\"Open\",\"Description\":\"Busca e Home enriquecida\",\"Current Behavior\":\"Filtros atuais não cobrem toda a busca visual.\",\"Expected Behavior\":\"Busca paginada com impressão, artwork e reputação.\",\"Dependency\":\"Contrato de consulta e índices\",\"Target Milestone\":\"Próxima execução P0\",\"GitHub\":\"https://github.com/FellipeVieira2/Vaulta\",\"Figma\":\"https://www.figma.com/design/Ey1vEJNXx1oaSZbODMamWY?node-id=0-1\"}},{\"id\":\"3ed6ef6d-792d-8143-9156-de6a810b312b\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d81439156de6a810b312b?pvs=204\",\"properties\":{\"Title\":\"Cotação disponível em produção\",\"Area\":\"Pricing\",\"Type\":\"Technical\",\"Severity\":\"P0\",\"Status\":\"Open\",\"Description\":\"Cotação disponível em produção\",\"Current Behavior\":\"Rotas novas documentadas como 404; código local tem snapshots.\",\"Expected Behavior\":\"Rotas validadas em ambiente alvo com origem e data.\",\"Dependency\":\"Publicação e validação operacional\",\"Target Milestone\":\"Próxima execução P0\",\"GitHub\":\"https://github.com/FellipeVieira2/Vaulta\",\"Figma\":\"https://www.figma.com/design/Ey1vEJNXx1oaSZbODMamWY?node-id=0-1\"}},{\"id\":\"3ed6ef6d-792d-813d-902f-e1df686eefeb\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d813d902fe1df686eefeb?pvs=204\",\"properties\":{\"Title\":\"Histórico de mercado e acervo\",\"Area\":\"Pricing\",\"Type\":\"Technical\",\"Severity\":\"P1\",\"Status\":\"Open\",\"Description\":\"Histórico de mercado e acervo\",\"Current Behavior\":\"Snapshots não oferecem toda a série para gráficos.\",\"Expected Behavior\":\"Séries consultáveis com tratamento de cotação ausente.\",\"Dependency\":\"Consultas e modelagem de acervo\",\"Target Milestone\":\"Expansão P1\",\"GitHub\":\"https://github.com/FellipeVieira2/Vaulta\",\"Figma\":\"https://www.figma.com/design/Ey1vEJNXx1oaSZbODMamWY?node-id=0-1\"}},{\"id\":\"3ed6ef6d-792d-8127-ad72-cc2b7f8e2ad2\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d8127ad72cc2b7f8e2ad2?pvs=204\",\"properties\":{\"Title\":\"Tokens Figma / MAUI\",\"Area\":\"Design\",\"Type\":\"Design\",\"Severity\":\"P0\",\"Status\":\"Open\",\"Description\":\"Tokens Figma / MAUI\",\"Current Behavior\":\"Figma roxo e MAUI ciano divergem.\",\"Expected Behavior\":\"Tokens com nomes e valores alinhados e contraste validado.\",\"Dependency\":\"Decisão visual e migração\",\"Target Milestone\":\"Próxima execução P0\",\"GitHub\":\"https://github.com/FellipeVieira2/Vaulta\",\"Figma\":\"https://www.figma.com/design/Ey1vEJNXx1oaSZbODMamWY?node-id=0-1\"}},{\"id\":\"3ed6ef6d-792d-8149-946a-c9fc6c5314cf\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d8149946ac9fc6c5314cf?pvs=204\",\"properties\":{\"Title\":\"IA Nova avaliada\",\"Area\":\"AWS\",\"Type\":\"Technical\",\"Severity\":\"P1\",\"Status\":\"Open\",\"Description\":\"IA Nova avaliada\",\"Current Behavior\":\"OCR implementado; Bedrock não integrado.\",\"Expected Behavior\":\"Benchmark de precisão, latência e custo antes de selecionar.\",\"Dependency\":\"Dataset, região, modelo e segurança\",\"Target Milestone\":\"Expansão P1\",\"GitHub\":\"https://github.com/FellipeVieira2/Vaulta\",\"Figma\":\"https://www.figma.com/design/Ey1vEJNXx1oaSZbODMamWY?node-id=0-1\"}},{\"id\":\"3ed6ef6d-792d-81f2-8f25-f7eef9246894\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d81f28f25f7eef9246894?pvs=204\",\"properties\":{\"Title\":\"Privacidade da câmera\",\"Area\":\"Security\",\"Type\":\"Product\",\"Severity\":\"P0\",\"Status\":\"Open\",\"Description\":\"Privacidade da câmera\",\"Current Behavior\":\"Retenção e finalidade de gravação precisam de política.\",\"Expected Behavior\":\"Gravação opt-in e mídia protegida com exclusão.\",\"Dependency\":\"Consentimento e armazenamento\",\"Target Milestone\":\"Próxima execução P0\",\"GitHub\":\"https://github.com/FellipeVieira2/Vaulta\",\"Figma\":\"https://www.figma.com/design/Ey1vEJNXx1oaSZbODMamWY?node-id=0-1\"}},{\"id\":\"3ed6ef6d-792d-8100-863a-e932b866dcae\",\"url\":\"https://app.notion.com/p/3ed6ef6d792d8100863ae932b866dcae?pvs=204\",\"properties\":{\"Title\":\"Acessibilidade nativa\",\"Area\":\"Design\",\"Type\":\"Design\",\"Severity\":\"P0\",\"Status\":\"Open\",\"Description\":\"Acessibilidade nativa\",\"Current Behavior\":\"Frames conferidos visualmente; app nativo não testado.\",\"Expected Behavior\":\"Fonte ampliada, leitor de tela e alvos de toque verificados.\",\"Dependency\":\"Implementação MAUI e dispositivos\",\"Target Milestone\":\"Próxima execução P0\",\"GitHub\":\"https://github.com/FellipeVieira2/Vaulta\",\"Figma\":\"https://www.figma.com/design/Ey1vEJNXx1oaSZbODMamWY?node-id=0-1\"}}]}"
+      }
+    ],
+    "isError": false
+  },
+  "tldraw": {
+    "id": "tKrHPaOm1vyg9K9zwAUzA",
+    "url": "https://www.tldraw.com/f/tKrHPaOm1vyg9K9zwAUzA"
+  },
+  "magicpath": {
+    "projectId": "456589685570015232",
+    "components": [
+      "456589876406665216",
+      "456590087627636736",
+      "456590091880636416"
+    ],
+    "status": "Build completed; native previews inspected",
+    "externalUpload": "Explicitly authorized by user"
+  },
+  "foundation": {
+    "changed": [
+      "VariableID:10:4",
+      "VariableID:10:5",
+      "VariableID:10:6",
+      "VariableID:10:7",
+      "VariableID:10:8",
+      "VariableID:10:9",
+      "VariableID:10:10",
+      "VariableID:10:11",
+      "VariableID:10:12",
+      "VariableID:10:13",
+      "VariableID:10:14",
+      "S:0534e52dea7e3bea05ebc3292ab7d0fe57c8a1bb,",
+      "S:caa2f9579a8a24a67d64755d75aed58eff7dda7e,",
+      "S:40335c167414c772bb5e0573fa06a3819141f9a5,",
+      "S:129669875ec1d369e0752f795f397a5acf755c9b,",
+      "S:2d55a9c689c584201ac2ddef3c2b01fa016adcc0,",
+      "S:a331d9333da4890a5fdfcbe999c2c63686ebc92f,",
+      "10:21",
+      "10:26",
+      "10:30",
+      "10:35",
+      "10:39",
+      "10:43",
+      "10:47",
+      "10:50",
+      "10:53",
+      "10:57",
+      "3:25",
+      "3:27",
+      "3:29",
+      "3:34",
+      "3:41"
+    ],
+    "icons": {
+      "tab_profile": "10:21",
+      "icon-arrow-left": "10:26",
+      "tab_collection": "10:30",
+      "tab_home": "10:35",
+      "icon-video": "10:39",
+      "icon-x": "10:43",
+      "icon-heart": "10:47",
+      "icon-chevron-right": "10:50",
+      "icon-plus": "10:53",
+      "icon-search": "10:57"
+    },
+    "hashes": {
+      "sv03-223": "5fb54979c102eaf3a0d7c3055682d62e96fa01e8",
+      "swsh7-215": "1a18dede69392a11e2d780033dbb2896f6d81bcd",
+      "swsh8-271": "6bb100f996ca568852fe8001e34d045d9a66038e",
+      "swshp-SWSH020": "965646b05f7790010072251fe89e038a7bc3ca7f"
+    },
+    "styles": {
+      "Title": "S:0534e52dea7e3bea05ebc3292ab7d0fe57c8a1bb,",
+      "Section": "S:caa2f9579a8a24a67d64755d75aed58eff7dda7e,",
+      "Product": "S:40335c167414c772bb5e0573fa06a3819141f9a5,",
+      "Price": "S:129669875ec1d369e0752f795f397a5acf755c9b,",
+      "Body": "S:2d55a9c689c584201ac2ddef3c2b01fa016adcc0,",
+      "Metadata": "S:a331d9333da4890a5fdfcbe999c2c63686ebc92f,"
+    },
+    "listingSize": {
+      "w": 171,
+      "h": 246
+    },
+    "collections": [
+      "VariableCollectionId:10:2",
+      "VariableCollectionId:10:3"
+    ]
+  }
+}

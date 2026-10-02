@@ -50,11 +50,11 @@ public sealed partial class ScannerSessionPage
 
         var root = new Grid(); root.Children.Add(camera);
         var overlay = new Grid { RowDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) } };
-        var top = new Grid { Padding = new Thickness(18, 22, 18, 10), ColumnSpacing = 12,
+        var top = new Grid { Padding = new Thickness(16, 12, 16, 8), ColumnSpacing = 12,
             ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star) } };
-        var brand = new VerticalStackLayout { Spacing = 5, Children = { Text("VAULTA", 19, Colors.White, true), Text("PACK OPENING", 10, Color.FromArgb("#BBA4FF"), true), _count } };
+        var brand = new VerticalStackLayout { Spacing = 3, Children = { Text("VAULTA", 16, Colors.White, true), Text("PACK OPENING", 8, Color.FromArgb("#BBA4FF"), true), _count } };
         var exit = Action("Sair", () => Shell.Current.GoToAsync("..")); exit.FontSize = 12; exit.Padding = new Thickness(10, 4);
-        exit.HorizontalOptions = LayoutOptions.Start; brand.Children.Add(exit);
+        exit.MinimumHeightRequest = 36; exit.HorizontalOptions = LayoutOptions.Start; brand.Children.Add(exit);
         var score = new VerticalStackLayout { Spacing = 5 };
         var caption = Text("VALOR DAS CARTAS", 9, Color.FromArgb("#BBA4FF"), true); caption.HorizontalTextAlignment = TextAlignment.End;
         _total.FontSize = 28; _total.LineBreakMode = LineBreakMode.NoWrap;
@@ -75,40 +75,44 @@ public sealed partial class ScannerSessionPage
         _revealPanel.Stroke = Color.FromArgb("#C8B1FF"); _revealPanel.StrokeThickness = 1.5;
         center.Children.Add(_revealPanel); overlay.Add(center, 0, 1);
 
-        var bottom = new VerticalStackLayout { Padding = new Thickness(18, 8, 18, 20), Spacing = 10 };
+        var bottom = new VerticalStackLayout { Padding = new Thickness(16, 6, 16, 12), Spacing = 7 };
         _lastCard.MaxLines = 1; _lastCard.LineBreakMode = LineBreakMode.TailTruncation;
         _lastCardPanel = Surface(_lastCard, "#D9111520"); _lastCardPanel.IsVisible = false; bottom.Children.Add(_lastCardPanel);
-        var scroll = new ScrollView { Content = _result, MaximumHeightRequest = Math.Clamp(Height * 0.38, 180, 340) };
-        _resultPanel = Surface(scroll, "#F0080911"); _resultPanel.IsVisible = false; bottom.Children.Add(_resultPanel);
+        var scroll = new ScrollView { Content = _result, MaximumHeightRequest = 300 };
+        _resultPanel = Surface(scroll, "#F0080911"); _resultPanel.IsVisible = false;
+        // Results float over the camera area; opening them must not collapse
+        // the guide into the tiny frame observed on a physical phone.
+        _resultPanel.VerticalOptions = LayoutOptions.End; _resultPanel.Margin = new Thickness(16, 0, 16, 8);
+        overlay.Add(_resultPanel, 0, 1);
         _status.FontSize = 12; bottom.Children.Add(Surface(_status, "#CE080911"));
-        var reading = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star) }, ColumnSpacing = 10 };
-        Button? automatic = null;
-        automatic = Action(_continuousEnabled ? "Pausar leitura" : "Leitura contínua", () =>
-        {
-            _continuousEnabled = !_continuousEnabled; automatic!.Text = _continuousEnabled ? "Pausar leitura" : "Leitura contínua";
-            _status.Text = _continuousEnabled ? "Mostre uma carta e mantenha por um instante." : "Leitura pausada. Use Identificar quando quiser.";
-            return Task.CompletedTask;
-        });
-        reading.Add(automatic); reading.Add(Action("Identificar agora", CaptureCard), 1, 0); bottom.Children.Add(reading);
         var actions = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star) }, ColumnSpacing = 10 };
-        actions.Add(Action("Buscar pelo nome", Search)); actions.Add(Action("Revisar e finalizar", Finish), 1, 0); bottom.Children.Add(actions);
-        var utilities = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star) }, ColumnSpacing = 10 };
-        var sound = Action(_soundEnabled ? "Som ligado" : "Som desligado", () =>
+        actions.Add(Action("Buscar carta", Search)); actions.Add(Action("Finalizar", Finish), 1, 0); bottom.Children.Add(actions);
+        var options = Action("Opções da sessão", async () =>
         {
-            _soundEnabled = !_soundEnabled; Preferences.Default.Set("scanner-session-sound", _soundEnabled);
-            return Task.CompletedTask;
+            var choice = await DisplayActionSheetAsync("Sessão", "Voltar", null,
+                _soundEnabled ? "Desligar som" : "Ligar som", "Pacotes e custo", "Capturar novamente", "Nova sessão");
+            if (choice is "Desligar som" or "Ligar som")
+            { _soundEnabled = !_soundEnabled; Preferences.Default.Set("scanner-session-sound", _soundEnabled); }
+            else if (choice == "Pacotes e custo")
+            { RequireOwner(); await StopRecording(); RequireOwner(); ShowSetup(); }
+            else if (choice == "Capturar novamente") await CaptureCard();
+            else if (choice == "Nova sessão") { await StopRecording(); RequireOwner(); _session = null; ShowSetup(); }
         });
-        sound.Clicked += (_, _) => { sound.Text = _soundEnabled ? "Som ligado" : "Som desligado"; SemanticProperties.SetDescription(sound, sound.Text); };
-        sound.FontSize = 12; sound.BackgroundColor = Colors.Transparent;
-        var editCost = Action("Pacotes e custo", async () => { RequireOwner(); await StopRecording(); RequireOwner(); ShowSetup(); }); editCost.FontSize = 12; editCost.BackgroundColor = Colors.Transparent;
-        utilities.Add(sound); utilities.Add(editCost, 1, 0); bottom.Children.Add(utilities);
-        var recording = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) }, ColumnSpacing = 10 };
+        options.FontSize = 11; options.MinimumHeightRequest = 40; options.Padding = new Thickness(8, 4); options.BackgroundColor = Colors.Transparent;
+        var recording = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) }, ColumnSpacing = 8 };
         _recordButton = Action("Gravar com voz e efeitos", ToggleRecording); _recordButton.BackgroundColor = Color.FromArgb("#472339");
-        recording.Add(_recordButton); _videoClock.Text = ""; recording.Add(_videoClock, 1, 0); bottom.Children.Add(recording);
+        _recordButton.FontSize = 12; _recordButton.MinimumHeightRequest = 42; _recordButton.Padding = new Thickness(10, 6);
+        recording.Add(_recordButton); recording.Add(options, 1, 0); bottom.Children.Add(recording);
+        _videoClock.Text = ""; bottom.Children.Add(_videoClock);
         overlay.Add(bottom, 0, 2); root.Children.Add(overlay);
         _revealCanvas = new GraphicsView { Drawable = _revealDrawing, InputTransparent = true }; root.Children.Add(_revealCanvas);
         Content = root; UpdateScore();
-        if (_session!.Cards.LastOrDefault() is { } latest) ShowLastCard(latest);
+        if (_session!.Cards.LastOrDefault() is { } latest)
+        {
+            ShowLastCard(latest);
+            ShowLiquidityActions(latest);
+            _status.Text = "Retome esta carta ou toque em Próxima carta para continuar.";
+        }
     }
 
     private void ClearResults()

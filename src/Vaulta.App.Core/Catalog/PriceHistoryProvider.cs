@@ -1,9 +1,7 @@
 namespace Vaulta.App.Core.Catalog;
 
 /// <summary>
-/// Provides simulated price history data for charts until a real backend endpoint is available.
-/// Generates deterministic, realistic-looking time series based on the input key so the same
-/// card/filter always shows the same chart (avoiding visual jitter on re-renders).
+/// Provides verified price history for charts. An empty result means history is unavailable.
 /// </summary>
 public interface IPriceHistoryProvider
 {
@@ -14,6 +12,19 @@ public interface IPriceHistoryProvider
 
 public sealed record PricePoint(DateTimeOffset Date, double Value, string? Label = null);
 
+/// <summary>
+/// Production fallback while verified backend history is unavailable.
+/// </summary>
+public sealed class UnavailablePriceHistoryProvider : IPriceHistoryProvider
+{
+    public IReadOnlyList<PricePoint> GetPortfolioHistory(int days = 30) => [];
+    public IReadOnlyList<PricePoint> GetCardPriceHistory(Guid printingId, int days = 30) => [];
+    public IReadOnlyList<PricePoint> GetFilterPriceHistory(string filterKey, int days = 30) => [];
+}
+
+/// <summary>
+/// Explicit demo/test data only. Never register as the production price-history provider.
+/// </summary>
 public sealed class SimulatedPriceHistoryProvider : IPriceHistoryProvider
 {
     public IReadOnlyList<PricePoint> GetPortfolioHistory(int days = 30)

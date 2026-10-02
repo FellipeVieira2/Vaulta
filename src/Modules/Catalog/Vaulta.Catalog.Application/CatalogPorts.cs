@@ -5,6 +5,7 @@ namespace Vaulta.Catalog.Application;
 public interface ICatalogProvider
 {
     string Code { get; }
+    string? Language => null;
     Task<IReadOnlyList<ProviderSet>> GetSets(CancellationToken cancellationToken);
     Task<ProviderSetDetails> GetSetDetails(string setId, CancellationToken cancellationToken);
 }

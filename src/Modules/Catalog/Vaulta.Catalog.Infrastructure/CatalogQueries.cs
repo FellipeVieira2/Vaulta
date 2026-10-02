@@ -14,16 +14,17 @@ internal sealed class CatalogQueries(CatalogDbContext db) : ICatalogSearch, ICat
         var numberPattern = string.IsNullOrEmpty(number) ? null : "^0*" + System.Text.RegularExpressions.Regex.Escape(number) + "(?:/.*)?$";
         var matches = await db.Printings.AsNoTracking()
             .Where(x => x.IsActive && x.Card.Game.Code == gameCode)
-            .Where(x => EF.Functions.TrigramsSimilarity(x.Card.NormalizedName, normalizedName) >= 0.25
-                || (numberPattern != null && System.Text.RegularExpressions.Regex.IsMatch(x.NormalizedCollectorNumber, numberPattern)))
+            .Where(x => EF.Functions.TrigramsSimilarity(x.Card.NormalizedName, normalizedName) >= 0.25)
+            .Where(x => numberPattern == null || System.Text.RegularExpressions.Regex.IsMatch(x.NormalizedCollectorNumber, numberPattern))
             .OrderByDescending(x => EF.Functions.TrigramsSimilarity(x.Card.NormalizedName, normalizedName))
             .ThenBy(x => x.Id).Take(50)
             .Select(x => new
             {
                 Card = new CatalogSearchResult(x.Id, x.Card.Game.Code, x.SetId, x.Set.Name, x.Card.Name, x.CollectorNumber, x.Language, x.Rarity, x.ExternalArtworkUrl),
+                ProviderSetId = db.ExternalIds.Where(e => e.Provider == "tcgdex" && e.EntityType == "set" && e.EntityId == x.SetId).Select(e => e.ExternalId).SingleOrDefault(),
                 Variants = x.Variants.Where(v => v.IsActive).OrderBy(v => v.Code).Select(v => v.Code).ToArray()
             }).ToArrayAsync(cancellationToken);
-        return matches.Select(x => new RecognitionCatalogCard(x.Card, x.Variants)).ToArray();
+        return matches.Select(x => new RecognitionCatalogCard(x.Card, x.Variants, x.ProviderSetId)).ToArray();
     }
 
     public async Task<CatalogSearchPage> Search(string query, string? gameCode, int page, int pageSize, CancellationToken cancellationToken)
@@ -69,9 +70,12 @@ internal sealed class CatalogQueries(CatalogDbContext db) : ICatalogSearch, ICat
         {
             var normalized = Vaulta.Catalog.Domain.CatalogNormalizer.NormalizeName(query);
             if (normalized.Length == 0) return [];
-            printings = printings.Where(x => x.Card.NormalizedName.Contains(normalized));
+            var number = Vaulta.Catalog.Domain.CatalogNormalizer.NormalizeCollectorNumber(query);
+            printings = printings.Where(x => x.Card.NormalizedName.Contains(normalized)
+                || x.Set.NormalizedName.Contains(normalized)
+                || x.NormalizedCollectorNumber.Contains(number));
         }
-        if (!string.IsNullOrWhiteSpace(gameCode)) printings = printings.Where(x => x.Card.Game.Code == gameCode.ToLowerInvariant());
+        if (!string.IsNullOrWhiteSpace(gameCode)) printings = printings.Where(x => x.Card.Game.Code == gameCode.Trim().ToLowerInvariant());
         if (setId is { } id) printings = printings.Where(x => x.SetId == id);
         return await printings.Select(x => x.Id).ToArrayAsync(cancellationToken);
     }

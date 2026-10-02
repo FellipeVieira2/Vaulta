@@ -18,6 +18,7 @@ public static class DependencyInjection
         services.AddScoped<IMarketplaceReputation, MarketplaceReputationAdapter>();
         services.AddScoped<MarketplaceCommandHandlers>();
         services.AddScoped<ListingPublicationService>();
+        services.AddScoped<ListingDraftHandlers>();
         if (configuration.GetValue("Marketplace:CollectionWorkerEnabled", true)) services.AddHostedService<ListingCollectionWorker>();
         return services;
     }

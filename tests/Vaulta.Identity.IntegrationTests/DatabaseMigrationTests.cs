@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -5,7 +6,6 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
-using Testcontainers.PostgreSql;
 using Vaulta.Assets.Infrastructure;
 using Vaulta.Catalog.Infrastructure;
 using Vaulta.Collection.Infrastructure;
@@ -30,14 +30,19 @@ public sealed class DatabaseMigrationTests
     [InlineData(true)]
     public async Task MigratesAllModulesAndCanRepeatWithoutLosingData(bool existingFourModuleDatabase)
     {
-        await using var postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
-        await postgres.StartAsync();
+        await using var postgres = await TestPostgresDatabase.Start();
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:Vaulta"] = postgres.GetConnectionString(),
+                ["ConnectionStrings:Vaulta"] = postgres.ConnectionString,
+                ["Jwt:Secret"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48)),
+                ["Payouts:WorkerEnabled"] = "false",
+                ["Refunds:WorkerEnabled"] = "false",
+                ["Orders:ReleaseWorkerEnabled"] = "false",
+                ["Orders:CollectionWorkerEnabled"] = "false",
+                ["Marketplace:CollectionWorkerEnabled"] = "false",
                 ["Database:ApplyMigrations"] = "false",
                 ["Outbox:Enabled"] = "false"
             }));
@@ -54,7 +59,15 @@ public sealed class DatabaseMigrationTests
             await legacyScope.ServiceProvider.GetRequiredService<AssetsDbContext>().Database.MigrateAsync();
             await legacyScope.ServiceProvider.GetRequiredService<CollectionDbContext>().Database.MigrateAsync();
             userId = await AddUser(identity);
-            Assert.Equal(11, (await identity.Database.GetAppliedMigrationsAsync()).Count());
+            DbContext[] legacyContexts =
+            [
+                identity,
+                legacyScope.ServiceProvider.GetRequiredService<CatalogDbContext>(),
+                legacyScope.ServiceProvider.GetRequiredService<AssetsDbContext>(),
+                legacyScope.ServiceProvider.GetRequiredService<CollectionDbContext>()
+            ];
+            var expectedLegacyMigrations = legacyContexts.SelectMany(db => db.Database.GetMigrations()).Order().ToArray();
+            Assert.Equal(expectedLegacyMigrations, (await identity.Database.GetAppliedMigrationsAsync()).Order().ToArray());
         }
 
         await DatabaseMigrations.ApplyAsync(factory.Services);
@@ -96,7 +109,7 @@ public sealed class DatabaseMigrationTests
         var expectedMigrations = contexts.SelectMany(db => db.Database.GetMigrations()).Order().ToArray();
         Assert.Equal(expectedMigrations, historyBeforeRepeat.Order().ToArray());
 
-        await using var connection = new NpgsqlConnection(postgres.GetConnectionString());
+        await using var connection = new NpgsqlConnection(postgres.ConnectionString);
         await connection.OpenAsync();
         await using var command = new NpgsqlCommand("SELECT table_schema, table_name, column_name FROM information_schema.columns", connection);
         await using var reader = await command.ExecuteReaderAsync();

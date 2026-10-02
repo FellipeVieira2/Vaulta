@@ -1,0 +1,41 @@
+import { useState } from 'react';
+import charizard from '../../../assets/sv03-223.webp';
+import umbreon from '../../../assets/swsh7-215.webp';
+import gengar from '../../../assets/swsh8-271.webp';
+import pikachu from '../../../assets/swshp-SWSH020.webp';
+import searchIcon from '../../../assets/icon-search.svg';
+import plusIcon from '../../../assets/icon-plus.svg';
+import homeIcon from '../../../assets/tab_home.svg';
+import collectionIcon from '../../../assets/tab_collection.svg';
+import profileIcon from '../../../assets/tab_profile.svg';
+
+const cards = [
+ {name:'Charizard ex',set:'223/197 · Obsidian Flames',image:charizard,price:'R$ 289,90',condition:'NM',seller:'Fellipe',rating:'4,9 · 18 avaliações'},
+ {name:'Umbreon VMAX',set:'215/203 · Evolving Skies',image:umbreon,price:'R$ 1.249,90',condition:'LP',seller:'CardHouse',rating:'5,0 · 42 avaliações'},
+ {name:'Gengar VMAX',set:'271/264 · Fusion Strike',image:gengar,price:'R$ 485,00',condition:'NM',seller:'João',rating:'4,8 · 12 avaliações'},
+ {name:'Pikachu',set:'SWSH020 · Promo',image:pikachu,price:'R$ 159,00',condition:'NM',seller:'Ana',rating:'Sem avaliações'},
+];
+
+export function MarketplaceExploration({mode}:{mode:'grid'|'feed'|'hybrid'}) {
+ const [query,setQuery]=useState(''); const [selected,setSelected]=useState<number|null>(null);
+ const [message,setMessage]=useState(''); const [sort,setSort]=useState('recent');
+ const filtered=cards.map((card,id)=>({...card,id})).filter(c=>(c.name+' '+c.set+' '+c.seller).toLowerCase().includes(query.toLowerCase()));
+ if(sort==='price') filtered.sort((a,b)=>Number(a.price.replace(/[^0-9]/g,''))-Number(b.price.replace(/[^0-9]/g,'')));
+ const icon=(src:string)=><img src={src} alt="" width="20" height="20" style={{filter:'brightness(0) invert(1)'}}/>;
+ const card=(c:typeof filtered[number],row=false)=><button key={c.id} onClick={()=>setSelected(c.id)} className="text-left focus-visible:outline-2 focus-visible:outline-[#9987FA]" style={{display:row?'flex':'block',gap:12,width:'100%',borderBottom:row?'1px solid #2E3038':'none',paddingBottom:row?12:0,background:'transparent',color:'#fff'}}>
+  <img src={c.image} alt={c.name+' — '+c.set} style={{width:row?64:'100%',height:row?90:mode==='hybrid'?130:166,objectFit:'contain',background:'#121217',borderRadius:8,marginBottom:row?0:8}}/>
+  <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600,lineHeight:'18px'}}>{c.name}</div>{row&&<div style={{fontSize:11,color:'#B2B8C2',marginTop:2}}>{c.set}</div>}<div style={{fontSize:17,fontWeight:700,marginTop:4}}>{c.price}</div><div style={{fontSize:11,color:'#B2B8C2',marginTop:3}}>{c.condition} · Inglês · {c.seller}</div><div style={{fontSize:11,color:'#B2B8C2',marginTop:3}}>{c.rating}</div></div>
+ </button>;
+ const title=mode==='feed'?'Compare e encontre sua carta':mode==='hybrid'?'Descubra sua próxima carta':'Recém anunciadas';
+ return <main style={{background:'#0A0A0D',color:'#fff',fontFamily:'Inter, sans-serif',width:'100%',maxWidth:430,minHeight:844,position:'relative',margin:'auto',padding:'16px 16px 100px',boxSizing:'border-box'}}>
+ <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}><strong style={{fontSize:21,letterSpacing:1}}>VAULTA</strong><button onClick={()=>setMessage('Perfil: compras, vendas e repasses.')} aria-label="Abrir perfil" style={{padding:12}}>{icon(profileIcon)}</button></div>
+ <div style={{fontSize:10,color:'#B2B8C2',marginBottom:12}}>Protótipo · preços e vendedores ilustrativos</div>
+ <label style={{display:'flex',alignItems:'center',gap:8,border:'1px solid #2E3038',borderRadius:8,height:44,padding:'0 12px',background:'#121217'}}>{icon(searchIcon)}<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar carta, set ou vendedor" aria-label="Buscar anúncios" style={{background:'transparent',border:0,color:'#fff',width:'100%',fontSize:13,outline:'none'}}/></label>
+ <div style={{display:'flex',gap:6,marginTop:12,marginBottom:16}}>{['Pokémon','Yu-Gi-Oh!','One Piece','Magic'].map((g,i)=><button key={g} disabled={i!==0} style={{fontSize:11,padding:'8px 10px',borderRadius:6,border:'1px solid '+(i===0?'#7D6BF0':'#2E3038'),color:i===0?'#fff':'#B2B8C2',opacity:i===0?1:.65,background:i===0?'#382B7D':'#121217'}} title={i===0?'Filtrar Pokémon':'Catálogo ainda não conectado'}>{g}</button>)}</div>
+ <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><h1 style={{fontSize:16,fontWeight:600,margin:0}}>{title}</h1><select value={sort} onChange={e=>setSort(e.target.value)} aria-label="Ordenar anúncios" style={{fontSize:11,background:'#121217',border:'1px solid #2E3038',color:'#B2B8C2',padding:6,borderRadius:6}}><option value="recent">Recentes</option><option value="price">Menor preço</option></select></div>
+ {filtered.length===0?<div role="status" style={{padding:'40px 0',fontSize:14}}>Nenhum anúncio encontrado.<button onClick={()=>setQuery('')} style={{display:'block',color:'#9987FA',marginTop:12}}>Limpar busca</button></div>:mode==='feed'?<div style={{display:'grid',gap:12}}>{[...filtered,...filtered.slice(0,2)].map((c,i)=> <div key={i}>{card(c,true)}</div>)}</div>:mode==='hybrid'?<><div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:8}}>{filtered.slice(0,3).map(c=>card(c))}</div><h2 style={{fontSize:16,margin:'24px 0 12px'}}>Compare vendedores</h2><div style={{fontSize:11,color:'#B2B8C2',marginBottom:12}}>Charizard ex · mesma impressão e idioma</div>{['Fellipe · NM · R$ 289,90','João · LP · R$ 274,00','CardHouse · NM · R$ 295,00'].map(row=><button key={row} onClick={()=>setSelected(0)} style={{width:'100%',textAlign:'left',padding:'16px 0',borderBottom:'1px solid #2E3038',fontSize:13}}>{row}</button>)}<h2 style={{fontSize:16,margin:'24px 0 12px'}}>Recém anunciada</h2>{filtered.slice(-1).map(c=>card(c,true))}</>:<div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:'20px 12px'}}>{filtered.map(c=>card(c))}</div>}
+ {message&&<div role="status" style={{padding:12,marginTop:16,border:'1px solid #7D6BF0',fontSize:13,borderRadius:8}}>{message}<button onClick={()=>setMessage('')} aria-label="Fechar aviso" style={{float:'right'}}>Fechar</button></div>}
+ <nav aria-label="Navegação principal" style={{position:'absolute',bottom:0,left:0,right:0,display:'flex',justifyContent:'space-around',height:78,paddingBottom:12,alignItems:'center',background:'#121217',borderTop:'1px solid #2E3038'}}>{[['Início',homeIcon],['Buscar',searchIcon],['Vender',plusIcon],['Coleção',collectionIcon],['Perfil',profileIcon]].map(([label,src])=><button key={label} onClick={()=>{if(label==='Início'){setQuery('');setMessage('');}else if(label==='Buscar')document.querySelector<HTMLInputElement>('input')?.focus();else setMessage(label==='Vender'?'Aponte a carta. Identifique, ajuste condição e preço, fotografe e revise.':label+': próxima etapa P0.');}} style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4,minWidth:54,minHeight:48,fontSize:11,color:label==='Início'?'#fff':'#B2B8C2',background:label==='Vender'?'#7D6BF0':'transparent',borderRadius:8,padding:6}}>{icon(src)}{label}</button>)}</nav>
+ {selected!==null&&<div role="dialog" aria-modal="true" aria-label="Detalhe do anúncio ilustrativo" style={{position:'absolute',inset:0,zIndex:5,background:'#0A0A0D',padding:16,boxSizing:'border-box'}}><button onClick={()=>setSelected(null)} style={{padding:'12px 0',color:'#9987FA'}}>Voltar aos anúncios</button><img src={cards[selected].image} alt={cards[selected].name} style={{height:285,width:'100%',objectFit:'contain',margin:'16px 0'}}/><h2 style={{fontSize:20}}>{cards[selected].name}</h2><p style={{fontSize:12,color:'#B2B8C2'}}>{cards[selected].set} · {cards[selected].condition} · Inglês</p><strong style={{fontSize:24}}>{cards[selected].price}</strong><p style={{fontSize:13,marginTop:12}}>{cards[selected].seller} · {cards[selected].rating}</p><p style={{fontSize:12,color:'#B2B8C2'}}>Frete a definir antes da compra. Valores ilustrativos.</p><button onClick={()=>setMessage('Checkout é dependência P0. Esta exploração não realiza compras.')} style={{width:'100%',marginTop:16,height:44,background:'#7D6BF0',borderRadius:8,color:'#0A0A0D',fontWeight:600}}>Comprar agora</button><p role="status" style={{fontSize:12,marginTop:12}}>{message}</p></div>}
+ </main>;
+}

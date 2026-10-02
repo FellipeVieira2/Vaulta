@@ -7,7 +7,8 @@ public sealed record SessionMarketValue(decimal AmountBrl, string Source, DateTi
     decimal? OriginalAmount = null, string? OriginalCurrency = null, decimal? ExchangeRate = null, DateTimeOffset? ExchangeRateAt = null);
 public sealed record ScannerSessionCard(Guid ScanId, Guid PrintingId, Guid? VariantId, string Name, string SetName,
     string CollectorNumber, string VariantName, string Condition, string? ArtworkUrl, SessionMarketValue? MarketValue,
-    DateTimeOffset ScannedAt, Guid? ImportedItemId = null);
+    DateTimeOffset ScannedAt, Guid? ImportedItemId = null, bool ImportStarted = false,
+    Guid? ListingDraftId = null, Guid? PublicationVersion = null, Guid? PublishedListingId = null);
 
 /// <summary>A scan occurrence identifies a physical copy; printing IDs can repeat.</summary>
 public sealed record ScannerSession(Guid Id, Guid OwnerId, DateTimeOffset StartedAt, ScannerSessionPhase Phase,
@@ -65,7 +66,51 @@ public sealed record ScannerSession(Guid Id, Guid OwnerId, DateTimeOffset Starte
     public ScannerSession Remove(Guid scanId)
     {
         RequireScanning();
+        if (Cards.Any(x => x.ScanId == scanId && (x.ImportStarted || x.ImportedItemId.HasValue)))
+            throw new InvalidOperationException("Esta carta já iniciou a adição ao estoque. Gerencie a unidade na coleção.");
         return this with { Cards = Cards.Where(x => x.ScanId != scanId).ToArray() };
+    }
+
+    public ScannerSession BeginOccurrenceImport(Guid scanId)
+    {
+        var card = Cards.SingleOrDefault(x => x.ScanId == scanId) ?? throw new ArgumentException("Carta fora da sessão.");
+        return this with { Cards = Cards.Select(x => x.ScanId == card.ScanId ? x with { ImportStarted = true } : x).ToArray() };
+    }
+
+    public ScannerSession RecordOccurrenceImported(Guid scanId, Guid itemId)
+    {
+        var card = Cards.SingleOrDefault(x => x.ScanId == scanId) ?? throw new ArgumentException("Carta fora da sessão.");
+        if (!card.ImportStarted || itemId == Guid.Empty) throw new InvalidOperationException("Adição não iniciada.");
+        if (card.ImportedItemId.HasValue && card.ImportedItemId != itemId) throw new InvalidOperationException("Carta já vinculada a outra unidade do estoque.");
+        var cards = Cards.Select(x => x.ScanId == scanId ? x with { ImportedItemId = itemId } : x).ToArray();
+        return this with { Cards = cards, Phase = Phase == ScannerSessionPhase.Importing && cards.All(x => x.ImportedItemId.HasValue) ? ScannerSessionPhase.Imported : Phase };
+    }
+
+    public ScannerSession RecordListingDraft(Guid scanId, Guid draftId) => ChangeOccurrence(scanId, card =>
+    {
+        if (!card.ImportedItemId.HasValue || draftId == Guid.Empty || card.ListingDraftId.HasValue && card.ListingDraftId != draftId)
+            throw new InvalidOperationException("O rascunho não corresponde à unidade desta leitura.");
+        return card with { ListingDraftId = draftId };
+    });
+
+    public ScannerSession BeginListingPublication(Guid scanId, Guid version) => ChangeOccurrence(scanId, card =>
+    {
+        if (!card.ListingDraftId.HasValue || version == Guid.Empty) throw new InvalidOperationException("Prepare o anúncio antes de publicar.");
+        return card with { PublicationVersion = card.PublicationVersion ?? version };
+    });
+
+    public ScannerSession ResetListingPublication(Guid scanId) => ChangeOccurrence(scanId, card => card with { PublicationVersion = null });
+
+    public ScannerSession RecordListingPublished(Guid scanId, Guid listingId) => ChangeOccurrence(scanId, card =>
+    {
+        if (card.ListingDraftId != listingId) throw new InvalidOperationException("Anúncio fora desta leitura.");
+        return card with { PublishedListingId = listingId };
+    });
+
+    private ScannerSession ChangeOccurrence(Guid scanId, Func<ScannerSessionCard, ScannerSessionCard> change)
+    {
+        if (!Cards.Any(x => x.ScanId == scanId)) throw new ArgumentException("Carta fora da sessão.");
+        return this with { Cards = Cards.Select(x => x.ScanId == scanId ? change(x) : x).ToArray() };
     }
 
     public ScannerSession Complete()

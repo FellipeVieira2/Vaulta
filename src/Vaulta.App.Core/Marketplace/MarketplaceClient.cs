@@ -7,6 +7,7 @@ namespace Vaulta.App.Core.Marketplace;
 
 public interface IMarketplaceClient
 {
+    Task<ListingPageDto> BrowseListingsAsync(BrowseListingsQueryDto query, CancellationToken cancellationToken = default);
     Task<ListingPageDto> ListActiveListingsAsync(Guid? sellerUserId = null, Guid? printingId = null, int page = 1, int pageSize = 20, string sort = "newest", CancellationToken cancellationToken = default);
     Task<ListingDto?> GetListingAsync(Guid listingId, CancellationToken cancellationToken = default);
     Task<SellerProfileDto?> GetMySellerProfileAsync(CancellationToken cancellationToken = default);
@@ -19,11 +20,17 @@ public interface IMarketplaceClient
 
 public sealed class MarketplaceClient(HttpClient httpClient) : IMarketplaceClient
 {
-    public async Task<ListingPageDto> ListActiveListingsAsync(Guid? sellerUserId = null, Guid? printingId = null, int page = 1, int pageSize = 20, string sort = "newest", CancellationToken cancellationToken = default)
+    public Task<ListingPageDto> ListActiveListingsAsync(Guid? sellerUserId = null, Guid? printingId = null, int page = 1, int pageSize = 20, string sort = "newest", CancellationToken cancellationToken = default) =>
+        BrowseListingsAsync(new(sellerUserId, printingId, null, null, null, page, pageSize, sort), cancellationToken);
+
+    public async Task<ListingPageDto> BrowseListingsAsync(BrowseListingsQueryDto query, CancellationToken cancellationToken = default)
     {
-        var url = $"api/v1/marketplace/listings?page={page}&pageSize={pageSize}&sort={Uri.EscapeDataString(sort)}";
-        if (sellerUserId.HasValue) url += $"&sellerUserId={sellerUserId.Value}";
-        if (printingId.HasValue) url += $"&printingId={printingId.Value}";
+        var url = $"api/v1/marketplace/listings?page={query.Page}&pageSize={query.PageSize}&sort={Uri.EscapeDataString(query.Sort)}";
+        if (query.SellerUserId.HasValue) url += $"&sellerUserId={query.SellerUserId.Value}";
+        if (query.PrintingId.HasValue) url += $"&printingId={query.PrintingId.Value}";
+        if (query.VariantId.HasValue) url += $"&variantId={query.VariantId.Value}";
+        if (!string.IsNullOrWhiteSpace(query.Query)) url += $"&query={Uri.EscapeDataString(query.Query.Trim())}";
+        if (!string.IsNullOrWhiteSpace(query.GameCode)) url += $"&game={Uri.EscapeDataString(query.GameCode.Trim())}";
         using var response = await httpClient.GetAsync(url, cancellationToken);
         return await response.ReadApiJsonAsync<ListingPageDto>(cancellationToken);
     }

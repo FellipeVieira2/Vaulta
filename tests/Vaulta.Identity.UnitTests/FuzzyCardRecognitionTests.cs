@@ -14,6 +14,15 @@ public sealed class FuzzyCardRecognitionTests
         var service = new FuzzyCardSearchService(new FakeRecognitionCatalog("Professor Oak", "88"), NullLogger<FuzzyCardSearchService>.Instance);
         var match = Assert.Single(await service.SearchAsync(new("Professor Oak", []), "pokemon", CancellationToken.None));
         Assert.False(match.HasCollectorNumberMatch);
+        Assert.True(match.ConfidenceScore <= 0.7);
+    }
+
+    [Fact]
+    public async Task Recognition_CharmeleonPromoNumberMustNeverResolveToBaseSetTwentyFour()
+    {
+        var service = new FuzzyCardSearchService(new FakeRecognitionCatalog("Charmeleon", "24"), NullLogger<FuzzyCardSearchService>.Instance);
+        var matches = await service.SearchAsync(new("Charmeleon\nHálito de Fogo Constante\n079/100", []), "pokemon", default);
+        Assert.Empty(matches);
     }
 
     [Fact]

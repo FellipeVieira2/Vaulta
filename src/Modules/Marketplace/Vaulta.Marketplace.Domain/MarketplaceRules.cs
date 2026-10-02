@@ -9,6 +9,21 @@ public static class MarketplaceRules
     public const string CancelledStatus = "cancelled";
     public const string SoldStatus = "sold";
     public const string PublishingStatus = "publishing";
+    public const string DraftStatus = "draft";
+
+    public static string DraftCondition(string? condition)
+    {
+        var normalized = condition?.Trim().ToUpperInvariant();
+        return normalized is "MINT" or "NEAR_MINT" or "LIGHTLY_PLAYED" or "MODERATELY_PLAYED" or "HEAVILY_PLAYED" or "DAMAGED" or "UNKNOWN"
+            ? normalized : throw new DomainException("Declare a supported card condition.");
+    }
+
+    public static string OperationKey(string? key)
+    {
+        if (string.IsNullOrWhiteSpace(key) || key.Length > 128)
+            throw new DomainException("An operation key between 1 and 128 characters is required.");
+        return key.Trim();
+    }
 
     public const decimal MinPriceBrl = 1.00m;
     public const decimal MaxPriceBrl = 999_999.99m;

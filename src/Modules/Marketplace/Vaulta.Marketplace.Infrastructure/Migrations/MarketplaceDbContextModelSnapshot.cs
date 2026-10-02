@@ -29,6 +29,11 @@ namespace Vaulta.Marketplace.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("ClientDraftKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("client_draft_key");
+
                     b.Property<Guid>("CollectibleItemId")
                         .HasColumnType("uuid")
                         .HasColumnName("collectible_item_id");
@@ -54,6 +59,11 @@ namespace Vaulta.Marketplace.Infrastructure.Migrations
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("description");
 
+                    b.Property<string>("DraftCreationFingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("draft_creation_fingerprint");
+
                     b.Property<decimal>("PriceBrl")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
@@ -62,6 +72,15 @@ namespace Vaulta.Marketplace.Infrastructure.Migrations
                     b.Property<Guid>("PrintingId")
                         .HasColumnType("uuid")
                         .HasColumnName("printing_id");
+
+                    b.Property<string>("PublicationKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("publication_key");
+
+                    b.Property<Guid?>("PublicationVersion")
+                        .HasColumnType("uuid")
+                        .HasColumnName("publication_version");
 
                     b.Property<Guid>("SellerUserId")
                         .HasColumnType("uuid")
@@ -103,6 +122,11 @@ namespace Vaulta.Marketplace.Infrastructure.Migrations
 
                     b.HasIndex("PrintingId", "Status")
                         .HasDatabaseName("ix_marketplace_listings_printing_status");
+
+                    b.HasIndex("SellerUserId", "ClientDraftKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_marketplace_listing_draft_key")
+                        .HasFilter("client_draft_key IS NOT NULL");
 
                     b.HasIndex("SellerUserId", "Status")
                         .HasDatabaseName("ix_marketplace_listings_seller_status");

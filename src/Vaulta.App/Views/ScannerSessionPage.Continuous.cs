@@ -46,53 +46,57 @@ public sealed partial class ScannerSessionPage
         }
     }
 
-    private async Task HandleContinuousResult(CardScanResultDto result, byte[] signature)
+    private async Task HandleContinuousResult(CardScanResultDto result, byte[] signature, ScannerOperation operation, bool refinement = false, Guid? previousPrintingId = null)
     {
         var current = _camera is null ? null : CameraSceneSampler.Read(_camera);
         if (current is null || !ScannerSceneGate.IsSameScene(signature, current))
         { _status.Text = "Mantenha a próxima carta até identificar."; return; }
         var candidates = result.Candidates.OrderByDescending(x => x.ConfidenceScore).ToArray();
+        var first = ScannerAutomaticRecognition.Select(result, previousPrintingId);
+        if (first is null && !refinement)
+        {
+            _status.Text = "Validando a leitura… mantenha a carta.";
+            await Task.Delay(250, operation.Context.Token); RequireScannerOperation(operation);
+            current = _camera is null ? null : CameraSceneSampler.Read(_camera);
+            if (!_visible || current is null || !ScannerSceneGate.IsSameScene(signature, current))
+            { _status.Text = "A carta mudou. Enquadre novamente."; return; }
+            await CaptureCard(true, signature, refinement: true, candidates.FirstOrDefault()?.PrintingId);
+            return;
+        }
         if (candidates.Length == 0)
         {
             _status.Text = "Não consegui ler. Ajuste a carta e mantenha por um instante.";
             return;
         }
-        var first = candidates[0];
-        var strong = first.PrintingId != Guid.Empty && first.HasCollectorNumberMatch && first.ConfidenceScore >= .93
-            && (candidates.Length == 1 || first.ConfidenceScore - candidates[1].ConfidenceScore >= .12);
-        if (!strong) { ShowCandidates(result); return; }
-        if (_session!.Cards.LastOrDefault()?.PrintingId == first.PrintingId)
-        {
-            await ShowCard(first.PrintingId);
-            _status.Text = "Mesma carta: confirme se esta é outra cópia."; return;
-        }
-        var details = await _scanner.GetCardDetailsAsync(first.PrintingId, _lifetime.Token); RequireOwner();
+        if (first is null) { ShowCandidates(result); return; }
+        var details = await _scanner.GetCardDetailsAsync(first.PrintingId, operation.Context.Token); RequireScannerOperation(operation);
         current = _camera is null ? null : CameraSceneSampler.Read(_camera);
         if (current is null || !ScannerSceneGate.IsSameScene(signature, current))
         { _status.Text = "Mantenha a próxima carta até identificar."; return; }
         var variants = details.Printing.Variants;
         var selected = _continuousVariantCode is { } code ? variants.SingleOrDefault(x => x.Code == code)
             : variants.Count == 1 ? variants[0] : null;
-        if (selected is null) { await ShowCard(first.PrintingId); return; }
-        var quote = ChooseQuote(details, selected.Id);
-        await AddIdentifiedCard(details, selected, "UNKNOWN", quote, Guid.NewGuid(), DateTimeOffset.UtcNow);
+        if (selected is null && variants.Count > 0) { await ShowCard(first.PrintingId); return; }
+        var quote = ChooseQuote(details, selected?.Id);
+        await AddIdentifiedCard(details, selected, "UNKNOWN", quote, Guid.NewGuid(), DateTimeOffset.UtcNow, operation);
     }
 
-    private static CardMarketQuoteDto? ChooseQuote(ScannerCardDetailsDto details, Guid variantId) =>
+    private static CardMarketQuoteDto? ChooseQuote(ScannerCardDetailsDto details, Guid? variantId) =>
         details.MarketQuotes.Where(x => x.VariantId == variantId)
             .OrderBy(x => x.Source.Contains("TCGplayer", StringComparison.OrdinalIgnoreCase) ? 0 : 1).FirstOrDefault();
 
     private async Task AddIdentifiedCard(ScannerCardDetailsDto details, CatalogVariantDto? variant, string condition,
-        CardMarketQuoteDto? quote, Guid scanId, DateTimeOffset scannedAt)
+        CardMarketQuoteDto? quote, Guid scanId, DateTimeOffset scannedAt, ScannerOperation? operation = null)
     {
-        RequireOwner();
+        operation ??= BeginScannerOperation(); RequireScannerOperation(operation);
         var card = new ScannerSessionCard(scanId, details.Printing.PrintingId, variant?.Id, details.Printing.CardName,
             details.Printing.SetName, details.Printing.CollectorNumber, variant?.Name ?? "Sem variante", condition, details.Printing.ArtworkUrl,
             quote is null ? null : new(decimal.Round(quote.MarketValueBrl, 2), quote.Source, quote.UpdatedAt,
                 quote.OriginalValue, quote.OriginalCurrency, quote.ExchangeRate, quote.ExchangeRateAt), scannedAt);
-        var previousTotal = _session!.EstimatedValueBrl;
-        var added = _session.Add(card); await _store.Save(added, _lifetime.Token); RequireOwner(); _session = added;
+        var previousTotal = operation.Session.EstimatedValueBrl;
+        var added = operation.Session.Add(card); await _store.Save(added, operation.Context.Token); RequireScannerOperation(operation); _session = added;
         ClearResults(); _status.Text = quote is null ? "Pode retirar a carta · adicionada sem cotação." : "Pode retirar a carta.";
-        UpdateScore(); ShowLastCard(card); await RecordVideoReveal(card); await Reveal(card, previousTotal);
+        UpdateScore(); ShowLastCard(card); await RecordVideoReveal(card); RequireScannerOperation(operation);
+        await Reveal(card, previousTotal); RequireScannerOperation(operation); ShowLiquidityActions(card);
     }
 }

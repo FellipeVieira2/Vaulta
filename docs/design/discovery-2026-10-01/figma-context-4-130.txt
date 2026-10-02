@@ -1,0 +1,157 @@
+const imgCatalogArtworkSv03223 = "https://www.figma.com/api/mcp/asset/3bc673a7-fe94-44dc-9d54-5ba3c0c5c5de.png";
+const imgFrame = "https://www.figma.com/api/mcp/asset/d4ef45dc-b00f-43da-a03c-ddf102bb9a5d.svg";
+
+type ButtonSecondaryCompactProps = {
+  className?: string;
+  label?: string;
+};
+
+function ButtonSecondaryCompact({ className, label = "Adicionar" }: ButtonSecondaryCompactProps) {
+  return (
+    <div className={className || "bg-[var(--vaulta-surface-default,#121217)] border border-[var(--vaulta-border-default,#2e3038)] border-solid content-stretch flex h-[40px] items-center justify-center px-[var(--vaulta-space-16,16px)] relative rounded-[var(--vaulta-radius-8,8px)]"} data-node-id="3:27" data-name="Button / Secondary / Compact">
+      <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[18px] not-italic relative shrink-0 text-[13px] text-[color:var(--vaulta-text-primary,white)] whitespace-nowrap" data-node-id="3:28">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+type ButtonPrimaryCompactProps = {
+  className?: string;
+  label?: string;
+};
+
+function ButtonPrimaryCompact({ className, label = "Comprar agora" }: ButtonPrimaryCompactProps) {
+  return (
+    <div className={className || "bg-[var(--vaulta-brand-primary,#7d6bf0)] content-stretch flex h-[40px] items-center justify-center px-[var(--vaulta-space-16,16px)] relative rounded-[var(--vaulta-radius-8,8px)]"} data-node-id="3:25" data-name="Button / Primary / Compact">
+      <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[18px] not-italic relative shrink-0 text-[13px] text-[color:var(--vaulta-background-primary,#0a0a0d)] whitespace-nowrap" data-node-id="3:26">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+type ScannerResultCompactProps = {
+  className?: string;
+  freshness?: string;
+  marketPrice?: string;
+  printing?: string;
+  source?: string;
+  title?: string;
+};
+
+function ScannerResultCompact({ className, freshness = "Cotação ilustrativa · não é preço de venda", marketPrice = "R$ 302,40", printing = "223/197 · Holo · Inglês", source = "TCGdex / TCGplayer · exemplo", title = "Charizard ex" }: ScannerResultCompactProps) {
+  return (
+    <div className={className || "bg-[var(--vaulta-surface-default,#121217)] content-stretch flex gap-[var(--vaulta-space-12,12px)] h-[132px] items-start p-[var(--vaulta-space-12,12px)] relative rounded-[var(--vaulta-radius-8,8px)] w-[358px]"} data-node-id="12:91" data-name="Scanner Result / Compact">
+      <div className="h-[96px] relative shrink-0 w-[68px]" data-node-id="12:92" data-name="Catalog artwork / sv03-223">
+        <img alt="" className="absolute inset-0 max-w-none object-contain pointer-events-none size-full" src={imgCatalogArtworkSv03223} />
+      </div>
+      <div className="[word-break:break-word] content-stretch flex flex-col gap-[var(--vaulta-space-4,4px)] h-[108px] items-start not-italic overflow-clip relative shrink-0 w-[254px]" data-node-id="12:93" data-name="Card and valuation">
+        <p className="font-['Inter:Semi_Bold'] font-semibold leading-[18px] relative shrink-0 text-[13px] text-[color:var(--vaulta-text-primary,white)] w-[254px]" data-node-id="12:94">
+          {title}
+        </p>
+        <p className="font-['Inter:Medium'] font-medium leading-[16px] relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] w-[254px]" data-node-id="12:95">
+          {printing}
+        </p>
+        <p className="font-['Inter:Bold'] font-bold leading-[24px] relative shrink-0 text-[18px] text-[color:var(--vaulta-text-primary,white)] w-[254px]" data-node-id="12:96">
+          {marketPrice}
+        </p>
+        <p className="font-['Inter:Medium'] font-medium leading-[16px] relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] w-[254px]" data-node-id="12:97">
+          {source}
+        </p>
+        <p className="font-['Inter:Medium'] font-medium leading-[16px] relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] w-[254px]" data-node-id="12:98">
+          {freshness}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function IconIconX({ className }: { className?: string }) {
+  return (
+    <div className={className || "relative size-[24px]"} data-node-id="10:43" data-name="Icon / icon-x">
+      <div className="absolute left-0 size-[24px] top-0" data-node-id="10:44" data-name="Frame">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgFrame} />
+      </div>
+    </div>
+  );
+}
+
+export default function Component03ScannerAutomaticoVender() {
+  return (
+    <div className="bg-[var(--vaulta-background-primary,#0a0a0d)] content-stretch flex flex-col items-start relative size-full" data-node-id="4:130" data-name="03 — Scanner automático → vender">
+      <div className="content-stretch flex flex-col gap-[var(--vaulta-space-8,8px)] h-[766px] items-start overflow-clip px-[16px] py-[12px] relative shrink-0 w-[390px]" data-node-id="12:135" data-name="Scanner content">
+        <div className="content-stretch flex gap-[var(--vaulta-space-4,4px)] h-[44px] items-center justify-between overflow-clip relative shrink-0 w-[358px]" data-node-id="12:136" data-name="Scanner header">
+          <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[26px] not-italic relative shrink-0 text-[20px] text-[color:var(--vaulta-text-primary,white)] whitespace-nowrap" data-node-id="12:137">
+            Scanner
+          </p>
+          <div className="content-stretch flex gap-[var(--vaulta-space-4,4px)] items-center justify-center overflow-clip relative shrink-0 size-[44px]" data-node-id="12:138" data-name="Fechar">
+            <IconIconX className="relative shrink-0 size-[20px]" />
+          </div>
+        </div>
+        <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] whitespace-nowrap" data-node-id="12:143">
+          Protótipo · identificação e cotação ilustrativas
+        </p>
+        <div className="bg-[var(--vaulta-surface-default,#121217)] content-stretch flex flex-col gap-[var(--vaulta-space-8,8px)] h-[280px] items-center justify-center overflow-clip relative rounded-[var(--vaulta-radius-8,8px)] shrink-0 w-[358px]" data-node-id="12:144" data-name="Camera viewport — identified composition">
+          <div className="h-[228px] relative shrink-0 w-[166px]" data-node-id="12:145" data-name="Catalog artwork / sv03-223">
+            <img alt="" className="absolute inset-0 max-w-none object-contain pointer-events-none size-full" src={imgCatalogArtworkSv03223} />
+          </div>
+          <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[16px] not-italic relative shrink-0 text-[11px] text-[color:var(--vaulta-text-secondary,#8c919e)] whitespace-nowrap" data-node-id="12:146">
+            Prévia de câmera · referência de layout
+          </p>
+        </div>
+        <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[18px] not-italic relative shrink-0 text-[13px] text-[color:var(--vaulta-status-success,#33c766)] whitespace-nowrap" data-node-id="12:147">
+          Carta identificada
+        </p>
+        <ScannerResultCompact className="bg-[var(--vaulta-surface-default,#121217)] content-stretch flex gap-[var(--vaulta-space-12,12px)] h-[132px] items-start p-[var(--vaulta-space-12,12px)] relative rounded-[var(--vaulta-radius-8,8px)] shrink-0 w-[358px]" />
+        <div className="content-stretch flex gap-[var(--vaulta-space-16,16px)] h-[44px] items-start overflow-clip relative shrink-0 w-[358px]" data-node-id="12:156" data-name="Scanner result actions">
+          <div className="content-stretch flex flex-col gap-[var(--vaulta-space-4,4px)] h-[44px] items-start justify-center overflow-clip relative shrink-0 w-[171px]" data-node-id="12:157" data-name="Action / Vender esta carta">
+            <ButtonPrimaryCompact className="bg-[var(--vaulta-brand-primary,#7d6bf0)] content-stretch flex h-[40px] items-center justify-center px-[var(--vaulta-space-16,16px)] relative rounded-[var(--vaulta-radius-8,8px)] shrink-0 w-[171px]" label="Vender esta carta" />
+          </div>
+          <div className="content-stretch flex flex-col gap-[var(--vaulta-space-4,4px)] h-[44px] items-start justify-center overflow-clip relative shrink-0 w-[171px]" data-node-id="12:160" data-name="Action / Adicionar">
+            <ButtonSecondaryCompact className="bg-[var(--vaulta-surface-default,#121217)] border border-[var(--vaulta-border-default,#2e3038)] border-solid content-stretch flex h-[40px] items-center justify-center px-[var(--vaulta-space-16,16px)] relative rounded-[var(--vaulta-radius-8,8px)] shrink-0 w-[171px]" />
+          </div>
+        </div>
+        <div className="content-stretch flex flex-col gap-[var(--vaulta-space-4,4px)] h-[44px] items-start justify-center overflow-clip relative shrink-0 w-[358px]" data-node-id="12:163" data-name="Action / Próxima carta">
+          <ButtonSecondaryCompact className="bg-[var(--vaulta-surface-default,#121217)] border border-[var(--vaulta-border-default,#2e3038)] border-solid content-stretch flex h-[40px] items-center justify-center px-[var(--vaulta-space-16,16px)] relative rounded-[var(--vaulta-radius-8,8px)] shrink-0 w-[358px]" label="Próxima carta" />
+        </div>
+      </div>
+      <div className="bg-[var(--vaulta-surface-default,#121217)] content-stretch flex flex-col gap-[var(--vaulta-space-4,4px)] h-[78px] items-start overflow-clip pb-[20px] pt-[8px] px-[16px] relative shrink-0 w-[390px]" data-node-id="12:166" data-name="Recording controls — off by default">
+        <div className="content-stretch flex flex-col gap-[var(--vaulta-space-4,4px)] h-[44px] items-start justify-center overflow-clip relative shrink-0 w-[358px]" data-node-id="12:167" data-name="Action / Iniciar gravação">
+          <ButtonSecondaryCompact className="bg-[var(--vaulta-surface-default,#121217)] border border-[var(--vaulta-border-default,#2e3038)] border-solid content-stretch flex h-[40px] items-center justify-center px-[var(--vaulta-space-16,16px)] relative rounded-[var(--vaulta-radius-8,8px)] shrink-0 w-[358px]" label="Iniciar gravação" />
+        </div>
+      </div>
+    </div>
+  );
+}
+SUPER CRITICAL: The generated React+Tailwind code MUST be converted to match the target project's technology stack and styling system.
+1. Analyze the target codebase to identify: technology stack, styling approach, component patterns, and design tokens
+2. Convert React syntax to the target framework/library
+3. Transform all Tailwind classes to the target styling system while preserving exact visual design
+4. Follow the project's existing patterns and conventions
+DO NOT install any Tailwind as a dependency unless the user instructs you to do so.
+
+Node ids have been added to the code as data attributes, e.g. `data-node-id="1:2"`.
+These styles are contained in the design: Vaulta / Compact / Title: Font(family: "Inter", style: Semi Bold, size: 20, weight: 600, lineHeight: 26, letterSpacing: 0), Vaulta / Compact / Metadata: Font(family: "Inter", style: Medium, size: 11, weight: 500, lineHeight: 16, letterSpacing: 0), Vaulta / Compact / Product: Font(family: "Inter", style: Semi Bold, size: 13, weight: 600, lineHeight: 18, letterSpacing: 0), Vaulta / Compact / Price: Font(family: "Inter", style: Bold, size: 18, weight: 700, lineHeight: 24, letterSpacing: 0).
+Component descriptions: The following components have usage descriptions or documentation links defined in Figma. These descriptions provide important context about the intended usage, best practices, and any constraints for each component. Follow these guidelines when implementing or using these components.
+
+## Icon / icon-x
+**Node ID:** 10:43
+
+Source: Lucide public icon. Decorative icon; accessible name on parent action.
+
+## Scanner Result / Compact
+**Node ID:** 12:91
+
+Automatic acceptance requires strong candidate evidence and defined variant. Market price distinct from listing price and acquisition cost. Source/date mandatory; missing price is Sem cotação. Owner enters condition.
+
+## Button / Primary / Compact
+**Node ID:** 3:25
+
+Compact visual height 40px; place within at least 44px touch target. Label property; disable during submission.
+
+## Button / Secondary / Compact
+**Node ID:** 3:27
+
+Ação secundária compacta. Usar para adicionar, voltar ou tentar novamente. Ofertas dependem de contrato futuro.
+Images and SVGs will be stored as constants, e.g. const image = 'https://www.figma.com/api/mcp/asset/550e8400-e29b-41d4-a716-446655440000.png'. These constants will be used in the code as the source for the image, ex: <img src={image} />. Image assets are stored on a remote server for 7 days and can be fetched using the provided URLs until they expire.

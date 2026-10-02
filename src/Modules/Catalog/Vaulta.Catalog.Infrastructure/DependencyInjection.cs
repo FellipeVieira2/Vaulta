@@ -3,6 +3,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Vaulta.Catalog.Application;
+using Amazon;
+using Amazon.BedrockRuntime;
 
 namespace Vaulta.Catalog.Infrastructure;
 
@@ -28,7 +30,32 @@ public static class DependencyInjection
             client.BaseAddress = new Uri("https://api.pokemontcg.io/v2/", UriKind.Absolute);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Vaulta-Scanner/1.0");
         });
-        services.AddScoped<ICardRecognitionProvider>(p => p.GetRequiredService<PokemonTcgRecognitionProvider>());
+        services.AddOptions<Recognition.NovaScannerOptions>().Bind(configuration.GetSection("Scanner:Nova"))
+            .Validate(o => !o.Enabled || o.IsValid(), "Invalid Nova scanner configuration or request limits.")
+            .ValidateOnStart();
+        if (configuration.GetValue<bool>("Scanner:Nova:Enabled"))
+        {
+            services.AddSingleton<IAmazonBedrockRuntime>(provider =>
+            {
+                var options = provider.GetRequiredService<IOptions<Recognition.NovaScannerOptions>>().Value;
+                // SDK credential discovery supports workload IAM roles and refreshes credentials.
+                // The extractor owns retries within one deadline; avoid multiplying SDK retries.
+                return new AmazonBedrockRuntimeClient(new AmazonBedrockRuntimeConfig
+                {
+                    RegionEndpoint = RegionEndpoint.GetBySystemName(options.Region),
+                    Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds),
+                    MaxErrorRetry = 0, LogResponse = false, LogMetrics = false
+                });
+            });
+            services.AddSingleton<ICardEvidenceExtractor, Recognition.NovaCardEvidenceExtractor>();
+            services.AddScoped<Recognition.CardEvidenceCatalogMatcher>();
+            services.AddScoped<ICardRecognitionProvider>(provider => new Recognition.NovaCardRecognitionProvider(
+                provider.GetRequiredService<ICardEvidenceExtractor>(),
+                provider.GetRequiredService<Recognition.CardEvidenceCatalogMatcher>(),
+                provider.GetRequiredService<PokemonTcgRecognitionProvider>()));
+        }
+        else
+            services.AddScoped<ICardRecognitionProvider>(p => p.GetRequiredService<PokemonTcgRecognitionProvider>());
         services.AddScoped<ICardSearchProvider>(p => p.GetRequiredService<PokemonTcgRecognitionProvider>());
         services.AddScoped<IExternalIdResolver, ExternalIdResolver>();
         services.AddSingleton<Recognition.IOcrService, Recognition.TesseractOcrService>();

@@ -29,6 +29,7 @@ internal sealed partial class TcgDexProvider(HttpClient httpClient, IOptions<Tcg
 {
     private readonly TcgDexOptions _options = options.Value;
     public string Code => "tcgdex";
+    public string Language => NormalizeLanguage(_options.Language);
 
     public async Task<IReadOnlyList<ProviderSet>> GetSets(CancellationToken cancellationToken)
     {

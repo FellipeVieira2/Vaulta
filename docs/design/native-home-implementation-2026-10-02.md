@@ -1,0 +1,17 @@
+# Home marketplace nativa — 02/10/2026
+
+Home MAUI conectada a `IMarketplaceClient.BrowseListingsAsync`, baseada no contexto de alta fidelidade Figma `Ey1vEJNXx1oaSZbODMamWY`, Home `4:2`, e no screenshot `discovery-2026-10-01/01-home-after.png`. A tela usa grid de duas colunas virtualizado com `CollectionView`, espaçamento 16, artwork de 156 e tipografia compacta 13/18/11. Os tokens vêm dos recursos primitivos existentes; a Home usa a paleta preta/roxa da referência sem modificar o tema do catálogo legado.
+
+Busca por carta/set/número com debounce de 300 ms, Pokémon/Todos e ordenação mais recente/menor preço/maior preço. Paginação de 20 por requisição, gatilho de fim de lista e botão acessível de carregar mais. `MarketplaceHomeController` cancela a requisição anterior e rejeita resposta ou falha obsoleta. Loading, vazio, offline, erro inicial e erro de paginação têm recuperação; erro de paginação mantém os anúncios e o retry no fim da lista. Sair da tela cancela chamadas pendentes.
+
+Cards usam preço pedido real, condição/idioma reais, identificação abreviada explicitamente rotulada como vendedor e reputação agregada real. Zero avaliações mostra “Sem avaliações”. Foto válida do vendedor tem prioridade; foto expirada cai para artwork de catálogo rotulado “Imagem de referência”; ausência de imagem/metadados é explícita. Não há dados de espécimes Figma em produção.
+
+Navegação: startup/login → Home nativa; Início/Buscar/Vender/Coleção/Perfil; Vender exige sessão e abre `ScannerSessionPage` pela rota registrada com DI. Busca abre uma instância da Home com foco na entrada. Catálogo continua acessível por link próprio e pelas ações da coleção. `listingId` chega ao detalhe legado antes da configuração da tela. A implementação de detalhe nativo é a entrega seguinte.
+
+Assets estáticos: `icon_search.svg` (275 bytes), `icon_plus.svg` (256), `icon_chevron_right.svg` (237), cópias binariamente iguais aos assets já salvos do design; ícones de Home/Coleção/Perfil são os recursos existentes indicados pelo Figma. Nenhuma imagem estática de carta ou URL temporária Figma é usada no produto. Ícones têm dimensão raiz 24×24 preservada. Os controles de navegação e ações têm alvos de pelo menos 48 dp; entradas/fotos/cards têm descrição semântica, cabeçalhos marcados, fonte escalável e estados escritos.
+
+Validação: RED por ausência do controlador/presentation antes da implementação; 9 testes do controlador e 5 de apresentação GREEN. Suite App.Core completa no momento da entrega: **93/93**. Build Android integrado pelo executor principal: **sucesso, zero warnings/erros**. Hashes dos três assets copiados conferidos; `git diff --check` sem erro de whitespace. Não houve validação visual em emulador/dispositivo nesta entrega; posições e dimensões foram conferidas no código e screenshot Figma.
+
+Ruling: apenas Pokémon possui código/catálogo confirmado no repositório. Yu-Gi-Oh!, One Piece e Magic permanecem chips indisponíveis com descrição acessível; não foram inventados aliases. Pokémon e Todos são funcionais. Custo se errado: outros catálogos exigem revelar códigos/capacidade e habilitar chips.
+
+Limites: nome público do vendedor e busca por vendedor não existem no contrato de anúncio; Inter não está empacotada nesta árvore, então os tamanhos/pesos usam fonte nativa. URLs de imagem externas podem falhar independentemente do feed; os placeholders tratam ausência de URL. Sessões e DI são registrados pelo executor principal em `MauiProgram`. Nenhum commit, push, deploy, banco compartilhado ou operação financeira foi executado.

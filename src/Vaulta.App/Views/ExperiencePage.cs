@@ -32,6 +32,14 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
 
     public void ApplyQueryAttributes(IDictionary<string, object> query)
     {
+        if (query.TryGetValue("checkoutListing", out var checkout) && checkout is Vaulta.Marketplace.Contracts.ListingDto checkoutListing)
+        {
+            _viewModel.PrepareCheckout(checkoutListing);
+            BuildContent();
+            return;
+        }
+        if (query.TryGetValue("listingId", out var listingId) && Guid.TryParse(listingId.ToString(), out var listing))
+            _viewModel.SelectedListingId = listing;
         if (query.TryGetValue("printingId", out var printingId) && Guid.TryParse(printingId.ToString(), out var id))
             _viewModel.SelectPrinting(id);
         if (query.TryGetValue("screen", out var screen))
@@ -42,6 +50,20 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        if (_viewModel.ScreenId is "login" or "welcome")
+        {
+            Dispatcher.Dispatch(async () =>
+            {
+                if (Shell.Current is AppShell appShell) await appShell.ShowLoginAsync();
+                else await Shell.Current.GoToAsync("login");
+            });
+            return;
+        }
+        if (_viewModel.ScreenId == "home")
+        {
+            _ = Shell.Current.GoToAsync("//main/home/home-page");
+            return;
+        }
         _visible = true;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         if (_builtScreen != _viewModel.ScreenId) BuildContent();
@@ -1095,72 +1117,7 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
         }
     }
 
-    private Border CreatePortfolioChart()
-{
-// Simulated 7-day price history for the portfolio chart (replace with real API data later)
-var values = new double[] { 12450, 12380, 12520, 12490, 12610, 12580, 12720 };
-var min = values.Min();
-var max = values.Max();
-var range = max - min > 0 ? max - min : 1;
-var chartHeight = 120.0;
-var pointCount = values.Length;
-var grid = new Grid
-{
-HeightRequest = chartHeight,
-ColumnSpacing = 0,
-RowSpacing = 0,
-VerticalOptions = LayoutOptions.End,
-HorizontalOptions = LayoutOptions.Fill
-};
-// Add column definitions
-for (int i = 0; i < pointCount; i++)
-grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
-// Build vertical bar segments representing price movement per period
-for (int i = 0; i < pointCount - 1; i++)
-{
-var norm = (values[i] - min) / range;
-var barHeight = Math.Max(chartHeight * norm, 2);
-var isUp = values[i + 1] >= values[i];
-var bar = new Border
-{
-WidthRequest = 6,
-HeightRequest = barHeight,
-HorizontalOptions = LayoutOptions.Center,
-VerticalOptions = LayoutOptions.End,
-StrokeThickness = 0,
-StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(3) },
-Background = new SolidColorBrush(isUp ? Color.FromArgb("#22D3EE") : Color.FromArgb("#FB7185")),
-Margin = new Thickness(0, 0, 0, 0)
-};
-grid.Add(bar, i, 0);
-}
-// Add data points as circles
-for (int i = 0; i < pointCount; i++)
-{
-var norm = (values[i] - min) / range;
-var y = chartHeight * (1 - norm);
-var dot = new Border
-{
-WidthRequest = 8,
-HeightRequest = 8,
-StrokeThickness = 0,
-StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(4) },
-Background = new SolidColorBrush(Color.FromArgb("#22D3EE")),
-VerticalOptions = LayoutOptions.End,
-HorizontalOptions = LayoutOptions.Center,
-Margin = new Thickness(0, 0, 0, y)
-};
-grid.Add(dot, i, 0);
-}
-return new Border
-{
-Content = grid,
-Padding = new Thickness(16, 8, 16, 16),
-StrokeThickness = 1,
-StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(16) }
-};
-}
-private Label CreateLabel(string? text, string style, string? colorResource = null)
+    private Label CreateLabel(string? text, string style, string? colorResource = null)
     {
         var label = new Label { Text = text, Style = (Style)Application.Current!.Resources[style] };
         if (colorResource is not null)

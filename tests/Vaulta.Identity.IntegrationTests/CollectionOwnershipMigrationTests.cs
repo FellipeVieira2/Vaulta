@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
-using Testcontainers.PostgreSql;
 using Vaulta.Collection.Infrastructure;
 using Xunit;
 
@@ -15,8 +14,8 @@ public sealed class CollectionOwnershipMigrationTests
     [InlineData(true)]
     public async Task UpgradeLocksLegacyUnitPreservesPrivateDataAndRejectsAmbiguousOwnership(bool ambiguous)
     {
-        await using var postgres = new PostgreSqlBuilder("postgres:17-alpine").Build(); await postgres.StartAsync();
-        var options = new DbContextOptionsBuilder<CollectionDbContext>().UseNpgsql(postgres.GetConnectionString()).Options;
+        await using var postgres = await TestPostgresDatabase.Start();
+        var options = new DbContextOptionsBuilder<CollectionDbContext>().UseNpgsql(postgres.ConnectionString).Options;
         await using var db = new CollectionDbContext(options);
         var migrator = db.GetService<IMigrator>();
         await migrator.MigrateAsync("20260926201932_AddCollectionIdempotencyKeys");

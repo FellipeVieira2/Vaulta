@@ -17,7 +17,7 @@ public interface ICardRecognitionCatalog
     Task<IReadOnlyList<RecognitionCatalogCard>> FindCandidatesAsync(string name, string? collectorNumber, string gameCode, CancellationToken cancellationToken);
 }
 
-public sealed record RecognitionCatalogCard(Vaulta.Catalog.Contracts.CatalogSearchResult Card, IReadOnlyList<string> VariantCodes);
+public sealed record RecognitionCatalogCard(Vaulta.Catalog.Contracts.CatalogSearchResult Card, IReadOnlyList<string> VariantCodes, string? ProviderSetId = null);
 
 public interface ICardRecognitionProvider
 {

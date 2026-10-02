@@ -13,12 +13,43 @@ public static class MarketplaceEndpoints
     {
         var marketplace = app.MapGroup("/api/v1/marketplace").WithTags("Marketplace");
         var mySeller = app.MapGroup("/api/v1/me/seller").WithTags("Marketplace").RequireAuthorization();
+        var drafts = mySeller.MapGroup("/listing-drafts");
+
+        drafts.MapPost("", async (CreateListingDraftRequest request, ClaimsPrincipal principal, ListingDraftHandlers handler, CancellationToken ct) =>
+        {
+            var result = await handler.Handle(new CreateListingDraftCommand(UserId(principal), request), ct);
+            return Results.Created($"/api/v1/me/seller/listing-drafts/{result.Id}", result);
+        }).WithName("CreateListingDraft").Produces<ListingDraftDto>(201).ProducesProblem(400).ProducesProblem(401).ProducesProblem(404).ProducesProblem(409);
+
+        drafts.MapGet("/{draftId:guid}", async (Guid draftId, ClaimsPrincipal principal, ListingDraftHandlers handler, CancellationToken ct) =>
+            Results.Ok(await handler.Get(UserId(principal), draftId, ct)))
+            .WithName("GetListingDraft").Produces<ListingDraftDto>().ProducesProblem(401).ProducesProblem(404);
+
+        drafts.MapPut("/{draftId:guid}", async (Guid draftId, UpdateListingDraftRequest request, ClaimsPrincipal principal, ListingDraftHandlers handler, CancellationToken ct) =>
+            Results.Ok(await handler.Handle(new UpdateListingDraftCommand(UserId(principal), draftId, request), ct)))
+            .WithName("UpdateListingDraft").Produces<ListingDraftDto>().ProducesProblem(400).ProducesProblem(401).ProducesProblem(404).ProducesProblem(409);
+
+        drafts.MapPost("/{draftId:guid}/photos", async (Guid draftId, ListingDraftPhotoRequest request, ClaimsPrincipal principal, ListingDraftHandlers handler, CancellationToken ct) =>
+            Results.Ok(await handler.Handle(new AddListingDraftPhotoCommand(UserId(principal), draftId, request), ct)))
+            .WithName("AddListingDraftPhoto").Produces<ListingDraftDto>().ProducesProblem(400).ProducesProblem(401).ProducesProblem(404).ProducesProblem(409);
+
+        drafts.MapDelete("/{draftId:guid}/photos/{assetId:guid}", async (Guid draftId, Guid assetId, Guid version, ClaimsPrincipal principal, ListingDraftHandlers handler, CancellationToken ct) =>
+            Results.Ok(await handler.Handle(new RemoveListingDraftPhotoCommand(UserId(principal), draftId, assetId, version), ct)))
+            .WithName("RemoveListingDraftPhoto").Produces<ListingDraftDto>().ProducesProblem(400).ProducesProblem(401).ProducesProblem(404).ProducesProblem(409);
+
+        drafts.MapPost("/{draftId:guid}/publish", async (Guid draftId, PublishListingDraftRequest request, ClaimsPrincipal principal, ListingDraftHandlers handler, CancellationToken ct) =>
+            Results.Ok(await handler.Handle(new PublishListingDraftCommand(UserId(principal), draftId, request), ct)))
+            .WithName("PublishListingDraft").Produces<ListingDraftDto>().ProducesProblem(400).ProducesProblem(401).ProducesProblem(404).ProducesProblem(409);
+
+        drafts.MapDelete("/{draftId:guid}", async (Guid draftId, Guid version, ClaimsPrincipal principal, ListingDraftHandlers handler, CancellationToken ct) =>
+            Results.Ok(await handler.Handle(new CancelListingDraftCommand(UserId(principal), draftId, version), ct)))
+            .WithName("CancelListingDraft").Produces<ListingDraftDto>().ProducesProblem(400).ProducesProblem(401).ProducesProblem(404).ProducesProblem(409);
 
         // Public: browse active listings
         marketplace.MapGet("/listings", async (Guid? sellerUserId, Guid? printingId, Guid? variantId,
-            int? page, int? pageSize, string? sort, IMarketplaceQueries queries, CancellationToken ct) =>
-            Results.Ok(await queries.ListActiveListings(sellerUserId, printingId, variantId,
-                page ?? 1, pageSize ?? 20, sort ?? "newest", ct)))
+            int? page, int? pageSize, string? sort, string? query, string? game, IMarketplaceQueries queries, CancellationToken ct) =>
+            Results.Ok(await queries.BrowseListings(new(sellerUserId, printingId, variantId, query, game,
+                page ?? 1, pageSize ?? 20, sort ?? "newest"), ct)))
             .WithName("ListActiveListings").Produces<ListingPageDto>().ProducesProblem(400);
 
         marketplace.MapGet("/listings/{listingId:guid}", async (Guid listingId, IMarketplaceQueries queries, CancellationToken ct) =>

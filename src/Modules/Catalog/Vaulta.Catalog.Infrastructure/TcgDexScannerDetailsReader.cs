@@ -35,6 +35,7 @@ public sealed class TcgDexScannerDetailsReader(HttpClient httpClient, CatalogDbC
             .Select(x => x.ExternalId).SingleOrDefaultAsync(cancellationToken);
         if (externalId is null) return new(printing, new Dictionary<string, string>(), [], "Informações adicionais indisponíveis para esta carta.");
         var language = TcgDexProvider.NormalizeLanguage(printing.Language);
+        if (externalId.StartsWith(language + ":", StringComparison.Ordinal)) externalId = externalId[(language.Length + 1)..];
         try
         {
             using var response = await httpClient.GetAsync($"{Uri.EscapeDataString(language)}/cards/{Uri.EscapeDataString(externalId)}", cancellationToken);

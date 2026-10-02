@@ -30,18 +30,10 @@ public static class MauiProgram
             .UseMauiCommunityToolkitCamera()
             .ConfigureFonts(fonts =>
             {
-#if VAULTA_INTER_REGULAR
                 fonts.AddFont("Inter-Regular.ttf", "InterRegular");
-#endif
-#if VAULTA_INTER_MEDIUM
                 fonts.AddFont("Inter-Medium.ttf", "InterMedium");
-#endif
-#if VAULTA_INTER_SEMIBOLD
                 fonts.AddFont("Inter-SemiBold.ttf", "InterSemiBold");
-#endif
-#if VAULTA_INTER_BOLD
                 fonts.AddFont("Inter-Bold.ttf", "InterBold");
-#endif
             });
 
 #if DEBUG
@@ -85,6 +77,7 @@ public static class MauiProgram
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<SessionState>();
         builder.Services.AddSingleton<ITokenStore, SecureTokenStore>();
+        builder.Services.AddSingleton<Vaulta.App.Core.Identity.AuthenticationCommitCoordinator>();
         builder.Services.AddSingleton<IAuthenticationService, AuthenticationService>();
         builder.Services.AddSingleton<IAccessTokenProvider, AppAccessTokenProvider>();
         builder.Services.AddTransient<AuthorizingHttpMessageHandler>();
@@ -127,30 +120,32 @@ public static class MauiProgram
             return new AssetClient(factory.CreateClient("Vaulta.Assets.Api"), factory.CreateClient("Vaulta.Assets.PresignedUpload"));
         });
 
-        // Price history: JustTCG API when configured, otherwise simulated data for immediate use.
-        builder.Services.AddHttpClient("Vaulta.JustTcg", client =>
-        {
-            client.BaseAddress = new Uri("https://api.justtcg.com/");
-            client.DefaultRequestHeaders.Add("Accept", "application/json");
-        });
-        builder.Services.AddSingleton<SimulatedPriceHistoryProvider>();
-        builder.Services.AddSingleton<IPriceHistoryProvider>(serviceProvider =>
-        {
-            var apiKey = builder.Configuration["JustTcg:ApiKey"];
-            if (string.IsNullOrWhiteSpace(apiKey))
-                return serviceProvider.GetRequiredService<SimulatedPriceHistoryProvider>();
-
-            var factory = serviceProvider.GetRequiredService<IHttpClientFactory>();
-            var httpClient = factory.CreateClient("Vaulta.JustTcg");
-            httpClient.DefaultRequestHeaders.Add("x-api-key", apiKey);
-            return new JustTcgPriceHistoryProvider(
-                httpClient,
-                serviceProvider.GetRequiredService<SimulatedPriceHistoryProvider>(),
-                apiKey);
-        });
+        // Charts remain unavailable until the backend exposes measured BRL snapshots.
+        builder.Services.AddSingleton<IPriceHistoryProvider, UnavailablePriceHistoryProvider>();
 
         builder.Services.AddSingleton<ICameraService, CameraService>();
+        builder.Services.AddHttpClient<IListingDraftClient, ListingDraftClient>((serviceProvider, client) =>
+        {
+            client.BaseAddress = new Uri(serviceProvider.GetRequiredService<IOptions<VaultaApiOptions>>().Value.BaseUrl);
+        }).AddHttpMessageHandler<AuthorizingHttpMessageHandler>();
         builder.Services.AddSingleton<IScannerSessionStore>(_ => new FileScannerSessionStore(Path.Combine(FileSystem.AppDataDirectory, "scanner-sessions")));
+        builder.Services.AddSingleton<ScannerOccurrenceImporter>(sp => new(sp.GetRequiredService<ICollectionClient>(), sp.GetRequiredService<IScannerSessionStore>(),
+            () => sp.GetRequiredService<SessionState>().User?.Id));
+        builder.Services.AddSingleton<ScannerSaleFlow>(sp => new(sp.GetRequiredService<ScannerOccurrenceImporter>(), sp.GetRequiredService<ICollectionClient>(),
+            sp.GetRequiredService<IListingDraftClient>(), sp.GetRequiredService<IScannerSessionStore>(), () => sp.GetRequiredService<SessionState>().User?.Id));
+        builder.Services.AddTransient<ScannerSaleViewModel>();
+        builder.Services.AddTransient<ScannerSalePage>();
+        builder.Services.AddTransient<MarketplaceHomeController>(sp => new(sp.GetRequiredService<IMarketplaceClient>(),
+            () => Connectivity.Current.NetworkAccess == NetworkAccess.Internet));
+        builder.Services.AddTransient<MarketplaceHomeViewModel>();
+        builder.Services.AddTransient<MarketplaceHomePage>();
+        builder.Services.AddTransient<MarketplaceListingDetailController>();
+        builder.Services.AddTransient<MarketplaceListingDetailViewModel>();
+        builder.Services.AddTransient<MarketplaceListingDetailPage>();
+        builder.Services.AddTransient<MarketplaceSellerViewModel>();
+        builder.Services.AddTransient<MarketplaceSellerPage>();
+        builder.Services.AddTransient<LoginViewModel>();
+        builder.Services.AddTransient<LoginPage>();
         builder.Services.AddTransient<ScannerSessionImporter>(sp => new(sp.GetRequiredService<ICollectionClient>(), sp.GetRequiredService<IScannerSessionStore>(),
             () => sp.GetRequiredService<SessionState>().User?.Id));
         builder.Services.AddTransient<ScannerSessionPage>();

@@ -45,6 +45,9 @@ public sealed class MarketplaceDbContext(DbContextOptions<MarketplaceDbContext> 
             b.Property(x => x.Currency).HasMaxLength(3).IsRequired();
             b.Property(x => x.Status).HasMaxLength(20).IsRequired();
             b.Property(x => x.Description).HasMaxLength(2000);
+            b.Property(x => x.ClientDraftKey).HasMaxLength(128);
+            b.Property(x => x.DraftCreationFingerprint).HasMaxLength(64);
+            b.Property(x => x.PublicationKey).HasMaxLength(128);
             b.Property(x => x.Version).IsConcurrencyToken();
             b.Ignore(x => x.DomainEvents);
             b.HasMany(x => x.Photos).WithOne().HasForeignKey(x => x.ListingId).OnDelete(DeleteBehavior.Cascade);
@@ -53,6 +56,7 @@ public sealed class MarketplaceDbContext(DbContextOptions<MarketplaceDbContext> 
             b.HasIndex(x => new { x.PrintingId, x.Status }).HasDatabaseName("ix_marketplace_listings_printing_status");
             b.HasIndex(x => new { x.Status, x.CreatedAt }).HasDatabaseName("ix_marketplace_listings_status_created");
             b.HasIndex(x => x.CollectibleItemId).IsUnique().HasFilter("status IN ('active', 'publishing')").HasDatabaseName("ux_marketplace_listings_active_item");
+            b.HasIndex(x => new { x.SellerUserId, x.ClientDraftKey }).IsUnique().HasFilter("client_draft_key IS NOT NULL").HasDatabaseName("ux_marketplace_listing_draft_key");
         });
 
         modelBuilder.Entity<ListingPhoto>(b =>

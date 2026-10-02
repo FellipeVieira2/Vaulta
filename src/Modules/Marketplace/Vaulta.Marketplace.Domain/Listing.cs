@@ -27,9 +27,78 @@ public sealed class Listing : AggregateRoot
     public DateTimeOffset? SoldAt { get; private set; }
     public Guid? SoldToOrderId { get; private set; }
     public Guid Version { get; private set; }
+    public string? ClientDraftKey { get; private set; }
+    public string? DraftCreationFingerprint { get; private set; }
+    public string? PublicationKey { get; private set; }
+    public Guid? PublicationVersion { get; private set; }
     public IReadOnlyCollection<ListingPhoto> Photos => _photos.AsReadOnly();
 
     public bool IsActive => Status == MarketplaceRules.ActiveStatus;
+
+    public static Listing CreateDraft(Guid sellerUserId, Guid collectibleItemId, Guid printingId, Guid? variantId,
+        string condition, decimal? priceBrl, string? description, string clientDraftKey, string fingerprint, DateTimeOffset now)
+    {
+        if (sellerUserId == Guid.Empty || collectibleItemId == Guid.Empty || printingId == Guid.Empty || variantId == Guid.Empty)
+            throw new DomainException("Seller, collectible item and printing identifiers are required.");
+        if (string.IsNullOrWhiteSpace(fingerprint) || fingerprint.Length > 64)
+            throw new DomainException("Draft creation fingerprint is required.");
+        return new Listing
+        {
+            Id = Guid.NewGuid(), SellerUserId = sellerUserId, CollectibleItemId = collectibleItemId,
+            PrintingId = printingId, VariantId = variantId, Condition = MarketplaceRules.DraftCondition(condition),
+            PriceBrl = priceBrl.HasValue ? MarketplaceRules.Price(priceBrl.Value) : 0,
+            Description = MarketplaceRules.Description(description), Status = MarketplaceRules.DraftStatus,
+            ClientDraftKey = MarketplaceRules.OperationKey(clientDraftKey), DraftCreationFingerprint = fingerprint,
+            CreatedAt = now, UpdatedAt = now, Version = Guid.NewGuid()
+        };
+    }
+
+    public void UpdateDraft(string condition, decimal? priceBrl, string? description, Guid expectedVersion, DateTimeOffset now)
+    {
+        EnsureDraft(); EnsureVersion(expectedVersion);
+        var normalizedCondition = MarketplaceRules.DraftCondition(condition);
+        var normalizedPrice = priceBrl.HasValue ? MarketplaceRules.Price(priceBrl.Value) : 0;
+        var normalizedDescription = MarketplaceRules.Description(description);
+        Condition = normalizedCondition; PriceBrl = normalizedPrice; Description = normalizedDescription; Touch(now);
+    }
+
+    public void AddDraftPhoto(Guid assetId, string type, int sortOrder, Guid expectedVersion, DateTimeOffset now)
+    {
+        EnsureDraft(); EnsureVersion(expectedVersion); AddPhotoCore(assetId, type, sortOrder, now);
+    }
+
+    public void RemoveDraftPhoto(Guid assetId, Guid expectedVersion, DateTimeOffset now)
+    {
+        EnsureDraft(); EnsureVersion(expectedVersion); RemovePhotoCore(assetId, now);
+    }
+
+    public void PrepareDraftPublication(string key, Guid expectedVersion, DateTimeOffset now)
+    {
+        var normalizedKey = MarketplaceRules.OperationKey(key);
+        if (PublicationKey is not null)
+        {
+            if (PublicationKey != normalizedKey || PublicationVersion != expectedVersion)
+                throw new ConflictException("Publication retry does not match the reviewed draft.");
+            if (Status is not (MarketplaceRules.PublishingStatus or MarketplaceRules.ActiveStatus or MarketplaceRules.SoldStatus))
+                throw new ConflictException("This publication has been cancelled.");
+            return;
+        }
+        EnsureDraft(); EnsureVersion(expectedVersion);
+        if (Condition == "UNKNOWN") throw new DomainException("Declare the condition before publishing.");
+        MarketplaceRules.DraftCondition(Condition); MarketplaceRules.Price(PriceBrl);
+        if (!_photos.Any(x => x.Type == "FRONT") || !_photos.Any(x => x.Type == "BACK"))
+            throw new DomainException("Real front and back photos are required before publishing.");
+        PublicationKey = normalizedKey; PublicationVersion = expectedVersion;
+        Status = MarketplaceRules.PublishingStatus; Touch(now);
+    }
+
+    public void CancelDraft(Guid expectedVersion, DateTimeOffset now)
+    {
+        if (ClientDraftKey is null) throw new ConflictException("Listing is not a draft.");
+        if (Status == MarketplaceRules.CancelledStatus) return;
+        if (Status == MarketplaceRules.PublishingStatus) { Cancel(expectedVersion, now); return; }
+        EnsureDraft(); EnsureVersion(expectedVersion); Status = MarketplaceRules.CancelledStatus; Touch(now);
+    }
 
     public static Listing Create(
         Guid sellerUserId,
@@ -101,7 +170,9 @@ public sealed class Listing : AggregateRoot
         if (Status != MarketplaceRules.PublishingStatus) throw new ConflictException("Anúncio não está aguardando publicação.");
         Status = MarketplaceRules.ActiveStatus;
         Touch(now);
-        Raise(new ListingUpdatedDomainEvent(Guid.NewGuid(), Id, PriceBrl, Condition, now));
+        if (ClientDraftKey is not null)
+            Raise(new ListingCreatedDomainEvent(Guid.NewGuid(), Id, SellerUserId, PrintingId, VariantId, PriceBrl, now));
+        else Raise(new ListingUpdatedDomainEvent(Guid.NewGuid(), Id, PriceBrl, Condition, now));
     }
 
     public void MarkAsSold(Guid orderId, DateTimeOffset now)
@@ -117,6 +188,11 @@ public sealed class Listing : AggregateRoot
     public void AddPhoto(Guid assetId, string type, int sortOrder, DateTimeOffset now)
     {
         EnsureActive();
+        AddPhotoCore(assetId, type, sortOrder, now);
+    }
+
+    private void AddPhotoCore(Guid assetId, string type, int sortOrder, DateTimeOffset now)
+    {
         if (assetId == Guid.Empty) throw new DomainException("Asset identifier is required.");
         var normalizedType = MarketplaceRules.PhotoType(type);
         if (sortOrder < 0 || sortOrder > 99) throw new DomainException("Photo sort order must be between 0 and 99.");
@@ -140,6 +216,11 @@ public sealed class Listing : AggregateRoot
     public void RemovePhoto(Guid assetId, DateTimeOffset now)
     {
         EnsureActive();
+        RemovePhotoCore(assetId, now);
+    }
+
+    private void RemovePhotoCore(Guid assetId, DateTimeOffset now)
+    {
         var photo = _photos.SingleOrDefault(x => x.AssetId == assetId) ?? throw new DomainException("Photo is not attached to this listing.");
         _photos.Remove(photo);
         if (photo.IsPrimary && _photos.Count > 0) _photos[0].SetPrimary(true);
@@ -149,6 +230,12 @@ public sealed class Listing : AggregateRoot
     private void EnsureActive()
     {
         if (!IsActive) throw new DomainException("Inactive listings cannot be modified.");
+    }
+
+    private void EnsureDraft()
+    {
+        if (ClientDraftKey is null || Status != MarketplaceRules.DraftStatus)
+            throw new ConflictException("Only private drafts can be edited.");
     }
 
     private void EnsureVersion(Guid expectedVersion)

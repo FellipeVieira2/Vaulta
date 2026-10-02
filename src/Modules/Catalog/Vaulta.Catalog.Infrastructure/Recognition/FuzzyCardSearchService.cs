@@ -37,12 +37,12 @@ public sealed partial class FuzzyCardSearchService(
                 extracted.Name, extracted.CollectorNumber, gameCode, cancellationToken);
             foreach (var item in searchResults)
             {
-                var score = CalculateScore(item.Card, extracted);
+                var score = CalculateScore(item, extracted);
                 if (score >= 0.55 && (!candidates.TryGetValue(item.Card.PrintingId, out var previous) || previous.Score < score))
                     candidates[item.Card.PrintingId] = (item, score, extracted.CollectorNumber is not null &&
                         NormalizeNumber(item.Card.CollectorNumber) == NormalizeNumber(extracted.CollectorNumber));
             }
-            if (candidates.Values.Any(x => x.Score >= 0.9)) break;
+            if (candidates.Values.Any(x => x.NumberMatch && x.Score >= 0.93)) break;
         }
 
         return candidates.Values
@@ -63,8 +63,18 @@ public sealed partial class FuzzyCardSearchService(
 
         // Try to find collector number pattern (e.g., "12/102", "SV03-223", "045/198")
         string? collectorNumber = null;
+        string? promoSet = null;
+        string? printedLanguage = null;
+        var promo = PromoFooterRegex().Match(string.Join(' ', rawLines.TakeLast(8)));
+        if (promo.Success)
+        {
+            collectorNumber = promo.Groups["number"].Value;
+            promoSet = promo.Groups["set"].Value.ToLowerInvariant();
+            printedLanguage = promo.Groups["language"].Success ? promo.Groups["language"].Value.ToLowerInvariant() : null;
+        }
         foreach (var word in rawLines.Reverse().Concat(words.AsEnumerable().Reverse()))
         {
+            if (collectorNumber is not null) break;
             if (CollectorNumberRegex().IsMatch(word))
             {
                 collectorNumber = CollectorNumberRegex().Match(word).Value;
@@ -90,11 +100,14 @@ public sealed partial class FuzzyCardSearchService(
         if (collectorNumber is not null && Regex.IsMatch(collectorNumber, @"^B\s*\d+\s*/\s*\d+$", RegexOptions.IgnoreCase))
             numbers.Add(Regex.Replace(collectorNumber, @"^B\s*", "8", RegexOptions.IgnoreCase));
 
-        return names.SelectMany(name => numbers.Select(number => new ExtractedFields(name, number, setName))).ToArray();
+        return names.SelectMany(name => numbers.Select(number => new ExtractedFields(name, number, setName, promoSet, printedLanguage))).ToArray();
     }
 
-    private static double CalculateScore(CatalogSearchResult item, ExtractedFields extracted)
+    private static double CalculateScore(RecognitionCatalogCard match, ExtractedFields extracted)
     {
+        var item = match.Card;
+        if (extracted.PromoSet is not null && !string.Equals(match.ProviderSetId, extracted.PromoSet, StringComparison.OrdinalIgnoreCase)) return 0;
+        if (extracted.PrintedLanguage is not null && !string.Equals(item.Language.Split('-')[0], extracted.PrintedLanguage, StringComparison.OrdinalIgnoreCase)) return 0;
         var nameScore = Fuzz.Ratio(
             Normalize(item.CardName),
             Normalize(extracted.Name)) / 100.0;
@@ -118,7 +131,10 @@ public sealed partial class FuzzyCardSearchService(
 
         if (nameScore < 0.55 || (extracted.CollectorNumber is not null && numberScore == 0)) return 0;
         var availableWeight = NameWeight + (extracted.CollectorNumber is not null ? NumberWeight : 0) + (extracted.SetName is not null ? SetWeight : 0);
-        return Math.Min(0.95, ((nameScore * NameWeight) + (numberScore * NumberWeight) + (setScore * SetWeight)) / availableWeight);
+        // A common Pokémon name alone identifies a character, not its printing.
+        // Never present a name-only guess with the confidence of an exact card.
+        var ceiling = extracted.CollectorNumber is null ? 0.7 : 0.95;
+        return Math.Min(ceiling, ((nameScore * NameWeight) + (numberScore * NumberWeight) + (setScore * SetWeight)) / availableWeight);
     }
 
     private static CardRecognitionCandidate MapToCandidate(RecognitionCatalogCard match, double score, bool numberMatch)
@@ -151,5 +167,8 @@ public sealed partial class FuzzyCardSearchService(
     [GeneratedRegex(@"^(base|jungle|fossil|team|rocket|gym|neo|aquapolis|expedition|skyridge|ex|diamond|pearl|platinum|heartgold|soulsilver|black|white|xy|sun|moon|sword|shield|scarlet|violet|prismatic|evolutions|champions|destiny|dragon|legendary|mythical|ultra|shining|reverse|holo|promo|secret|rare|common|uncommon)$", RegexOptions.Compiled | RegexOptions.IgnoreCase)]
     private static partial Regex SetKeywordRegex();
 
-    private sealed record ExtractedFields(string Name, string? CollectorNumber, string? SetName);
+    [GeneratedRegex(@"\b(?<set>MEP|SVP)\s*(?<language>PT|EN|ES|FR|DE|IT)?\s*(?<number>\d{1,4})\b", RegexOptions.IgnoreCase)]
+    private static partial Regex PromoFooterRegex();
+
+    private sealed record ExtractedFields(string Name, string? CollectorNumber, string? SetName, string? PromoSet, string? PrintedLanguage);
 }

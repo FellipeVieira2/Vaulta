@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Testcontainers.PostgreSql;
 using Vaulta.Identity.Contracts;
 using Vaulta.Marketplace.Contracts;
 using Vaulta.Marketplace.Domain;
@@ -90,8 +89,8 @@ public sealed class SellerReviewFlowTests(ApiFixture fixture)
     [Fact]
     public async Task MigrationClassifiesLegacyRolesAndPreservesUnknownRows()
     {
-        await using var postgres = new PostgreSqlBuilder("postgres:17-alpine").Build(); await postgres.StartAsync();
-        await using var db = new ReviewsDbContext(new DbContextOptionsBuilder<ReviewsDbContext>().UseNpgsql(postgres.GetConnectionString()).Options);
+        await using var postgres = await TestPostgresDatabase.Start();
+        await using var db = new ReviewsDbContext(new DbContextOptionsBuilder<ReviewsDbContext>().UseNpgsql(postgres.ConnectionString).Options);
         var migrator = db.GetService<IMigrator>(); await migrator.MigrateAsync("20260928221900_InitReviews");
         await db.Database.ExecuteSqlRawAsync("CREATE SCHEMA orders; CREATE TABLE orders.orders (id uuid PRIMARY KEY, buyer_id uuid NOT NULL, seller_id uuid NOT NULL, status text NOT NULL);");
         var orderId = Guid.NewGuid(); var buyerId = Guid.NewGuid(); var sellerId = Guid.NewGuid();

@@ -42,6 +42,8 @@
 	<ItemGroup>
 		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appicon.svg" Color="#030817" />
 		<MauiImage Include="Resources/Images/*.svg" />
+		<MauiFont Include="Resources/Fonts/*.ttf" />
+		<MauiAsset Include="Resources/Fonts/Inter-OFL.txt" LogicalName="licenses/Inter-OFL.txt" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.60" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
 		<PackageReference Include="CommunityToolkit.Maui.Camera" Version="6.1.0" />

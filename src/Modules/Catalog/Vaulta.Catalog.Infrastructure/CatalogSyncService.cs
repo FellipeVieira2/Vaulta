@@ -73,7 +73,7 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
                     var seenPrintingIds = new List<Guid>(details.Printings.Count);
                     foreach (var printing in details.Printings)
                         seenPrintingIds.Add(await UpsertPrinting(source.Code, game, set, printing, run, cancellationToken));
-                    await DeactivateMissingPrintings(set, seenPrintingIds, run, cancellationToken);
+                    await DeactivateMissingPrintings(set, seenPrintingIds, source.Language, run, cancellationToken);
                     await db.SaveChangesAsync(cancellationToken);
                     await transaction.CommitAsync(cancellationToken);
                     logger.LogInformation("Catalog set persisted with {PrintingCount} printings", details.Printings.Count);
@@ -160,14 +160,19 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
 
     private async Task<Guid> UpsertPrinting(string providerCode, Game game, Set set, ProviderPrinting input, CatalogSyncRun run, CancellationToken ct)
     {
-        var cardExternal = await db.ExternalIds.SingleOrDefaultAsync(x => x.Provider == providerCode && x.EntityType == EntityCard && x.ExternalId == input.ExternalId, ct);
+        // TCGdex reuses the same card ID in every language. Preserve legacy
+        // English identities, and namespace other languages rather than
+        // overwriting a printing already owned by collectors.
+        var sourceId = providerCode == "tcgdex" && CatalogNormalizer.NormalizeLanguage(input.Language) != "en"
+            ? $"{CatalogNormalizer.NormalizeLanguage(input.Language)}:{input.ExternalId}" : input.ExternalId;
+        var cardExternal = await db.ExternalIds.SingleOrDefaultAsync(x => x.Provider == providerCode && x.EntityType == EntityCard && x.ExternalId == sourceId, ct);
         Card card;
         if (cardExternal is null)
         {
             card = new Card { Id = Guid.NewGuid(), GameId = game.Id, Name = input.Name, NormalizedName = CatalogNormalizer.NormalizeName(input.Name) };
             db.Cards.Add(card);
             run.RecordsUnresolved++; // No authoritative cross-printing Card identity from this source.
-            cardExternal = NewExternal(providerCode, EntityCard, card.Id, input.ExternalId, input);
+            cardExternal = NewExternal(providerCode, EntityCard, card.Id, sourceId, input);
             db.ExternalIds.Add(cardExternal);
             run.RecordsCreated++;
         }
@@ -182,7 +187,7 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
             UpdateExternal(cardExternal, input);
         }
 
-        var printingExternal = await db.ExternalIds.SingleOrDefaultAsync(x => x.Provider == providerCode && x.EntityType == EntityPrinting && x.ExternalId == input.ExternalId, ct);
+        var printingExternal = await db.ExternalIds.SingleOrDefaultAsync(x => x.Provider == providerCode && x.EntityType == EntityPrinting && x.ExternalId == sourceId, ct);
         Printing printing;
         if (printingExternal is null)
         {
@@ -191,7 +196,7 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
                 Rarity = CatalogNormalizer.NormalizeCode(input.Rarity), RawRarity = input.Rarity,
                 ExternalArtworkUrl = input.ImageUrl, ArtworkProvider = input.ImageUrl is null ? null : providerCode, IsActive = true };
             db.Printings.Add(printing);
-            db.ExternalIds.Add(NewExternal(providerCode, EntityPrinting, printing.Id, input.ExternalId, input));
+            db.ExternalIds.Add(NewExternal(providerCode, EntityPrinting, printing.Id, sourceId, input));
             run.RecordsCreated++;
         }
         else
@@ -233,11 +238,12 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
         return printing.Id;
     }
 
-    private async Task DeactivateMissingPrintings(Set set, IReadOnlyCollection<Guid> seenPrintingIds, CatalogSyncRun run, CancellationToken ct)
+    private async Task DeactivateMissingPrintings(Set set, IReadOnlyCollection<Guid> seenPrintingIds, string? language, CatalogSyncRun run, CancellationToken ct)
     {
         // Only reached after every printing in this provider batch has been upserted successfully; a Printing
         // previously known for this Set that the provider no longer returns becomes unavailable, not deleted.
-        var toDeactivate = await db.Printings.Where(x => x.SetId == set.Id && x.IsActive && !seenPrintingIds.Contains(x.Id)).ToArrayAsync(ct);
+        var toDeactivate = await db.Printings.Where(x => x.SetId == set.Id && x.IsActive && (language == null || x.Language == language)
+            && !seenPrintingIds.Contains(x.Id)).ToArrayAsync(ct);
         foreach (var printing in toDeactivate)
         {
             printing.IsActive = false;
