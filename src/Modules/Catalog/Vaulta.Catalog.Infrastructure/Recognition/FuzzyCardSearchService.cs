@@ -38,7 +38,7 @@ public sealed partial class FuzzyCardSearchService(
             foreach (var item in searchResults)
             {
                 var score = CalculateScore(item, extracted);
-                if (score >= 0.55 && (!candidates.TryGetValue(item.Card.PrintingId, out var previous) || previous.Score < score))
+                if (score >= 0.45 && (!candidates.TryGetValue(item.Card.PrintingId, out var previous) || previous.Score < score))
                     candidates[item.Card.PrintingId] = (item, score, extracted.CollectorNumber is not null &&
                         NormalizeNumber(item.Card.CollectorNumber) == NormalizeNumber(extracted.CollectorNumber));
             }
@@ -129,7 +129,7 @@ public sealed partial class FuzzyCardSearchService(
                 Normalize(extracted.SetName)) / 100.0;
         }
 
-        if (nameScore < 0.55 || (extracted.CollectorNumber is not null && numberScore == 0)) return 0;
+        if (nameScore < 0.45 || (extracted.CollectorNumber is not null && numberScore == 0)) return 0;
         var availableWeight = NameWeight + (extracted.CollectorNumber is not null ? NumberWeight : 0) + (extracted.SetName is not null ? SetWeight : 0);
         // A common Pokémon name alone identifies a character, not its printing.
         // Never present a name-only guess with the confidence of an exact card.
