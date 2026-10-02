@@ -36,9 +36,9 @@ public sealed class ScannerService(
                 if (reading.Evidence is { Name.Value: { } name, Name.Confidence: >= .65 } evidence)
                     visual ??= new(name, evidence.CollectorNumber.Value, evidence.Language.Value, evidence.SetName.Value, evidence.Name.Confidence,
                         evidence.GameCode.Value, evidence.Hp is { Confidence: >= .8, Value: { } hp } && int.TryParse(hp, out var value) ? value : null,
-                        Visible(evidence.Finish) ?? Visible(evidence.Variant), Visible(evidence.Condition),
+                        ReadVariant(evidence), Visible(evidence.Condition),
                         ReadCertification(evidence), new(Visible(evidence.Rarity),
-                            int.TryParse(Visible(evidence.Year), out var year) ? year : null, Visible(evidence.CardType), Visible(evidence.Stage)));
+                            int.TryParse(Visible(evidence.Year), out var year) ? year : null, Visible(evidence.CardType), Visible(evidence.Stage)), Visible(evidence.Finish));
             }
             else candidates.AddRange(await provider.IdentifyAsync(image, cancellationToken));
         }
@@ -46,7 +46,14 @@ public sealed class ScannerService(
         return (await MapResult(candidates, cancellationToken)) with { VisualIdentification = visual, ServiceIssue = serviceIssue };
     }
 
-    private static string? Visible(CardEvidenceField? field) => field is { Confidence: >= .85 and <= 1, Value: { } value } ? value : null;
+    private static string? Visible(CardEvidenceField? field) => field is { Confidence: >= ScannerConfidencePolicy.AutoAcceptThreshold and <= 1, Value: { } value } ? value : null;
+    private static string? ReadVariant(CardEvidence evidence)
+    {
+        var variant = Visible(evidence.Variant) ?? Visible(evidence.Finish);
+        // Texture and full-art layout are useful observations, but do not by
+        // themselves resolve the priced normal/holo/reverse classification.
+        return variant is "normal" or "holo" or "reverse" ? variant : null;
+    }
     private static CardCertificationDto? ReadCertification(CardEvidence evidence) => Visible(evidence.IsGraded) == "true"
         || Visible(evidence.GradingCompany) is not null || Visible(evidence.Grade) is not null || Visible(evidence.CertificationNumber) is not null
         ? new(Visible(evidence.GradingCompany), Visible(evidence.Grade), Visible(evidence.CertificationNumber)) : null;

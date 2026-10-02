@@ -6,6 +6,30 @@ namespace Vaulta.App.Core.UnitTests.Catalog;
 public sealed class ScannerSceneGateTests
 {
     [Fact]
+    public void ConfirmedRemovalRearmsAnIdenticalCopyEvenWhenPreviewSignatureIsUnchanged()
+    {
+        var gate = new ScannerSceneGate(); var frame = Enumerable.Repeat((byte)80, 288).ToArray();
+        gate.Observe(frame, 0); gate.Consume(frame);
+        Assert.False(gate.Observe(frame, 1500, cardPresent: false));
+        Assert.False(gate.Observe(frame, 1750, cardPresent: false));
+        Assert.False(gate.Observe(frame, 2000));
+        Assert.False(gate.Observe(frame, 2999));
+        Assert.True(gate.Observe(frame, 3000));
+        gate.Consume(frame);
+        Assert.False(gate.Observe(frame, 5000));
+    }
+
+    [Fact]
+    public void OneMissedPresenceSampleDoesNotCountTheSameCardTwice()
+    {
+        var gate = new ScannerSceneGate(); var frame = Enumerable.Repeat((byte)80, 288).ToArray();
+        gate.Observe(frame, 0); gate.Consume(frame);
+        Assert.False(gate.Observe(frame, 1500, cardPresent: false));
+        Assert.False(gate.Observe(frame, 1750));
+        Assert.False(gate.Observe(frame, 5000));
+    }
+
+    [Fact]
     public void SmallHandAndExposureChangesStillCaptureWithinOneSecond()
     {
         var gate = new ScannerSceneGate();

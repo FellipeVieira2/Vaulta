@@ -71,6 +71,8 @@ public sealed class OpenAiScannerFlowTests(ApiFixture fixture)
             var candidate = Assert.Single(result.Candidates, x => x.PrintingId == printingId);
             Assert.Null(candidate.EstimatedMarketValueBrl); Assert.True(candidate.HasCollectorNumberMatch);
             Assert.Equal(["holo", "normal"], candidate.VariantCodes);
+            Assert.InRange(candidate.ConfidenceScore, .8, .9);
+            Assert.Equal("normal", result.VisualIdentification!.Finish);
             if (i == 1)
             {
                 Assert.Equal("PSA", result.VisualIdentification!.Certification!.Company);
@@ -104,7 +106,7 @@ public sealed class OpenAiScannerFlowTests(ApiFixture fixture)
         {
             Calls++;
             const string evidence = """
-                {"schemaVersion":1,"gameCode":{"value":"pokemon","confidence":0.99},"name":{"value":"OpenAi Scanner Test Card","confidence":0.99},"collectorNumber":{"value":"058/102","confidence":0.99},"setCode":{"value":null,"confidence":0},"setName":{"value":null,"confidence":0},"language":{"value":"en","confidence":0.99},"variant":{"value":null,"confidence":0}}
+                {"schemaVersion":1,"gameCode":{"value":"pokemon","confidence":0.8},"name":{"value":"OpenAi Scanner Test Card","confidence":0.8},"collectorNumber":{"value":"058/102","confidence":0.8},"setCode":{"value":null,"confidence":0},"setName":{"value":null,"confidence":0},"language":{"value":"en","confidence":0.8},"variant":{"value":"normal","confidence":0.8}}
                 """;
             var reading = JsonNode.Parse(evidence)!;
             if (Certified)

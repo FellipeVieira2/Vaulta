@@ -1,4 +1,5 @@
 using Vaulta.Catalog.Application;
+using Vaulta.Catalog.Contracts;
 using Vaulta.Catalog.Domain;
 using FuzzySharp;
 using System.Text.RegularExpressions;
@@ -45,7 +46,7 @@ public sealed class CardEvidenceCatalogMatcher(ICardRecognitionCatalog catalog)
         var candidates = ranked.OrderByDescending(x => x.ConfidenceScore).ThenBy(x => x.PrintingId, StringComparer.Ordinal).Take(5)
             .Select(x => ambiguous ? x with { ConfidenceScore = Math.Min(0.7, x.ConfidenceScore) } : x).ToArray();
         var status = ambiguous ? CardEvidenceMatchStatus.Ambiguous
-            : candidates[0].ConfidenceScore >= 0.9 && candidates[0].HasCollectorNumberMatch ? CardEvidenceMatchStatus.Matched : CardEvidenceMatchStatus.NeedsReview;
+            : candidates[0].ConfidenceScore >= ScannerConfidencePolicy.AutoAcceptThreshold && candidates[0].HasCollectorNumberMatch ? CardEvidenceMatchStatus.Matched : CardEvidenceMatchStatus.NeedsReview;
         return new(status, candidates, Version);
     }
 

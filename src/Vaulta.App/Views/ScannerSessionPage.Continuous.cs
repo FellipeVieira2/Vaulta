@@ -71,8 +71,18 @@ public sealed partial class ScannerSessionPage
         // Identity belongs to the captured photo. Moving the physical card while
         // awaiting the response must not discard a valid completed recognition.
         var visual = result.VisualIdentification;
+        await AcceptOrConfirmCard(details, visual, operation);
+    }
+
+    private async Task AcceptOrConfirmCard(ScannerCardDetailsDto details, CardVisualIdentificationDto? visual, ScannerOperation operation)
+    {
+        RequireScannerOperation(operation);
         var selected = ScannerValuation.SelectVariant(details, visual);
-        if (selected is null && details.Printing.Variants.Count > 0) { ShowCardDetails(details, visual, operation); return; }
+        // The API only exposes finishes meeting the 80% acceptance threshold.
+        // Keep confident finishes absent from the catalog without guessing a
+        // different priced variant. Only uncertain readings need confirmation.
+        if (selected is null && visual?.Finish is null && details.Printing.Variants.Count > 0)
+        { ShowCardDetails(details, visual, operation); return; }
         var condition = visual?.Certification is not null ? "UNKNOWN" : visual?.Condition ?? "UNKNOWN";
         var quote = ScannerValuation.ChooseQuote(details, selected?.Id, visual);
         await AddIdentifiedCard(details, selected, condition, quote, Guid.NewGuid(), DateTimeOffset.UtcNow, operation, visual);
@@ -83,14 +93,15 @@ public sealed partial class ScannerSessionPage
     {
         operation ??= BeginScannerOperation(); RequireScannerOperation(operation);
         var card = new ScannerSessionCard(scanId, details.Printing.PrintingId, variant?.Id, details.Printing.CardName,
-            details.Printing.SetName, details.Printing.CollectorNumber, variant?.Name ?? "Sem variante", condition, details.Printing.ArtworkUrl,
+            details.Printing.SetName, details.Printing.CollectorNumber, variant?.Name ?? visual?.Finish ?? "Sem variante", condition, details.Printing.ArtworkUrl,
             quote is null ? null : new(decimal.Round(quote.MarketValueBrl, 2), quote.Source, quote.UpdatedAt,
                 quote.OriginalValue, quote.OriginalCurrency, quote.ExchangeRate, quote.ExchangeRateAt), scannedAt, VisualIdentification: visual);
         var previousTotal = operation.Session.EstimatedValueBrl;
         var added = operation.Session.Add(card); await _store.Save(added, operation.Context.Token); RequireScannerOperation(operation); _session = added;
         ClearResults(); _status.Text = quote is null ? "Pode retirar a carta · adicionada sem cotação." : "Pode retirar a carta.";
-        UpdateScore(); ShowLastCard(card); await RecordVideoReveal(card); RequireScannerOperation(operation);
+        UpdateScore();
         SetIdentificationLoading(false);
-        await Reveal(card, previousTotal); RequireScannerOperation(operation); ShowLiquidityActions(card);
+        await Reveal(card, previousTotal); RequireScannerOperation(operation);
+        _status.Text = "Mostre a próxima carta · captura automática.";
     }
 }

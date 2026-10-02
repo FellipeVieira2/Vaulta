@@ -13,19 +13,12 @@ public sealed partial class ScannerSessionPage
     private readonly SessionRevealDrawable _revealDrawing = new();
     private GraphicsView? _revealCanvas;
     private Border? _revealPanel;
-    private Border? _lastCardPanel;
     private Border? _resultPanel;
     private ProgressBar? _costProgress;
     private Border? _identificationPanel;
     private ActivityIndicator? _identificationSpinner;
     private Label? _identificationText;
-    private readonly Label _revealTitle = Text("", 12, Color.FromArgb("#FFDA77"), true);
     private readonly Label _revealValue = Text("", 44, Colors.White, true);
-    private readonly Label _revealName = Text("", 18, Colors.White, true);
-    private readonly Label _lastCard = Text("", 13, Colors.White);
-    private readonly Label _lastCardEdition = Text("", 11, Color.FromArgb("#B4B5C8"));
-    private readonly Label _lastCardValue = Text("", 23, Color.FromArgb("#C8FFDD"), true);
-    private readonly Image _lastCardArtwork = new() { WidthRequest = 42, HeightRequest = 58, Aspect = Aspect.AspectFit };
 
     private void ShowLive()
     {
@@ -88,21 +81,13 @@ public sealed partial class ScannerSessionPage
         _identificationPanel.InputTransparent = true;
         SemanticProperties.SetDescription(_identificationPanel, "Identificando esta carta. Aguarde antes de mostrar a próxima.");
         center.Children.Add(_identificationPanel);
-        var revealText = new VerticalStackLayout { Spacing = 6, Children = { _revealTitle, _revealValue, _revealName } };
-        _revealTitle.HorizontalTextAlignment = TextAlignment.Center; _revealValue.HorizontalTextAlignment = TextAlignment.Center;
-        _revealName.HorizontalTextAlignment = TextAlignment.Center; _revealName.MaxLines = 2;
-        _revealPanel = Surface(revealText, "#EF11101D"); _revealPanel.Margin = 24; _revealPanel.VerticalOptions = LayoutOptions.Center;
+        _revealValue.HorizontalTextAlignment = TextAlignment.Center;
+        _revealPanel = Surface(_revealValue, "#EF11101D"); _revealPanel.Margin = 24; _revealPanel.VerticalOptions = LayoutOptions.Center;
         _revealPanel.IsVisible = false; _revealPanel.InputTransparent = true;
         _revealPanel.Stroke = Color.FromArgb("#C8B1FF"); _revealPanel.StrokeThickness = 1.5;
         center.Children.Add(_revealPanel); overlay.Add(center, 0, 1);
 
         var bottom = new VerticalStackLayout { Padding = new Thickness(16, 6, 16, 12), Spacing = 7 };
-        _lastCard.MaxLines = 1; _lastCard.LineBreakMode = LineBreakMode.TailTruncation;
-        var lastContent = new Grid { ColumnSpacing = 10, ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) } };
-        lastContent.Add(_lastCardArtwork); lastContent.Add(new VerticalStackLayout { Spacing = 4, VerticalOptions = LayoutOptions.Center,
-            Children = { _lastCard, _lastCardEdition } }, 1, 0); lastContent.Add(_lastCardValue, 2, 0);
-        _lastCardValue.VerticalOptions = LayoutOptions.Center;
-        _lastCardPanel = Surface(lastContent, "#E8111520"); _lastCardPanel.IsVisible = false; bottom.Children.Add(_lastCardPanel);
         var scroll = new ScrollView { Content = _result, MaximumHeightRequest = 300 };
         _resultPanel = Surface(scroll, "#F0080911"); _resultPanel.IsVisible = false;
         // Results float over the camera area; opening them must not collapse
@@ -110,13 +95,10 @@ public sealed partial class ScannerSessionPage
         _resultPanel.VerticalOptions = LayoutOptions.End; _resultPanel.Margin = new Thickness(16, 0, 16, 8);
         overlay.Add(_resultPanel, 0, 1);
         _status.FontSize = 12; bottom.Children.Add(Surface(_status, "#CE080911"));
-        var actions = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto), new(GridLength.Star) }, ColumnSpacing = 14 };
+        var actions = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star) }, ColumnSpacing = 14 };
         var search = Action("Buscar", Search); search.BackgroundColor = Colors.Transparent;
-        var capture = Action("●", CaptureCard); capture.BackgroundColor = Colors.White; capture.TextColor = Color.FromArgb("#211C30");
-        capture.WidthRequest = 64; capture.HeightRequest = 64; capture.CornerRadius = 32; capture.FontSize = 32; capture.Padding = 0;
-        SemanticProperties.SetDescription(capture, "Capturar carta agora");
         var finish = Action("Finalizar", Finish); finish.BackgroundColor = Colors.Transparent;
-        actions.Add(search); actions.Add(capture, 1, 0); actions.Add(finish, 2, 0); bottom.Children.Add(actions);
+        actions.Add(search); actions.Add(finish, 1, 0); bottom.Children.Add(actions);
         var options = Action("Opções da sessão", async () =>
         {
             var choice = await DisplayActionSheetAsync("Sessão", "Voltar", null,
@@ -129,20 +111,11 @@ public sealed partial class ScannerSessionPage
             else if (choice == "Nova sessão") { await StopRecording(); RequireOwner(); _session = null; ShowSetup(); }
         });
         options.FontSize = 11; options.MinimumHeightRequest = 40; options.Padding = new Thickness(8, 4); options.BackgroundColor = Colors.Transparent;
-        var recording = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) }, ColumnSpacing = 8 };
-        _recordButton = Action("Gravar com voz e efeitos", ToggleRecording); _recordButton.BackgroundColor = Color.FromArgb("#472339");
-        _recordButton.FontSize = 12; _recordButton.MinimumHeightRequest = 42; _recordButton.Padding = new Thickness(10, 6);
-        recording.Add(_recordButton); recording.Add(options, 1, 0); bottom.Children.Add(recording);
-        _videoClock.Text = ""; bottom.Children.Add(_videoClock);
+        _recordButton = null;
+        bottom.Children.Add(options);
         overlay.Add(bottom, 0, 2); root.Children.Add(overlay);
         _revealCanvas = new GraphicsView { Drawable = _revealDrawing, InputTransparent = true }; root.Children.Add(_revealCanvas);
         Content = root; UpdateScore();
-        if (_session!.Cards.LastOrDefault() is { } latest)
-        {
-            ShowLastCard(latest);
-            ShowLiquidityActions(latest);
-            _status.Text = "Retome esta carta ou toque em Próxima carta para continuar.";
-        }
     }
 
     private void ClearResults()
@@ -159,18 +132,6 @@ public sealed partial class ScannerSessionPage
         return false;
     }
 
-    private void ShowLastCard(ScannerSessionCard card)
-    {
-        _lastCard.Text = card.Name;
-        _lastCardEdition.Text = card.VisualIdentification?.Certification is { } label
-            ? $"{label.Company ?? "Certificação"} · nota {label.Grade ?? "ilegível"}"
-            : $"{card.CollectorNumber} · {card.VariantName}";
-        _lastCardValue.Text = card.MarketValue is { } value ? Money(value.AmountBrl) : "Pendente";
-        _lastCardValue.FontSize = card.MarketValue is null ? 14 : 23;
-        _lastCardArtwork.Source = card.ArtworkUrl; _lastCardArtwork.IsVisible = !string.IsNullOrWhiteSpace(card.ArtworkUrl);
-        if (_lastCardPanel is not null) _lastCardPanel.IsVisible = true;
-    }
-
     private async Task Reveal(ScannerSessionCard card, decimal previousTotal)
     {
         RequireOwner(); var highlight = _session!.IsHighlight(card);
@@ -180,11 +141,9 @@ public sealed partial class ScannerSessionPage
         using var tone = _soundEnabled ? new Android.Media.ToneGenerator(Android.Media.Stream.Music, 60) : null;
         tone?.StartTone(highlight ? Android.Media.Tone.PropAck : Android.Media.Tone.PropBeep, highlight ? 450 : 150);
 #endif
-        _revealTitle.Text = card.MarketValue is null ? "NOVA CARTA" : highlight ? "GRANDE ACHADO" : "CARTA REVELADA";
         _revealValue.Text = card.MarketValue is { } value ? $"+ {Money(value.AmountBrl)}" : "Sem cotação";
         _revealValue.FontSize = card.MarketValue is null ? 28 : 38;
         _revealValue.TextColor = highlight ? Color.FromArgb("#FFDA77") : Color.FromArgb("#C8FFDD");
-        _revealName.Text = card.Name;
         var panel = _revealPanel;
         if (panel is null) return;
         panel.IsVisible = true; panel.Opacity = 1;
@@ -200,12 +159,13 @@ public sealed partial class ScannerSessionPage
                     _total.Text = Money(decimal.Round(previousTotal + (session.EstimatedValueBrl - previousTotal) * (decimal)progress, 2));
                 }).Commit(this, "SessionTotal", 16, 700, Easing.CubicOut);
                 new Animation(progress => { _revealDrawing.Progress = progress; _revealCanvas?.Invalidate(); })
-                    .Commit(this, "SessionConfetti", 16, highlight ? 1450u : 800u, Easing.Linear);
-                await panel.ScaleToAsync(highlight ? 1.035 : 1.015, 170, Easing.CubicOut);
+                    .Commit(this, "SessionConfetti", 16, 900u, Easing.Linear);
+                await panel.ScaleToAsync(highlight ? 1.035 : 1.015, 100, Easing.CubicOut);
                 token.ThrowIfCancellationRequested();
-                await panel.ScaleToAsync(1, 200, Easing.CubicOut);
+                await panel.ScaleToAsync(1, 140, Easing.CubicOut);
             }
-            await Task.Delay(highlight ? 1300 : 800, token);
+            await Task.Delay(650, token);
+            if (!UiMotion.ReducedMotion) await panel.FadeToAsync(0, 160, Easing.CubicIn);
         }
         finally
         {

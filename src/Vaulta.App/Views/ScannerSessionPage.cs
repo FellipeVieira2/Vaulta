@@ -111,7 +111,7 @@ public sealed partial class ScannerSessionPage : ContentPage
             Children = { Text("VAULTA / ABERTURA", 12, Color.FromArgb("#BBA4FF"), true), Text("Sua próxima\ngrande descoberta.", 34, Colors.White, true),
                 Text("Mostre o montinho e retire cada carta depois da identificação. A leitura é contínua.", 17, Color.FromArgb("#B4B5C8")),
                 Text("O acabamento e a condição são detectados automaticamente pela câmera. Aponte e aguarde o valor.", 12, Color.FromArgb("#B4B5C8")), packs, mode, cost,
-                Text("Grave só se quiser: toque em Gravar com voz e efeitos durante a sessão.", 13, Color.FromArgb("#BBA4FF")),
+                Text("A captura começa automaticamente quando a carta fica enquadrada por um instante.", 13, Color.FromArgb("#BBA4FF")),
                 Text("O custo é opcional. Se informar, a sessão mostrará a diferença estimada em relação ao valor das cartas.", 13, Color.FromArgb("#B4B5C8")) } };
         body.Children.Add(Action(editing ? "Salvar e continuar" : "Iniciar sessão", async () =>
         {
@@ -162,7 +162,7 @@ public sealed partial class ScannerSessionPage : ContentPage
             }
             RequireScannerOperation(operation);
             var result = await _scanner.ScanCardAsync(data.ToArray(), null, operation.Context.Token); RequireScannerOperation(operation);
-            if (continuous) await HandleContinuousResult(result, operation); else ShowCandidates(result);
+            await HandleContinuousResult(result, operation);
         }
         finally { SetIdentificationLoading(false); }
     }
@@ -212,7 +212,7 @@ public sealed partial class ScannerSessionPage : ContentPage
     {
         var operation = BeginScannerOperation();
         var details = await _scanner.GetCardDetailsAsync(printing, operation.Context.Token); RequireScannerOperation(operation);
-        ShowCardDetails(details, visual, operation);
+        await AcceptOrConfirmCard(details, visual, operation);
     }
 
     private void ShowCardDetails(ScannerCardDetailsDto details, CardVisualIdentificationDto? visual, ScannerOperation operation)
@@ -230,7 +230,7 @@ public sealed partial class ScannerSessionPage : ContentPage
         heading.Add(identity, 1, 0); _result.Children.Add(heading);
         AddVisualDetails(visual);
         _status.Text = visual?.Certification is not null ? "Carta certificada lida. Cotação da certificação pendente."
-            : "Carta identificada. Toque no acabamento para somar o valor.";
+            : "Não confirmei o acabamento com 80% de confiança. Confira esta carta.";
         _result.Children.Add(Text(visual?.Certification is not null ? "O preço da carta comum não representa o valor desta certificação."
             : "Confirme o acabamento · referência internacional em reais", 12, Color.FromArgb("#B4B5C8")));
         var scanId = Guid.NewGuid(); var scannedAt = DateTimeOffset.UtcNow;
@@ -249,14 +249,17 @@ public sealed partial class ScannerSessionPage : ContentPage
         if (_resultPanel is not null) _resultPanel.IsVisible = true;
     }
 
-    private void AddVisualDetails(CardVisualIdentificationDto? visual)
+    private void AddVisualDetails(CardVisualIdentificationDto? visual, VerticalStackLayout? target = null)
     {
+        target ??= _result;
         if (visual?.Certification is { } label)
-            _result.Children.Add(Text($"{label.Company ?? "Certificadora ilegível"} · nota {label.Grade ?? "ilegível"} · certificado {label.Number ?? "ilegível"} · leitura visual", 12, Color.FromArgb("#C8FFDD")));
+            target.Children.Add(Text($"{label.Company ?? "Certificadora ilegível"} · nota {label.Grade ?? "ilegível"} · certificado {label.Number ?? "ilegível"} · leitura visual não verificada", 12, Color.FromArgb("#C8FFDD")));
+        if (visual?.SurfaceTreatment is "textured" or "full-art")
+            target.Children.Add(Text(visual.SurfaceTreatment == "textured" ? "Superfície texturizada" : "Arte em toda a carta", 12, Color.FromArgb("#B4B5C8")));
         if (visual?.Attributes is { } attributes)
         {
             var text = string.Join(" · ", new[] { attributes.Rarity, attributes.Year?.ToString(), attributes.CardType, attributes.Stage }.Where(x => !string.IsNullOrWhiteSpace(x)));
-            if (text.Length > 0) _result.Children.Add(Text(text, 12, Color.FromArgb("#B4B5C8")));
+            if (text.Length > 0) target.Children.Add(Text(text, 12, Color.FromArgb("#B4B5C8")));
         }
     }
 
@@ -284,6 +287,7 @@ public sealed partial class ScannerSessionPage : ContentPage
         {
             var row = new VerticalStackLayout { Spacing = 4, Children = { Text(card.Name, 17, Colors.White, true), Text($"{card.SetName} · {card.CollectorNumber} · {card.VariantName}", 12, Color.FromArgb("#B4B5C8")),
                 Text(card.MarketValue is { } quote ? $"{Money(quote.AmountBrl)} · {quote.Source} · {quote.QuotedAt.ToLocalTime():dd/MM HH:mm}" : "Sem cotação", 14, Colors.White) } };
+            AddVisualDetails(card.VisualIdentification, row);
             if (session.Phase == ScannerSessionPhase.Completed)
                 row.Children.Add(Action("Remover da sessão", async () =>
                 {
@@ -360,8 +364,7 @@ public sealed partial class ScannerSessionPage : ContentPage
     private void DetachSharedViews()
     {
         _actions.Clear();
-        foreach (var view in new View[] { _total, _cost, _difference, _count, _status, _result, _revealTitle, _revealValue, _revealName,
-            _lastCard, _lastCardEdition, _lastCardValue, _lastCardArtwork, _videoClock })
+        foreach (var view in new View[] { _total, _cost, _difference, _count, _status, _result, _revealValue, _videoClock })
         {
             if (view.Parent is Layout layout) layout.Children.Remove(view);
             else if (view.Parent is Border border && border.Content == view) border.Content = null;

@@ -7,6 +7,33 @@ namespace Vaulta.Identity.UnitTests;
 
 public sealed class ScannerVisualResultTests
 {
+    [Theory]
+    [InlineData(.799, null)]
+    [InlineData(.8, "reverse")]
+    [InlineData(.84, "reverse")]
+    public async Task ModelVariantAtEightyPercentIsPreservedInsteadOfRequestingManualFinish(double confidence, string? expected)
+    {
+        var evidence = (await new Extractor().ExtractAsync([1], default))! with
+        {
+            Variant = new("reverse", confidence), Finish = new("textured", .99)
+        };
+        var provider = new EvidenceCardRecognitionProvider(new GivenExtractor(evidence), new(new EmptyCatalog()), null, "openai", null);
+        var result = await new ScannerService([provider], new LocalSearch(), new Resolver()).IdentifyAsync(new(Convert.ToBase64String([1]), null), default);
+        Assert.Equal(expected, result.VisualIdentification!.Finish);
+        Assert.Equal("textured", result.VisualIdentification.SurfaceTreatment);
+    }
+
+    [Theory]
+    [InlineData(.799, null)]
+    [InlineData(.8, "normal")]
+    public async Task FinishBelowEightyPercentRequiresReview(double confidence, string? expected)
+    {
+        var evidence = (await new Extractor().ExtractAsync([1], default))! with { Finish = new("normal", confidence) };
+        var provider = new EvidenceCardRecognitionProvider(new GivenExtractor(evidence), new(new EmptyCatalog()), null, "openai", null);
+        var result = await new ScannerService([provider], new LocalSearch(), new Resolver()).IdentifyAsync(new(Convert.ToBase64String([1]), null), default);
+        Assert.Equal(expected, result.VisualIdentification!.Finish);
+    }
+
     [Fact]
     public async Task LabelAndVisibleAttributesAreReturnedWithoutClaimingCertificateVerification()
     {

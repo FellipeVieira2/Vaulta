@@ -1,5 +1,10 @@
 namespace Vaulta.Catalog.Contracts;
 
+public static class ScannerConfidencePolicy
+{
+    public const double AutoAcceptThreshold = .8;
+}
+
 public sealed record CardScanRequest(string ImageBase64, string? GameCode);
 
 public sealed record CardScanCandidateDto(
@@ -19,7 +24,7 @@ public sealed record CardScanCandidateDto(
 // Visual reading is provisional: it never authorizes collection/marketplace writes.
 public sealed record CardVisualIdentificationDto(string Name, string? CollectorNumber, string? Language, string? SetName, double Confidence,
     string? GameCode = null, int? Hp = null, string? Finish = null, string? Condition = null,
-    CardCertificationDto? Certification = null, CardVisualAttributesDto? Attributes = null);
+    CardCertificationDto? Certification = null, CardVisualAttributesDto? Attributes = null, string? SurfaceTreatment = null);
 // A photographed label is evidence only; authenticity requires a separate issuer lookup.
 public sealed record CardCertificationDto(string? Company, string? Grade, string? Number, bool IsGraded = true)
 {

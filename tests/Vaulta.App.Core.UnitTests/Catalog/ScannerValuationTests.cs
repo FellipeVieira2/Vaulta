@@ -7,6 +7,16 @@ namespace Vaulta.App.Core.UnitTests.Catalog;
 public sealed class ScannerValuationTests
 {
     [Fact]
+    public void UnknownModelFinishCannotTakeTheOnlyCatalogVariantsPrice()
+    {
+        var details = Details();
+        details = details with { Printing = details.Printing with { Variants = [details.Printing.Variants[0]] } };
+        var selected = ScannerValuation.SelectVariant(details, Visual());
+        Assert.Null(selected);
+        Assert.Null(ScannerValuation.ChooseQuote(details, selected?.Id, Visual()));
+    }
+
+    [Fact]
     public void ConfirmedReverseAddsItsOwnQuoteAndPersistsVisualReading()
     {
         var details = Details(); var visual = Visual() with { Finish = "reverse" };

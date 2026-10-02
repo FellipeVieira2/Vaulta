@@ -9,7 +9,7 @@ public static class ScannerValuation
         var variants = details.Printing.Variants;
         if (!string.IsNullOrWhiteSpace(visual?.Finish))
             return variants.FirstOrDefault(x => string.Equals(x.Code, visual.Finish, StringComparison.OrdinalIgnoreCase));
-        return variants.Count == 1 ? variants[0] : null;
+        return visual is null && variants.Count == 1 ? variants[0] : null;
     }
 
     public static CardMarketQuoteDto? ChooseQuote(ScannerCardDetailsDto details, Guid? variantId, CardVisualIdentificationDto? visual = null) =>

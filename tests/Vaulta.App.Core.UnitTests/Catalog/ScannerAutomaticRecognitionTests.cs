@@ -6,15 +6,18 @@ namespace Vaulta.App.Core.UnitTests.Catalog;
 
 public sealed class ScannerAutomaticRecognitionTests
 {
-    [Fact]
-    public void StrongUniqueNumberMatchCanBeAccepted()
+    [Theory]
+    [InlineData(.8)]
+    [InlineData(.85)]
+    [InlineData(.98)]
+    public void UniqueNumberMatchAtEightyPercentOrAboveCanBeAccepted(double confidence)
     {
-        var candidate = Card(.98);
+        var candidate = Card(confidence);
         Assert.Equal(candidate, ScannerAutomaticRecognition.Select(new([candidate])));
     }
 
     [Theory]
-    [InlineData(.92, true)]
+    [InlineData(.799, true)]
     [InlineData(.99, false)]
     [InlineData(double.NaN, true)]
     [InlineData(double.PositiveInfinity, true)]
