@@ -8,7 +8,8 @@ public sealed record SessionMarketValue(decimal AmountBrl, string Source, DateTi
 public sealed record ScannerSessionCard(Guid ScanId, Guid PrintingId, Guid? VariantId, string Name, string SetName,
     string CollectorNumber, string VariantName, string Condition, string? ArtworkUrl, SessionMarketValue? MarketValue,
     DateTimeOffset ScannedAt, Guid? ImportedItemId = null, bool ImportStarted = false,
-    Guid? ListingDraftId = null, Guid? PublicationVersion = null, Guid? PublishedListingId = null);
+    Guid? ListingDraftId = null, Guid? PublicationVersion = null, Guid? PublishedListingId = null,
+    Vaulta.Catalog.Contracts.CardVisualIdentificationDto? VisualIdentification = null);
 
 /// <summary>A scan occurrence identifies a physical copy; printing IDs can repeat.</summary>
 public sealed record ScannerSession(Guid Id, Guid OwnerId, DateTimeOffset StartedAt, ScannerSessionPhase Phase,

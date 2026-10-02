@@ -5,6 +5,22 @@ namespace Vaulta.App.Core.UnitTests.Catalog;
 
 public sealed class ScannerCardPresenceTests
 {
+    [Theory]
+    [InlineData(90, 160)]
+    [InlineData(96, 128)]
+    [InlineData(72, 160)]
+    [InlineData(160, 72)]
+    public void CardAlignedWithTheActualCameraGuideIsDetected(int width, int height)
+    {
+        var guide = ScannerCaptureGuide.ForPreview(width, height);
+        var image = Enumerable.Repeat((byte)35, width * height).ToArray();
+        var left = (int)Math.Round(guide.Left); var top = (int)Math.Round(guide.Top);
+        var right = (int)Math.Round(guide.Left + guide.Width); var bottom = (int)Math.Round(guide.Top + guide.Height);
+        for (var y = top; y < bottom; y++) for (var x = left; x < right; x++)
+            image[y * width + x] = x > left + 5 && x < right - 5 && y > top + 5 && y < bottom - 5 && (x / 4 + y / 5) % 2 == 0 ? (byte)135 : (byte)180;
+        Assert.True(ScannerCardPresence.IsPresent(image, width, height));
+    }
+
     private const int Width = 96, Height = 128;
 
     [Theory]

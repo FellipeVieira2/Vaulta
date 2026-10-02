@@ -8,6 +8,58 @@ namespace Vaulta.Identity.UnitTests;
 
 public sealed class CardEvidenceTests
 {
+    [Theory]
+    [InlineData("pokemon", "058/102")]
+    [InlineData("yugioh", "LOB-001")]
+    [InlineData("onepiece", "OP01-001")]
+    public void VersionFourReadsGameAndCertificationWithoutInventingCanonicalIdentity(string game, string number)
+    {
+        var json = VersionFour();
+        json["gameCode"]!["value"] = game;
+        json["collectorNumber"]!["value"] = number;
+        json["isGraded"]!["value"] = "true";
+        json["isGraded"]!["confidence"] = .98;
+        json["gradingCompany"]!["value"] = "PSA";
+        json["gradingCompany"]!["confidence"] = .99;
+        json["grade"]!["value"] = "10";
+        json["grade"]!["confidence"] = .97;
+        json["certificationNumber"]!["value"] = "01234567";
+        json["certificationNumber"]!["confidence"] = .96;
+        var result = Assert.IsType<CardEvidence>(CardEvidenceJsonParser.Parse(json.ToJsonString(), "p", "m"));
+        Assert.Equal(game, result.GameCode.Value);
+        Assert.Equal(number, result.CollectorNumber.Value);
+        Assert.Equal("PSA", result.GradingCompany!.Value);
+        Assert.Equal("10", result.Grade!.Value);
+        Assert.Equal("01234567", result.CertificationNumber!.Value);
+    }
+
+    internal static JsonObject VersionFour()
+    {
+        var json = JsonNode.Parse(ValidJson)!.AsObject();
+        json["schemaVersion"] = 4;
+        foreach (var field in new[] { "hp", "finish", "condition", "isGraded", "gradingCompany", "grade", "certificationNumber", "rarity", "year", "cardType", "stage" })
+            json[field] = new JsonObject { ["value"] = null, ["confidence"] = 0 };
+        return json;
+    }
+
+    [Theory]
+    [InlineData("finish")]
+    [InlineData("condition")]
+    [InlineData("variant")]
+    public void UncertainOptionalAppearanceDoesNotDiscardReadableIdentity(string field)
+    {
+        var json = JsonNode.Parse(ValidJson)!;
+        json["schemaVersion"] = 3;
+        json["hp"] = new JsonObject { ["value"] = "140", ["confidence"] = .98 };
+        json["finish"] = new JsonObject { ["value"] = null, ["confidence"] = 0 };
+        json["condition"] = new JsonObject { ["value"] = null, ["confidence"] = 0 };
+        json[field]!["confidence"] = .25;
+        var evidence = Assert.IsType<CardEvidence>(CardEvidenceJsonParser.Parse(json.ToJsonString(), "p", "m"));
+        Assert.Equal("Pikachu", evidence.Name.Value);
+        Assert.Equal("058/102", evidence.CollectorNumber.Value);
+        Assert.Null(evidence.Finish!.Value);
+    }
+
     [Fact]
     public async Task MatcherDoesNotConfirmDenominatorMissingFromCatalog()
     {

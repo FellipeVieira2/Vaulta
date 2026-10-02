@@ -14,13 +14,13 @@ public sealed class ScannerSceneGate
         // Lower change threshold so the gate resets faster when a new card enters.
         if (_consumed is not null && Distance(signature, _consumed) >= 16) _changed = true;
         if (!cardPresent) { _stable = null; return false; }
-        // Tighter stability band and shorter dwell: trigger capture sooner
-        // so the user can point-and-shoot without holding still for a full second.
-        if (_stable is null || Distance(signature, _stable) > 7)
+        // Handheld preview and automatic exposure fluctuate even when the card
+        // is still. A narrow band keeps restarting the dwell indefinitely.
+        if (_stable is null || Distance(signature, _stable) > 15)
         {
             _stable = signature.ToArray(); _stableSince = timeMs; return false;
         }
-        return timeMs - _stableSince >= 550 && (_consumed is null || _changed);
+        return timeMs - _stableSince >= 1000 && (_consumed is null || _changed);
     }
 
     public void Consume(byte[] signature)

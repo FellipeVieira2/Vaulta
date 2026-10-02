@@ -10,6 +10,26 @@ namespace Vaulta.App.Core.UnitTests.Catalog;
 public sealed class ScannerOccurrenceImporterTests
 {
     [Fact]
+    public async Task CertificateFromThePhotoIsRetainedInCollectionNotesOnBothImportPaths()
+    {
+        var initial = Session();
+        var visual = new Vaulta.Catalog.Contracts.CardVisualIdentificationDto("Card", "1", "en", null, .99,
+            Certification: new("PSA", "10", "01234567"));
+        var session = initial with { Cards = initial.Cards.Select(x => x with { VisualIdentification = visual, MarketValue = null }).ToArray() };
+        var store = new MemoryStore(session); var handler = new Receipts();
+        var one = await Service(store, handler, () => session.OwnerId).Import(session, session.Cards[0].ScanId);
+        var completed = one.Complete(); await store.Save(completed);
+        await new ScannerSessionImporter(Client(handler), store, () => session.OwnerId).Import(completed);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.All(handler.Requests, request =>
+        {
+            Assert.Contains("01234567", request.Notes);
+            Assert.Contains("não verificada", request.Notes);
+            Assert.Null(request.AcquisitionPrice);
+        });
+    }
+
+    [Fact]
     public async Task ImportsOnlyChosenOccurrenceAndRetainsScanningPhase()
     {
         var session = Session(); var store = new MemoryStore(session); var handler = new Receipts();

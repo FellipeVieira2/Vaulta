@@ -15,7 +15,15 @@ public sealed record CardEvidence(
     string ModelVersion,
     CardEvidenceField? Hp = null,
     CardEvidenceField? Finish = null,
-    CardEvidenceField? Condition = null);
+    CardEvidenceField? Condition = null,
+    CardEvidenceField? IsGraded = null,
+    CardEvidenceField? GradingCompany = null,
+    CardEvidenceField? Grade = null,
+    CardEvidenceField? CertificationNumber = null,
+    CardEvidenceField? Rarity = null,
+    CardEvidenceField? Year = null,
+    CardEvidenceField? CardType = null,
+    CardEvidenceField? Stage = null);
 
 public interface ICardEvidenceExtractor
 {

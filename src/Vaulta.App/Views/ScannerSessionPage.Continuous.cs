@@ -63,42 +63,29 @@ public sealed partial class ScannerSessionPage
         var first = ScannerAutomaticRecognition.Select(result);
         if (candidates.Length == 0)
         {
-            _status.Text = result.VisualIdentification is { } visual
-                ? $"Li {DescribeVisual(visual)}, mas a edição ainda não foi confirmada."
-                : result.ServiceIssue is not null ? "O serviço de identificação está indisponível. Use Opções → Buscar pelo nome."
-                : "Não consegui identificar esta foto. Tente outra captura ou busque pelo nome.";
+            ShowCandidates(result);
             return;
         }
         if (first is null) { ShowCandidates(result); return; }
         var details = await _scanner.GetCardDetailsAsync(first.PrintingId, operation.Context.Token); RequireScannerOperation(operation);
         // Identity belongs to the captured photo. Moving the physical card while
         // awaiting the response must not discard a valid completed recognition.
-        var variants = details.Printing.Variants;
-        // Use GPT-detected finish when confident; fall back to session preset or single-variant auto-select.
-        // Never block the continuous flow on a picker — the goal is point-and-shoot with zero interaction.
-        var detectedFinish = result.VisualIdentification?.Finish;
-        CatalogVariantDto? selected = null;
-        if (!string.IsNullOrWhiteSpace(detectedFinish))
-            selected = variants.FirstOrDefault(x => string.Equals(x.Code, detectedFinish, StringComparison.OrdinalIgnoreCase));
-        selected ??= variants.Count == 1 ? variants[0] : null;
-        if (selected is null && variants.Count > 0) { await ShowCard(first.PrintingId); return; }
-        var condition = !string.IsNullOrWhiteSpace(result.VisualIdentification?.Condition) ? result.VisualIdentification!.Condition! : "UNKNOWN";
-        var quote = ChooseQuote(details, selected?.Id);
-        await AddIdentifiedCard(details, selected, condition, quote, Guid.NewGuid(), DateTimeOffset.UtcNow, operation);
+        var visual = result.VisualIdentification;
+        var selected = ScannerValuation.SelectVariant(details, visual);
+        if (selected is null && details.Printing.Variants.Count > 0) { ShowCardDetails(details, visual, operation); return; }
+        var condition = visual?.Certification is not null ? "UNKNOWN" : visual?.Condition ?? "UNKNOWN";
+        var quote = ScannerValuation.ChooseQuote(details, selected?.Id, visual);
+        await AddIdentifiedCard(details, selected, condition, quote, Guid.NewGuid(), DateTimeOffset.UtcNow, operation, visual);
     }
 
-    private static CardMarketQuoteDto? ChooseQuote(ScannerCardDetailsDto details, Guid? variantId) =>
-        details.MarketQuotes.Where(x => x.VariantId == variantId)
-            .OrderBy(x => x.Source.Contains("TCGplayer", StringComparison.OrdinalIgnoreCase) ? 0 : 1).FirstOrDefault();
-
     private async Task AddIdentifiedCard(ScannerCardDetailsDto details, CatalogVariantDto? variant, string condition,
-        CardMarketQuoteDto? quote, Guid scanId, DateTimeOffset scannedAt, ScannerOperation? operation = null)
+        CardMarketQuoteDto? quote, Guid scanId, DateTimeOffset scannedAt, ScannerOperation? operation = null, CardVisualIdentificationDto? visual = null)
     {
         operation ??= BeginScannerOperation(); RequireScannerOperation(operation);
         var card = new ScannerSessionCard(scanId, details.Printing.PrintingId, variant?.Id, details.Printing.CardName,
             details.Printing.SetName, details.Printing.CollectorNumber, variant?.Name ?? "Sem variante", condition, details.Printing.ArtworkUrl,
             quote is null ? null : new(decimal.Round(quote.MarketValueBrl, 2), quote.Source, quote.UpdatedAt,
-                quote.OriginalValue, quote.OriginalCurrency, quote.ExchangeRate, quote.ExchangeRateAt), scannedAt);
+                quote.OriginalValue, quote.OriginalCurrency, quote.ExchangeRate, quote.ExchangeRateAt), scannedAt, VisualIdentification: visual);
         var previousTotal = operation.Session.EstimatedValueBrl;
         var added = operation.Session.Add(card); await _store.Save(added, operation.Context.Token); RequireScannerOperation(operation); _session = added;
         ClearResults(); _status.Text = quote is null ? "Pode retirar a carta · adicionada sem cotação." : "Pode retirar a carta.";

@@ -18,7 +18,14 @@ public sealed record CardScanCandidateDto(
 
 // Visual reading is provisional: it never authorizes collection/marketplace writes.
 public sealed record CardVisualIdentificationDto(string Name, string? CollectorNumber, string? Language, string? SetName, double Confidence,
-    string? GameCode = null, int? Hp = null, string? Finish = null, string? Condition = null);
+    string? GameCode = null, int? Hp = null, string? Finish = null, string? Condition = null,
+    CardCertificationDto? Certification = null, CardVisualAttributesDto? Attributes = null);
+// A photographed label is evidence only; authenticity requires a separate issuer lookup.
+public sealed record CardCertificationDto(string? Company, string? Grade, string? Number, bool IsGraded = true)
+{
+    public bool Verified => false;
+}
+public sealed record CardVisualAttributesDto(string? Rarity, int? Year, string? CardType, string? Stage);
 public sealed record CardScanResultDto(IReadOnlyList<CardScanCandidateDto> Candidates, CardVisualIdentificationDto? VisualIdentification = null,
     string? ServiceIssue = null);
 

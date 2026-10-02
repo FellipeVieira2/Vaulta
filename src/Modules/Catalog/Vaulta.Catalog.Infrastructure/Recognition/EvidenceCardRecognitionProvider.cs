@@ -25,14 +25,18 @@ public sealed class EvidenceCardRecognitionProvider(ICardEvidenceExtractor extra
             activity?.SetTag("scanner.prompt.version", evidence.PromptVersion);
             activity?.SetTag("scanner.model.version", evidence.ModelVersion);
             var timer = Stopwatch.StartNew();
-            var match = await matcher.MatchAsync(evidence, GameCode, cancellationToken);
-            if (match.Candidates.Count == 0 && enricher is not null && await enricher.EnrichAsync(evidence, GameCode, cancellationToken))
-                match = await matcher.MatchAsync(evidence, GameCode, cancellationToken);
+            var visibleGame = evidence.GameCode is { Confidence: >= .8, Value: { } game } ? game : GameCode;
+            var match = await matcher.MatchAsync(evidence, visibleGame, cancellationToken);
+            if (match.Candidates.Count == 0 && enricher is not null && await enricher.EnrichAsync(evidence, visibleGame, cancellationToken))
+                match = await matcher.MatchAsync(evidence, visibleGame, cancellationToken);
             activity?.SetTag("scanner.match.status", match.Status.ToString());
             var tags = new[] { new KeyValuePair<string, object?>("provider", providerName), new("status", match.Status.ToString()) };
             ScannerTelemetry.Matches.Add(1, tags);
             ScannerTelemetry.MatcherDuration.Record(timer.Elapsed.TotalMilliseconds, tags);
             if (match.Candidates.Count > 0) return new(match.Candidates, evidence);
+            // One image, one visual extraction. Do not reinterpret another TCG
+            // with the Pokemon-only OCR fallback or invent catalog coverage.
+            if (!string.Equals(visibleGame, GameCode, StringComparison.OrdinalIgnoreCase)) return new([], evidence);
         }
         if (fallback is null) return new([], evidence, extraction.ServiceIssue);
         cancellationToken.ThrowIfCancellationRequested();

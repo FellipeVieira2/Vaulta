@@ -16,7 +16,7 @@ public sealed class ScannerSessionImporter(ICollectionClient collection, IScanne
             // Pack expense belongs to the session. A card's purchase price is unknown;
             // its market estimate is never persisted as an acquisition price.
             var request = new AddCollectibleItemsRequest(card.PrintingId, card.VariantId, 1, card.Condition, null,
-                DateOnly.FromDateTime(session.StartedAt.UtcDateTime), null);
+                DateOnly.FromDateTime(session.StartedAt.UtcDateTime), ScannerValuation.CertificationNotes(card.VisualIdentification));
             var result = await collection.AddItemsAsync(request, $"scanner-session-{session.Id:N}-{card.ScanId:N}", ct);
             RequireOwner(session);
             session = session.RecordImported(card.ScanId, result.CreatedItems.Single().Id);

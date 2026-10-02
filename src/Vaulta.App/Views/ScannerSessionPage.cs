@@ -161,7 +161,7 @@ public sealed partial class ScannerSessionPage : ContentPage
                 RequireScannerOperation(operation);
             }
             RequireScannerOperation(operation);
-            var result = await _scanner.ScanCardAsync(data.ToArray(), "pokemon", operation.Context.Token); RequireScannerOperation(operation);
+            var result = await _scanner.ScanCardAsync(data.ToArray(), null, operation.Context.Token); RequireScannerOperation(operation);
             if (continuous) await HandleContinuousResult(result, operation); else ShowCandidates(result);
         }
         finally { SetIdentificationLoading(false); }
@@ -180,7 +180,7 @@ public sealed partial class ScannerSessionPage : ContentPage
         var query = await DisplayPromptAsync("Buscar carta", "Digite o nome da carta.", "Buscar", "Cancelar");
         RequireScannerOperation(operation);
         if (string.IsNullOrWhiteSpace(query)) return;
-        var result = await _scanner.SearchCardsAsync(query, "pokemon", operation.Context.Token); RequireScannerOperation(operation); ShowCandidates(result, requireNumber: false);
+        var result = await _scanner.SearchCardsAsync(query, null, operation.Context.Token); RequireScannerOperation(operation); ShowCandidates(result, requireNumber: false);
     }
 
     private void ShowCandidates(CardScanResultDto result, bool requireNumber = true)
@@ -196,31 +196,29 @@ public sealed partial class ScannerSessionPage : ContentPage
             : result.Candidates.Count == 0 && result.ServiceIssue is not null ? "O serviço de identificação está indisponível. Use a busca pelo nome."
             : result.Candidates.Count == 0 ? "Não confirmei esta edição. Mostre nome e número nítidos ou busque a carta." : "Confira a edição para somar o valor correto.";
         foreach (var candidate in result.Candidates.Where(x => !requireNumber || x.HasCollectorNumberMatch).Take(3).Where(x => x.PrintingId != Guid.Empty))
-            _result.Children.Add(Action($"{candidate.Name} · {candidate.SetName} · {candidate.CollectorNumber}", () => ShowCard(candidate.PrintingId)));
+            _result.Children.Add(Action($"{candidate.Name} · {candidate.SetName} · {candidate.CollectorNumber}", () => ShowCard(candidate.PrintingId, result.VisualIdentification)));
+        if (result.Candidates.Count == 0 && result.VisualIdentification is { } reading)
+        {
+            _result.Children.Add(Text(DescribeVisual(reading), 18, Colors.White, true));
+            _result.Children.Add(Text($"{reading.GameCode ?? "TCG"} · {reading.Language ?? "idioma não legível"}", 12, Color.FromArgb("#B4B5C8")));
+            AddVisualDetails(reading);
+            _result.Children.Add(Text("Leitura do GPT concluída. Esta edição ainda não foi encontrada no catálogo; o valor está pendente.", 12, Color.FromArgb("#B4B5C8")));
+        }
         if (_result.Children.Count > 0) _result.Children.Add(Action("Pular carta", () => { ClearResults(); _status.Text = "Mostre a próxima carta."; return Task.CompletedTask; }));
         if (_resultPanel is not null) _resultPanel.IsVisible = _result.Children.Count > 0;
     }
 
-    private async Task ShowCard(Guid printing)
+    private async Task ShowCard(Guid printing, CardVisualIdentificationDto? visual = null)
     {
         var operation = BeginScannerOperation();
-        var details = await _scanner.GetCardDetailsAsync(printing, operation.Context.Token); RequireScannerOperation(operation); ClearResults();
+        var details = await _scanner.GetCardDetailsAsync(printing, operation.Context.Token); RequireScannerOperation(operation);
+        ShowCardDetails(details, visual, operation);
+    }
+
+    private void ShowCardDetails(ScannerCardDetailsDto details, CardVisualIdentificationDto? visual, ScannerOperation operation)
+    {
+        RequireScannerOperation(operation); ClearResults();
         var variants = details.Printing.Variants.ToArray();
-        var variant = new Picker { Title = "Escolha o acabamento", TitleColor = Color.FromArgb("#D2BFFF"), TextColor = Colors.White,
-            BackgroundColor = Color.FromArgb("#211C30"), ItemsSource = variants.Select(x => x.Name).ToArray(), SelectedIndex = variants.Length == 1 ? 0 : -1 };
-        var conditions = new[] { "UNKNOWN", "MINT", "NEAR_MINT", "LIGHTLY_PLAYED", "MODERATELY_PLAYED", "HEAVILY_PLAYED", "DAMAGED" };
-        var condition = new Picker { Title = "Condição da carta", TitleColor = Color.FromArgb("#D2BFFF"), BackgroundColor = Color.FromArgb("#211C30"), ItemsSource = new[] { "Não avaliada", "Mint", "Near mint", "Pouco jogada", "Jogada", "Muito jogada", "Danificada" }, SelectedIndex = 0, TextColor = Colors.White };
-        var valueLabel = Text("Escolha a variante para consultar o valor.", 20, Colors.White, true);
-        var averageLabel = Text("", 12, Color.FromArgb("#B4B5C8"));
-        CardMarketQuoteDto? SelectedQuote() => variant.SelectedIndex >= 0
-            ? details.MarketQuotes.Where(x => x.VariantId == variants[variant.SelectedIndex].Id).OrderBy(x => x.Source.Contains("TCGplayer", StringComparison.OrdinalIgnoreCase) ? 0 : 1).FirstOrDefault() : null;
-        void Price()
-        {
-            var quote = SelectedQuote(); valueLabel.Text = quote is null ? "Cotação indisponível" : $"{Money(quote.MarketValueBrl)} · {quote.Source}";
-            averageLabel.IsVisible = quote?.AverageMarketValueBrl is not null;
-            averageLabel.Text = quote?.AverageMarketValueBrl is { } average ? $"Média de {quote.AveragePeriodDays} dias: {Money(average)} · referência internacional em reais" : "";
-        }
-        variant.SelectedIndexChanged += (_, _) => Price(); Price();
         var identity = new VerticalStackLayout { Spacing = 5, Children = { Text(details.Printing.CardName, 22, Colors.White, true),
             Text($"{details.Printing.SetName} · {details.Printing.CollectorNumber}", 12, Color.FromArgb("#B4B5C8")) } };
         var heading = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star) } };
@@ -230,18 +228,36 @@ public sealed partial class ScannerSessionPage : ContentPage
             SemanticProperties.SetDescription(artwork, $"Imagem de referência de {details.Printing.CardName}"); heading.Add(artwork);
         }
         heading.Add(identity, 1, 0); _result.Children.Add(heading);
-        if (variants.Length > 0) _result.Children.Add(variant);
-        _result.Children.Add(valueLabel); _result.Children.Add(averageLabel); _result.Children.Add(condition);
-        _result.Children.Add(Text("Referência da variante em reais, sem ajuste pela condição. Confira antes de adicionar.", 12, Color.FromArgb("#B4B5C8")));
+        AddVisualDetails(visual);
+        _status.Text = visual?.Certification is not null ? "Carta certificada lida. Cotação da certificação pendente."
+            : "Carta identificada. Toque no acabamento para somar o valor.";
+        _result.Children.Add(Text(visual?.Certification is not null ? "O preço da carta comum não representa o valor desta certificação."
+            : "Confirme o acabamento · referência internacional em reais", 12, Color.FromArgb("#B4B5C8")));
         var scanId = Guid.NewGuid(); var scannedAt = DateTimeOffset.UtcNow;
-        _result.Children.Add(Action("Somar à sessão", async () =>
+        var condition = visual?.Certification is not null ? "UNKNOWN" : visual?.Condition ?? "UNKNOWN";
+        foreach (var variant in variants)
         {
-            if (variants.Length > 0 && variant.SelectedIndex < 0) throw new ArgumentException("Escolha a variante da carta.");
-            await AddIdentifiedCard(details, variants.Length > 0 ? variants[variant.SelectedIndex] : null,
-                conditions[Math.Max(0, condition.SelectedIndex)], SelectedQuote(), scanId, scannedAt, operation);
-        }));
+            var quote = ScannerValuation.ChooseQuote(details, variant.Id, visual);
+            _result.Children.Add(Action(quote is null ? $"{variant.Name} · adicionar sem cotação" : $"{variant.Name} · somar {Money(quote.MarketValueBrl)}",
+                () => AddIdentifiedCard(details, variant, condition, quote, scanId, scannedAt, operation, visual)));
+            if (quote?.AverageMarketValueBrl is { } average)
+                _result.Children.Add(Text($"Média {quote.AveragePeriodDays} dias: {Money(average)} · {quote.Source}", 11, Color.FromArgb("#B4B5C8")));
+        }
+        if (variants.Length == 0) _result.Children.Add(Action("Adicionar sem cotação",
+            () => AddIdentifiedCard(details, null, condition, null, scanId, scannedAt, operation, visual)));
         _result.Children.Add(Action("Pular carta", () => { ClearResults(); _status.Text = "Mostre a próxima carta."; return Task.CompletedTask; }));
         if (_resultPanel is not null) _resultPanel.IsVisible = true;
+    }
+
+    private void AddVisualDetails(CardVisualIdentificationDto? visual)
+    {
+        if (visual?.Certification is { } label)
+            _result.Children.Add(Text($"{label.Company ?? "Certificadora ilegível"} · nota {label.Grade ?? "ilegível"} · certificado {label.Number ?? "ilegível"} · leitura visual", 12, Color.FromArgb("#C8FFDD")));
+        if (visual?.Attributes is { } attributes)
+        {
+            var text = string.Join(" · ", new[] { attributes.Rarity, attributes.Year?.ToString(), attributes.CardType, attributes.Stage }.Where(x => !string.IsNullOrWhiteSpace(x)));
+            if (text.Length > 0) _result.Children.Add(Text(text, 12, Color.FromArgb("#B4B5C8")));
+        }
     }
 
     private static string DescribeVisual(CardVisualIdentificationDto visual) => visual.Name
@@ -344,7 +360,8 @@ public sealed partial class ScannerSessionPage : ContentPage
     private void DetachSharedViews()
     {
         _actions.Clear();
-        foreach (var view in new View[] { _total, _cost, _difference, _count, _status, _result, _revealTitle, _revealValue, _revealName, _lastCard, _videoClock })
+        foreach (var view in new View[] { _total, _cost, _difference, _count, _status, _result, _revealTitle, _revealValue, _revealName,
+            _lastCard, _lastCardEdition, _lastCardValue, _lastCardArtwork, _videoClock })
         {
             if (view.Parent is Layout layout) layout.Children.Remove(view);
             else if (view.Parent is Border border && border.Content == view) border.Content = null;

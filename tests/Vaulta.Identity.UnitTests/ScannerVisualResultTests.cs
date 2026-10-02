@@ -8,6 +8,51 @@ namespace Vaulta.Identity.UnitTests;
 public sealed class ScannerVisualResultTests
 {
     [Fact]
+    public async Task LabelAndVisibleAttributesAreReturnedWithoutClaimingCertificateVerification()
+    {
+        var source = new Extractor();
+        var evidence = (await source.ExtractAsync([1], default))! with
+        {
+            IsGraded = new("true", .99), GradingCompany = new("PSA", .99), Grade = new("10", .98),
+            CertificationNumber = new("01234567", .96), Year = new("2025", .95), Rarity = new("Rare", .95),
+            Finish = new("reverse", .6)
+        };
+        var provider = new EvidenceCardRecognitionProvider(new GivenExtractor(evidence), new(new EmptyCatalog()), null, "openai", null);
+        var result = await new ScannerService([provider], new LocalSearch(), new Resolver()).IdentifyAsync(new(Convert.ToBase64String([1]), null), default);
+        var visual = Assert.IsType<CardVisualIdentificationDto>(result.VisualIdentification);
+        Assert.Equal("PSA", visual.Certification!.Company);
+        Assert.Equal("10", visual.Certification.Grade);
+        Assert.Equal("01234567", visual.Certification.Number);
+        Assert.False(visual.Certification.Verified);
+        Assert.Equal(2025, visual.Attributes!.Year);
+        Assert.Null(visual.Finish);
+    }
+
+    [Fact]
+    public async Task AnotherGameIsReadInOneCallWithoutPokemonFallbackOrCatalogGuessing()
+    {
+        var evidence = (await new Extractor().ExtractAsync([1], default))! with { GameCode = new("onepiece", .99), CollectorNumber = new("OP01-001", .99) };
+        var extractor = new GivenExtractor(evidence);
+        var provider = new EvidenceCardRecognitionProvider(extractor, new(new EmptyCatalog()), new ForbiddenFallback(), "openai", "ocr");
+        var result = await new ScannerService([provider], new LocalSearch(), new Resolver()).IdentifyAsync(new(Convert.ToBase64String([1]), null), default);
+        Assert.Empty(result.Candidates);
+        Assert.Equal("onepiece", result.VisualIdentification!.GameCode);
+        Assert.Equal("OP01-001", result.VisualIdentification.CollectorNumber);
+        Assert.Equal(1, extractor.Calls);
+    }
+
+    private sealed class GivenExtractor(CardEvidence evidence) : ICardEvidenceExtractor
+    {
+        public int Calls;
+        public Task<CardEvidence?> ExtractAsync(byte[] imageData, CancellationToken ct) { Calls++; return Task.FromResult<CardEvidence?>(evidence); }
+    }
+    private sealed class ForbiddenFallback : ICardRecognitionProvider
+    {
+        public string GameCode => "pokemon";
+        public Task<IReadOnlyList<CardRecognitionCandidate>> IdentifyAsync(byte[] data, CancellationToken ct) => throw new InvalidOperationException("Do not reinterpret another game as Pokemon");
+    }
+
+    [Fact]
     public async Task ReadableCardMissingFromCatalogStillReturnsVisualReadingWithoutInventedId()
     {
         var extractor = new Extractor();

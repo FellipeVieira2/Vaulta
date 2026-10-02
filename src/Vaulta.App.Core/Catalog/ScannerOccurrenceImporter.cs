@@ -24,7 +24,7 @@ public sealed class ScannerOccurrenceImporter(ICollectionClient collection, ISca
             await store.Save(session, ct); // Freeze before HTTP; a lost response retries the exact same payload.
             RequireOwner(session);
             var request = new AddCollectibleItemsRequest(card.PrintingId, card.VariantId, 1, card.Condition, null,
-                DateOnly.FromDateTime(session.StartedAt.UtcDateTime), null);
+                DateOnly.FromDateTime(session.StartedAt.UtcDateTime), ScannerValuation.CertificationNotes(card.VisualIdentification));
             var receipt = await collection.AddItemsAsync(request, $"scanner-session-{session.Id:N}-{scanId:N}", ct);
             RequireOwner(session);
             session = session.RecordOccurrenceImported(scanId, receipt.CreatedItems.Single().Id);

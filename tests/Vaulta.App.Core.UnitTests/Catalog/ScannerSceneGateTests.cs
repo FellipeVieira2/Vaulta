@@ -6,6 +6,20 @@ namespace Vaulta.App.Core.UnitTests.Catalog;
 public sealed class ScannerSceneGateTests
 {
     [Fact]
+    public void SmallHandAndExposureChangesStillCaptureWithinOneSecond()
+    {
+        var gate = new ScannerSceneGate();
+        byte[] Frame(byte brightness) => Enumerable.Repeat(brightness, 288).ToArray();
+        Assert.False(gate.Observe(Frame(80), 0));
+        Assert.False(gate.Observe(Frame(89), 250));
+        Assert.False(gate.Observe(Frame(80), 500));
+        Assert.False(gate.Observe(Frame(89), 750));
+        Assert.True(gate.Observe(Frame(80), 1000));
+        gate.Consume(Frame(85));
+        Assert.False(gate.Observe(Frame(89), 2000));
+    }
+
+    [Fact]
     public void CaptureRequiresOneFullSecondAndConsumedPhotoDoesNotRequestAnother()
     {
         var gate = new ScannerSceneGate(); var card = Enumerable.Repeat((byte)80, 288).ToArray();

@@ -23,6 +23,9 @@ public sealed partial class ScannerSessionPage
     private readonly Label _revealValue = Text("", 44, Colors.White, true);
     private readonly Label _revealName = Text("", 18, Colors.White, true);
     private readonly Label _lastCard = Text("", 13, Colors.White);
+    private readonly Label _lastCardEdition = Text("", 11, Color.FromArgb("#B4B5C8"));
+    private readonly Label _lastCardValue = Text("", 23, Color.FromArgb("#C8FFDD"), true);
+    private readonly Image _lastCardArtwork = new() { WidthRequest = 42, HeightRequest = 58, Aspect = Aspect.AspectFit };
 
     private void ShowLive()
     {
@@ -52,24 +55,27 @@ public sealed partial class ScannerSessionPage
         };
 
         var root = new Grid(); root.Children.Add(camera);
+        root.Children.Add(new GraphicsView { Drawable = new SessionFrameDrawable(), InputTransparent = true });
         var overlay = new Grid { RowDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) } };
         var top = new Grid { Padding = new Thickness(16, 12, 16, 8), ColumnSpacing = 12,
             ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star) } };
-        var brand = new VerticalStackLayout { Spacing = 3, Children = { Text("VAULTA", 16, Colors.White, true), Text("PACK OPENING", 8, Color.FromArgb("#BBA4FF"), true), _count } };
-        var exit = Action("Sair", () => Shell.Current.GoToAsync("..")); exit.FontSize = 12; exit.Padding = new Thickness(10, 4);
-        exit.MinimumHeightRequest = 36; exit.HorizontalOptions = LayoutOptions.Start; brand.Children.Add(exit);
+        var brand = new VerticalStackLayout { Spacing = 3, Children = { Text("VAULTA", 20, Colors.White, true), Text("SCANNER TCG", 9, Color.FromArgb("#BBA4FF"), true), _count } };
+        var exit = Action("×", () => Shell.Current.GoToAsync("..")); exit.FontSize = 24; exit.Padding = new Thickness(10, 2);
+        exit.MinimumHeightRequest = 44; exit.HorizontalOptions = LayoutOptions.Start;
+        SemanticProperties.SetDescription(exit, "Fechar scanner"); brand.Children.Add(exit);
         var score = new VerticalStackLayout { Spacing = 5 };
-        var caption = Text("VALOR DAS CARTAS", 9, Color.FromArgb("#BBA4FF"), true); caption.HorizontalTextAlignment = TextAlignment.End;
+        var caption = Text("TOTAL DA SESSÃO", 9, Color.FromArgb("#BBA4FF"), true); caption.HorizontalTextAlignment = TextAlignment.End;
         _total.FontSize = 28; _total.LineBreakMode = LineBreakMode.NoWrap;
         _total.HorizontalTextAlignment = TextAlignment.End; _cost.HorizontalTextAlignment = TextAlignment.End; _difference.HorizontalTextAlignment = TextAlignment.End;
-        score.Children.Add(caption); score.Children.Add(_total); score.Children.Add(_cost); score.Children.Add(_difference);
-        _costProgress = new ProgressBar { HeightRequest = 3, BackgroundColor = Color.FromArgb("#40364E") }; score.Children.Add(_costProgress);
+        score.Children.Add(caption); score.Children.Add(_total);
+        if (_session!.CostBrl.HasValue) { score.Children.Add(_cost); score.Children.Add(_difference); }
+        _costProgress = new ProgressBar { HeightRequest = 3, BackgroundColor = Color.FromArgb("#40364E") };
+        if (_session.CostBrl.HasValue) score.Children.Add(_costProgress);
         var scorePanel = Surface(score, "#E0080911");
         scorePanel.Stroke = Color.FromArgb("#594476"); scorePanel.StrokeThickness = 1;
         top.Add(brand); top.Add(scorePanel, 1, 0); overlay.Add(top, 0, 0);
 
         var center = new Grid { InputTransparent = true };
-        center.Children.Add(new GraphicsView { Drawable = new SessionFrameDrawable(), InputTransparent = true });
         _identificationSpinner = new ActivityIndicator { Color = Color.FromArgb("#C8FFDD"), WidthRequest = 22, HeightRequest = 22 };
         _identificationText = Text("Tirando a foto…", 13, Colors.White, true);
         var identifying = new HorizontalStackLayout { Spacing = 10, VerticalOptions = LayoutOptions.Center,
@@ -92,7 +98,11 @@ public sealed partial class ScannerSessionPage
 
         var bottom = new VerticalStackLayout { Padding = new Thickness(16, 6, 16, 12), Spacing = 7 };
         _lastCard.MaxLines = 1; _lastCard.LineBreakMode = LineBreakMode.TailTruncation;
-        _lastCardPanel = Surface(_lastCard, "#D9111520"); _lastCardPanel.IsVisible = false; bottom.Children.Add(_lastCardPanel);
+        var lastContent = new Grid { ColumnSpacing = 10, ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) } };
+        lastContent.Add(_lastCardArtwork); lastContent.Add(new VerticalStackLayout { Spacing = 4, VerticalOptions = LayoutOptions.Center,
+            Children = { _lastCard, _lastCardEdition } }, 1, 0); lastContent.Add(_lastCardValue, 2, 0);
+        _lastCardValue.VerticalOptions = LayoutOptions.Center;
+        _lastCardPanel = Surface(lastContent, "#E8111520"); _lastCardPanel.IsVisible = false; bottom.Children.Add(_lastCardPanel);
         var scroll = new ScrollView { Content = _result, MaximumHeightRequest = 300 };
         _resultPanel = Surface(scroll, "#F0080911"); _resultPanel.IsVisible = false;
         // Results float over the camera area; opening them must not collapse
@@ -100,8 +110,13 @@ public sealed partial class ScannerSessionPage
         _resultPanel.VerticalOptions = LayoutOptions.End; _resultPanel.Margin = new Thickness(16, 0, 16, 8);
         overlay.Add(_resultPanel, 0, 1);
         _status.FontSize = 12; bottom.Children.Add(Surface(_status, "#CE080911"));
-        var actions = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star) }, ColumnSpacing = 10 };
-        actions.Add(Action("Buscar carta", Search)); actions.Add(Action("Finalizar", Finish), 1, 0); bottom.Children.Add(actions);
+        var actions = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto), new(GridLength.Star) }, ColumnSpacing = 14 };
+        var search = Action("Buscar", Search); search.BackgroundColor = Colors.Transparent;
+        var capture = Action("●", CaptureCard); capture.BackgroundColor = Colors.White; capture.TextColor = Color.FromArgb("#211C30");
+        capture.WidthRequest = 64; capture.HeightRequest = 64; capture.CornerRadius = 32; capture.FontSize = 32; capture.Padding = 0;
+        SemanticProperties.SetDescription(capture, "Capturar carta agora");
+        var finish = Action("Finalizar", Finish); finish.BackgroundColor = Colors.Transparent;
+        actions.Add(search); actions.Add(capture, 1, 0); actions.Add(finish, 2, 0); bottom.Children.Add(actions);
         var options = Action("Opções da sessão", async () =>
         {
             var choice = await DisplayActionSheetAsync("Sessão", "Voltar", null,
@@ -146,7 +161,13 @@ public sealed partial class ScannerSessionPage
 
     private void ShowLastCard(ScannerSessionCard card)
     {
-        _lastCard.Text = card.MarketValue is { } value ? $"ÚLTIMA · {card.Name} · {Money(value.AmountBrl)}" : $"ÚLTIMA · {card.Name} · sem cotação";
+        _lastCard.Text = card.Name;
+        _lastCardEdition.Text = card.VisualIdentification?.Certification is { } label
+            ? $"{label.Company ?? "Certificação"} · nota {label.Grade ?? "ilegível"}"
+            : $"{card.CollectorNumber} · {card.VariantName}";
+        _lastCardValue.Text = card.MarketValue is { } value ? Money(value.AmountBrl) : "Pendente";
+        _lastCardValue.FontSize = card.MarketValue is null ? 14 : 23;
+        _lastCardArtwork.Source = card.ArtworkUrl; _lastCardArtwork.IsVisible = !string.IsNullOrWhiteSpace(card.ArtworkUrl);
         if (_lastCardPanel is not null) _lastCardPanel.IsVisible = true;
     }
 
@@ -213,20 +234,13 @@ public sealed partial class ScannerSessionPage
 
     private sealed class SessionFrameDrawable : IDrawable
     {
-        // Fixed card aspect ratio guide that never shrinks after the first scan.
-        // The previous layout tied the frame to the overlay row height, which
-        // collapsed when result panels appeared. We now anchor to the full
-        // camera preview bounds so the guide stays stable across captures.
+        // Draw over the full camera view, the same coordinates the detector samples.
         public void Draw(ICanvas canvas, RectF bounds)
         {
-            const float CardRatio = 0.715f;
-            var availableHeight = bounds.Height * 0.92f;
-            var availableWidth = bounds.Width * 0.96f;
-            var height = Math.Min(availableHeight, availableWidth / CardRatio);
-            var width = height * CardRatio;
+            var guide = ScannerCaptureGuide.ForPreview(bounds.Width, bounds.Height);
+            var height = (float)guide.Height; var width = (float)guide.Width;
             if (height < 60 || width < 40) return;
-            var left = (bounds.Width - width) / 2f;
-            var top = (bounds.Height - height) / 2f;
+            var left = (float)guide.Left; var top = (float)guide.Top;
             canvas.StrokeColor = Color.FromArgb("#D2BFFF"); canvas.StrokeSize = 1.2f;
             canvas.Alpha = 0.45f; canvas.DrawRoundedRectangle(left, top, width, height, 18);
             canvas.Alpha = 1; canvas.StrokeSize = 3;

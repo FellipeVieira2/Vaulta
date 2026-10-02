@@ -69,7 +69,7 @@ public sealed class OpenAiCardEvidenceExtractor : ICardEvidenceExtractor, IDispo
                         ["model"] = _options.Model, ["store"] = false, ["max_output_tokens"] = _options.MaxOutputTokens,
                         ["instructions"] = CardEvidenceOpenAiProtocol.Prompt,
                         ["input"] = new[] { new { role = "user", content = new[] { new { type = "input_image", image_url = "data:image/jpeg;base64," + Convert.ToBase64String(image), detail = _options.ImageDetail } } } },
-                        ["text"] = new { format = new { type = "json_schema", name = "card_evidence_v2", strict = true, schema = CardEvidenceOpenAiProtocol.Schema } }
+                        ["text"] = new { format = new { type = "json_schema", name = "card_evidence_v4", strict = true, schema = CardEvidenceOpenAiProtocol.Schema } }
                     };
                     // Focused visual extraction: avoid the default medium reasoning consuming
                     // the small output budget. Keep overrides for older models compatible.
