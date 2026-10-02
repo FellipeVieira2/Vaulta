@@ -30,4 +30,12 @@ O GPT pode ler Pokémon, Yu-Gi-Oh!, One Piece e outros jogos, independentemente 
 - Integração: quatro testes de scanner aprovados com HTTP/autenticação/PostgreSQL isolado, incluindo resposta v4 com selo e compatibilidade com v1.
 - A revisão independente encontrou o problema de orientação horizontal, corrigido com teste RED/GREEN.
 
-Builds e diagnóstico de produção são registrados após a validação final. Fotos físicas, reflexos, identificação de acabamento em condições reais e uma carta certificada real ainda precisam de teste no aparelho; fixtures de JSON não comprovam acurácia da visão nesses casos.
+Build Android ARM64 Debug aprovado, zero avisos/erros (2m24s no build final); assinatura APK v2/v3 verificada. Artefato: `artifacts/Vaulta-scanner-result-fixes-2026-10-02-arm64.apk`, 57.545.302 bytes, SHA-256 `98ED488D48C99780E1EAFF4AA75B2BDD1AE11EABB5772F2476C8B4C322FC10B5`. APK de teste, `com.vaulta.app`, versão 1.0; aponta para `https://api.vaultatcg.com.br/`.
+
+Commit de implementação `965650b`. Backend implantado pelo script existente com tag `965650b-scanner-result-20261002`, digest `sha256:6183db81a3f7c7a52331a84d1d6952aefad2a654213f547500e6dee3fba77df9`; nenhuma migration nova aplicada. SSM deploy `f217652b-b6a5-41f5-ba51-c8b45e8e1278`. Health e readiness HTTP 200/Healthy confirmados na imagem nova.
+
+Diagnóstico de operador após o deploy, SSM `6611ce9a-7501-486a-b36d-6caf6779c275`: `ScannerService` e `IScannerCardDetailsReader` reais dentro do contêiner, chave somente no runtime, artwork público TCGdex de Golisopod. Resultado em 6,63 segundos: Golisopod, 140 PS, 026/086, pt-BR, candidato local Caos Ascendente 026/86, confiança 0,95. Sem acabamento ou certificação afirmados a partir do artwork. Snapshot existente devolveu Normal/Cardmarket R$ 0,12 e Reverse/TCGplayer R$ 1,25; referências internacionais convertidas, não preço de venda brasileiro. Nenhum usuário/coleção foi criado pelo diagnóstico, cuja saída foi zero.
+
+Pacote Git local verificado: `artifacts/Vaulta-scanner-result-fixes-2026-10-02.bundle`, requer base `efc0992`, contém o commit de implementação. Não afirma publicação remota no GitHub.
+
+Fotos físicas, reflexos, identificação de acabamento em condições reais e uma carta certificada real ainda precisam de teste no aparelho; fixtures de JSON e artwork não comprovam acurácia da visão nesses casos. O diagnóstico de produção percorre serviços reais; autenticação e serialização HTTP são exercitadas pelos testes isolados.
