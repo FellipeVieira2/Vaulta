@@ -30,10 +30,34 @@ public static class DependencyInjection
             client.BaseAddress = new Uri("https://api.pokemontcg.io/v2/", UriKind.Absolute);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Vaulta-Scanner/1.0");
         });
+        services.AddOptions<Recognition.ScannerRecognitionOptions>().Bind(configuration.GetSection("Scanner:Recognition"))
+            .Validate(o => o.IsValid(), "Invalid scanner provider/fallback selection.").ValidateOnStart();
+        var selection = configuration.GetSection("Scanner:Recognition").Get<Recognition.ScannerRecognitionOptions>() ?? new();
+        var primary = selection.Provider ?? (configuration.GetValue<bool>("Scanner:Nova:Enabled") ? "nova" : "ocr");
+        var fallback = selection.FallbackProvider == primary ? null : selection.FallbackProvider;
         services.AddOptions<Recognition.NovaScannerOptions>().Bind(configuration.GetSection("Scanner:Nova"))
-            .Validate(o => !o.Enabled || o.IsValid(), "Invalid Nova scanner configuration or request limits.")
+            .Validate(o => !(o.Enabled || primary == "nova" || fallback == "nova") || o.IsValid(), "Invalid Nova scanner configuration or request limits.")
             .ValidateOnStart();
-        if (configuration.GetValue<bool>("Scanner:Nova:Enabled"))
+        services.AddOptions<Recognition.OpenAiScannerOptions>().Bind(configuration.GetSection("Scanner:OpenAI"))
+            .PostConfigure(o => o.ApiKey ??= configuration["OPENAI_API_KEY"])
+            .Validate(o => o.IsValid(), "Invalid OpenAI scanner configuration or request limits.").ValidateOnStart();
+        services.AddScoped<Recognition.CardEvidenceCatalogMatcher>();
+        if (primary == "openai" || fallback == "openai")
+        {
+            services.AddHttpClient("Vaulta.Scanner.OpenAI", client =>
+            {
+                client.BaseAddress = new Uri("https://api.openai.com/v1/");
+                client.Timeout = Timeout.InfiniteTimeSpan;
+            }).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false, PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+            }).SetHandlerLifetime(Timeout.InfiniteTimeSpan).RemoveAllLoggers();
+            services.AddSingleton<Recognition.OpenAiCardEvidenceExtractor>(provider => new(
+                provider.GetRequiredService<IHttpClientFactory>().CreateClient("Vaulta.Scanner.OpenAI"),
+                provider.GetRequiredService<IOptions<Recognition.OpenAiScannerOptions>>(),
+                provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Recognition.OpenAiCardEvidenceExtractor>>()));
+        }
+        if (primary == "nova" || fallback == "nova")
         {
             services.AddSingleton<IAmazonBedrockRuntime>(provider =>
             {
@@ -47,15 +71,31 @@ public static class DependencyInjection
                     MaxErrorRetry = 0, LogResponse = false, LogMetrics = false
                 });
             });
-            services.AddSingleton<ICardEvidenceExtractor, Recognition.NovaCardEvidenceExtractor>();
-            services.AddScoped<Recognition.CardEvidenceCatalogMatcher>();
-            services.AddScoped<ICardRecognitionProvider>(provider => new Recognition.NovaCardRecognitionProvider(
-                provider.GetRequiredService<ICardEvidenceExtractor>(),
-                provider.GetRequiredService<Recognition.CardEvidenceCatalogMatcher>(),
-                provider.GetRequiredService<PokemonTcgRecognitionProvider>()));
+            services.AddSingleton<Recognition.NovaCardEvidenceExtractor>();
         }
-        else
-            services.AddScoped<ICardRecognitionProvider>(p => p.GetRequiredService<PokemonTcgRecognitionProvider>());
+        if (primary is "openai" or "nova")
+            services.AddSingleton<ICardEvidenceExtractor>(provider => primary == "openai"
+                ? provider.GetRequiredService<Recognition.OpenAiCardEvidenceExtractor>() : provider.GetRequiredService<Recognition.NovaCardEvidenceExtractor>());
+        services.AddScoped<ICardRecognitionProvider>(provider =>
+        {
+            _ = provider.GetRequiredService<IOptions<Recognition.ScannerRecognitionOptions>>().Value;
+            ICardRecognitionProvider Create(string name, ICardRecognitionProvider? next, bool isPrimary)
+            {
+                if (name == "ocr")
+                {
+                    var ocr = provider.GetRequiredService<PokemonTcgRecognitionProvider>();
+                    return next is null ? ocr : new Recognition.FallbackCardRecognitionProvider(ocr, next);
+                }
+                var extractor = isPrimary ? provider.GetRequiredService<ICardEvidenceExtractor>()
+                    : name == "openai" ? (ICardEvidenceExtractor)provider.GetRequiredService<Recognition.OpenAiCardEvidenceExtractor>()
+                    : provider.GetRequiredService<Recognition.NovaCardEvidenceExtractor>();
+                // Compatibility wrapper for legacy callers; same shared matching implementation.
+                return name == "nova" && next is not null && fallback == "ocr"
+                    ? new Recognition.NovaCardRecognitionProvider(extractor, provider.GetRequiredService<Recognition.CardEvidenceCatalogMatcher>(), next)
+                    : new Recognition.EvidenceCardRecognitionProvider(extractor, provider.GetRequiredService<Recognition.CardEvidenceCatalogMatcher>(), next, name, isPrimary ? fallback : null);
+            }
+            return Create(primary, fallback is null ? null : Create(fallback, null, false), true);
+        });
         services.AddScoped<ICardSearchProvider>(p => p.GetRequiredService<PokemonTcgRecognitionProvider>());
         services.AddScoped<IExternalIdResolver, ExternalIdResolver>();
         services.AddSingleton<Recognition.IOcrService, Recognition.TesseractOcrService>();

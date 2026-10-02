@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Vaulta.Catalog.Application;
 using Vaulta.Catalog.Contracts;
 using Vaulta.SharedKernel;
+using Vaulta.Catalog.Infrastructure.Recognition;
 
 namespace Vaulta.Catalog.Infrastructure;
 
@@ -16,6 +17,7 @@ public sealed class TcgDexScannerDetailsReader(HttpClient httpClient, CatalogDbC
 {
     public async Task<ScannerCardDetailsDto?> GetAsync(Guid printingId, CancellationToken cancellationToken)
     {
+        using var activity = ScannerTelemetry.Activities.StartActivity("scanner.details");
         var printing = await catalog.GetPrinting(printingId, cancellationToken);
         if (printing is null) return null;
         var day = MarketPriceDay.At(clock.UtcNow);
@@ -38,6 +40,7 @@ public sealed class TcgDexScannerDetailsReader(HttpClient httpClient, CatalogDbC
         if (externalId.StartsWith(language + ":", StringComparison.Ordinal)) externalId = externalId[(language.Length + 1)..];
         try
         {
+            using var external = ScannerTelemetry.Activities.StartActivity("scanner.price.external");
             using var response = await httpClient.GetAsync($"{Uri.EscapeDataString(language)}/cards/{Uri.EscapeDataString(externalId)}", cancellationToken);
             response.EnsureSuccessStatusCode();
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
@@ -86,10 +89,13 @@ public sealed class TcgDexScannerDetailsReader(HttpClient httpClient, CatalogDbC
 
     private async Task<ScannerCardDetailsDto?> ReadSnapshot(CatalogPrintingDetails printing, MarketPriceDay day, CancellationToken ct)
     {
+        using var activity = ScannerTelemetry.Activities.StartActivity("scanner.price.cache");
         var snapshot = await db.DailyMarketSnapshots.AsNoTracking()
             .SingleOrDefaultAsync(x => x.PrintingId == printing.PrintingId && x.MarketDay == day.Date, ct);
-        if (snapshot is null || snapshot.RefreshAfter <= clock.UtcNow) return null;
-        var result = JsonSerializer.Deserialize<ScannerCardDetailsDto>(snapshot.Payload)
+        var hit = snapshot is not null && snapshot.RefreshAfter > clock.UtcNow;
+        activity?.SetTag("scanner.cache.hit", hit);
+        if (!hit) return null;
+        var result = JsonSerializer.Deserialize<ScannerCardDetailsDto>(snapshot!.Payload)
             ?? throw new JsonException("Invalid persisted market snapshot.");
         return result with { Printing = printing with { ArtworkUrl = result.Printing.ArtworkUrl ?? printing.ArtworkUrl } };
     }

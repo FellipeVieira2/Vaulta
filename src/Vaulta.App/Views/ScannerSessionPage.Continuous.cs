@@ -32,8 +32,17 @@ public sealed partial class ScannerSessionPage
             _session?.Phase != ScannerSessionPhase.Scanning || _continuousInFlight) return;
         try
         {
-            var signature = CameraSceneSampler.Read(_camera);
-            if (signature is null || !_sceneGate.Observe(signature, Environment.TickCount64) || _busy || _resultPanel?.IsVisible == true) return;
+            if (_busy || _resultPanel?.IsVisible == true) return;
+            var observation = CameraSceneSampler.ReadObservation(_camera);
+            if (observation is null) return;
+            var signature = observation.Signature;
+            var ready = _sceneGate.Observe(signature, Environment.TickCount64, observation.CardPresent);
+            if (!observation.CardPresent)
+            {
+                _status.Text = "Enquadre a carta inteira. Se não detectar, use Opções → Capturar novamente.";
+                return;
+            }
+            if (!ready) return;
             _sceneGate.Consume(signature); _continuousInFlight = true; _busy = true; SetActionsEnabled(false);
             await CaptureCard(true, signature);
         }
@@ -46,21 +55,20 @@ public sealed partial class ScannerSessionPage
         }
     }
 
-    private async Task HandleContinuousResult(CardScanResultDto result, byte[] signature, ScannerOperation operation, bool refinement = false, Guid? previousPrintingId = null)
+    private async Task HandleContinuousResult(CardScanResultDto result, byte[] signature, ScannerOperation operation, bool refinement, Guid? previousPrintingId, ScannerRefinementBudget budget)
     {
-        var current = _camera is null ? null : CameraSceneSampler.Read(_camera);
-        if (current is null || !ScannerSceneGate.IsSameScene(signature, current))
-        { _status.Text = "Mantenha a próxima carta até identificar."; return; }
+        var current = _camera is null ? null : CameraSceneSampler.ReadObservation(_camera);
+        var sameCard = current is { CardPresent: true } && ScannerSceneGate.IsSameScene(signature, current.Signature);
         var candidates = result.Candidates.OrderByDescending(x => x.ConfidenceScore).ToArray();
         var first = ScannerAutomaticRecognition.Select(result, previousPrintingId);
-        if (first is null && !refinement)
+        if (first is null && sameCard && !refinement && budget.TryRefine(result))
         {
             _status.Text = "Validando a leitura… mantenha a carta.";
             await Task.Delay(250, operation.Context.Token); RequireScannerOperation(operation);
-            current = _camera is null ? null : CameraSceneSampler.Read(_camera);
-            if (!_visible || current is null || !ScannerSceneGate.IsSameScene(signature, current))
-            { _status.Text = "A carta mudou. Enquadre novamente."; return; }
-            await CaptureCard(true, signature, refinement: true, candidates.FirstOrDefault()?.PrintingId);
+            current = _camera is null ? null : CameraSceneSampler.ReadObservation(_camera);
+            if (!_visible || current is null || !current.CardPresent || !ScannerSceneGate.IsSameScene(signature, current.Signature))
+            { ShowCandidates(result); return; }
+            await CaptureCard(true, signature, refinement: true, candidates.FirstOrDefault()?.PrintingId, budget);
             return;
         }
         if (candidates.Length == 0)
@@ -70,9 +78,8 @@ public sealed partial class ScannerSessionPage
         }
         if (first is null) { ShowCandidates(result); return; }
         var details = await _scanner.GetCardDetailsAsync(first.PrintingId, operation.Context.Token); RequireScannerOperation(operation);
-        current = _camera is null ? null : CameraSceneSampler.Read(_camera);
-        if (current is null || !ScannerSceneGate.IsSameScene(signature, current))
-        { _status.Text = "Mantenha a próxima carta até identificar."; return; }
+        // Identity belongs to the captured photo. Moving the physical card while
+        // awaiting the response must not discard a valid completed recognition.
         var variants = details.Printing.Variants;
         var selected = _continuousVariantCode is { } code ? variants.SingleOrDefault(x => x.Code == code)
             : variants.Count == 1 ? variants[0] : null;
@@ -97,6 +104,7 @@ public sealed partial class ScannerSessionPage
         var added = operation.Session.Add(card); await _store.Save(added, operation.Context.Token); RequireScannerOperation(operation); _session = added;
         ClearResults(); _status.Text = quote is null ? "Pode retirar a carta · adicionada sem cotação." : "Pode retirar a carta.";
         UpdateScore(); ShowLastCard(card); await RecordVideoReveal(card); RequireScannerOperation(operation);
+        SetIdentificationLoading(false);
         await Reveal(card, previousTotal); RequireScannerOperation(operation); ShowLiquidityActions(card);
     }
 }

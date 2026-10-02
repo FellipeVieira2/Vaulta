@@ -141,27 +141,43 @@ public sealed partial class ScannerSessionPage : ContentPage
 
     private Task CaptureCard() => CaptureCard(false, null);
 
-    private async Task CaptureCard(bool continuous, byte[]? signature, bool refinement = false, Guid? previousPrintingId = null)
+    private async Task CaptureCard(bool continuous, byte[]? signature, bool refinement = false, Guid? previousPrintingId = null, ScannerRefinementBudget? budget = null)
     {
         var operation = BeginScannerOperation();
         if (!_cameraReady || _camera is null) throw new InvalidOperationException("Aguarde a câmera ou use a busca pelo nome.");
         if (_session?.Phase != ScannerSessionPhase.Scanning) return;
+        if (continuous && !HasCurrentCard(signature))
+        { _status.Text = "Enquadre a carta inteira e mantenha por um instante."; return; }
         if (!continuous && Vaulta.App.Services.Camera.CameraSceneSampler.Read(_camera) is { } currentScene) _sceneGate.Consume(currentScene);
-        _status.Text = "Mantenha a carta…";
-        using var stream = await operation.Camera!.CaptureImage(operation.Context.Token);
-        RequireScannerOperation(operation);
-        using var data = new MemoryStream();
-        var buffer = new byte[81920]; int read;
-        while ((read = await stream.ReadAsync(buffer, operation.Context.Token)) > 0)
+        SetIdentificationLoading(true);
+        _status.Text = "Identificando esta carta… aguarde antes de mostrar a próxima.";
+        try
         {
+            using var stream = await operation.Camera!.CaptureImage(operation.Context.Token);
             RequireScannerOperation(operation);
-            if (data.Length + read > ScannerClient.MaxImageBytes) throw new InvalidOperationException("A foto ficou muito grande. Tente novamente ou busque pelo nome.");
-            await data.WriteAsync(buffer.AsMemory(0, read), operation.Context.Token);
+            using var data = new MemoryStream();
+            var buffer = new byte[81920]; int read;
+            while ((read = await stream.ReadAsync(buffer, operation.Context.Token)) > 0)
+            {
+                RequireScannerOperation(operation);
+                if (data.Length + read > ScannerClient.MaxImageBytes) throw new InvalidOperationException("A foto ficou muito grande. Tente novamente ou busque pelo nome.");
+                await data.WriteAsync(buffer.AsMemory(0, read), operation.Context.Token);
+                RequireScannerOperation(operation);
+            }
             RequireScannerOperation(operation);
+            if (continuous && !HasCurrentCard(signature))
+            { _status.Text = "A carta saiu do enquadramento. Mostre novamente."; return; }
+            var result = await _scanner.ScanCardAsync(data.ToArray(), "pokemon", operation.Context.Token); RequireScannerOperation(operation);
+            if (continuous) await HandleContinuousResult(result, signature!, operation, refinement, previousPrintingId, budget ?? new()); else ShowCandidates(result);
         }
-        RequireScannerOperation(operation);
-        var result = await _scanner.ScanCardAsync(data.ToArray(), "pokemon", operation.Context.Token); RequireScannerOperation(operation);
-        if (continuous) await HandleContinuousResult(result, signature!, operation, refinement, previousPrintingId); else ShowCandidates(result);
+        finally { SetIdentificationLoading(false); }
+    }
+
+    private bool HasCurrentCard(byte[]? signature)
+    {
+        var observation = _camera is null ? null : Vaulta.App.Services.Camera.CameraSceneSampler.ReadObservation(_camera);
+        return signature is not null && observation is { CardPresent: true }
+            && ScannerSceneGate.IsSameScene(signature, observation.Signature);
     }
 
     private async Task Search()
@@ -330,6 +346,7 @@ public sealed partial class ScannerSessionPage : ContentPage
     }
     private void StopCamera()
     {
+        SetIdentificationLoading(false);
         StopContinuous();
         if (_videoClip is not null)
         {

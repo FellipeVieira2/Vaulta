@@ -31,6 +31,10 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      Scanner__Recognition__Provider: ocr
+      Scanner__OpenAI__Enabled: 'false'
+      Scanner__Nova__Enabled: 'false'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -67,6 +71,8 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      SCANNER_RECOGNITION_PROVIDER: ocr
     steps:
       - uses: actions/checkout@v4
       - name: Generate disposable development configuration

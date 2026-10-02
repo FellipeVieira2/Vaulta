@@ -1,5 +1,7 @@
 # Vaulta
 
+Scanner: Development e Production selecionam OpenAI para extração visual, com OCR local como fallback. Identidade vem do catálogo e preço do snapshot PostgreSQL. Configure chave somente no servidor; veja [scanner](docs/scanner.md) e [implementação OpenAI](docs/design/scanner-openai-2026-10-02.md).
+
 Plataforma brasileira para colecionadores de TCGs, com app .NET MAUI e API .NET 10, ASP.NET Core, EF Core e PostgreSQL. A solution contém os módulos **Identity, Catalog, Collection, Assets, Marketplace, Orders, Payments, Wallets, Shipping e Reviews**. A existência dos módulos não significa que todos os fluxos comerciais estejam completos; o acompanhamento está em [Lacunas e validação](docs/business-gap-audit.md).
 
 ## Arquitetura e estrutura

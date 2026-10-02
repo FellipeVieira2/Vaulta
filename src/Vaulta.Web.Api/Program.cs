@@ -68,8 +68,8 @@ builder.Services.AddRateLimiter(o =>
 });
 builder.Services.AddHealthChecks().AddCheck<PostgresHealthCheck>("postgres", tags: ["ready"]);
 builder.Services.AddOpenTelemetry().ConfigureResource(r => r.AddService("Vaulta.Web.Api"))
-    .WithTracing(t => t.AddAspNetCoreInstrumentation())
-    .WithMetrics(m => m.AddAspNetCoreInstrumentation().AddMeter("Microsoft.AspNetCore.Hosting"));
+    .WithTracing(t => t.AddAspNetCoreInstrumentation().AddSource("Vaulta.Scanner"))
+    .WithMetrics(m => m.AddAspNetCoreInstrumentation().AddMeter("Microsoft.AspNetCore.Hosting", "Vaulta.Scanner"));
 
 var app = builder.Build();
 if (app.Environment.IsProduction()) ProductionConfiguration.Validate(app.Configuration);

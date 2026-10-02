@@ -20,6 +20,7 @@
 **/npm-debug.log
 **/obj
 **/artifacts
+**/scanner-eval
 **/.arena
 **/.agents
 **/.codex

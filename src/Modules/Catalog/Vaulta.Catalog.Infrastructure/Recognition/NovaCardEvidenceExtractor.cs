@@ -15,12 +15,11 @@ public sealed class NovaCardEvidenceExtractor : ICardEvidenceExtractor, IDisposa
 {
     public const string PromptVersion = "card-evidence-v1";
     private const int MaximumImageBytes = 3_750_000;
-    private static readonly ActivitySource Activities = new("Vaulta.Scanner");
-    private static readonly Meter Metrics = new("Vaulta.Scanner");
-    private static readonly Counter<long> Extractions = Metrics.CreateCounter<long>("scanner.evidence.extractions");
-    private static readonly Counter<long> Retries = Metrics.CreateCounter<long>("scanner.evidence.retries");
-    private static readonly Counter<long> Tokens = Metrics.CreateCounter<long>("scanner.evidence.tokens");
-    private static readonly Histogram<double> Duration = Metrics.CreateHistogram<double>("scanner.evidence.duration", "ms");
+    private static readonly ActivitySource Activities = ScannerTelemetry.Activities;
+    private static readonly Counter<long> Extractions = ScannerTelemetry.Extractions;
+    private static readonly Counter<long> Retries = ScannerTelemetry.Retries;
+    private static readonly Counter<long> Tokens = ScannerTelemetry.Tokens;
+    private static readonly Histogram<double> Duration = ScannerTelemetry.Duration;
     private readonly IAmazonBedrockRuntime _client;
     private readonly NovaScannerOptions _options;
     private readonly ILogger<NovaCardEvidenceExtractor> _logger;
@@ -88,6 +87,7 @@ public sealed class NovaCardEvidenceExtractor : ICardEvidenceExtractor, IDisposa
                 try
                 {
                     imageStream.Position = 0;
+                    ScannerTelemetry.Calls.Add(1, new KeyValuePair<string, object?>("provider", "nova"), new("model", _options.ModelId));
                     var response = await _client.ConverseAsync(request, deadline.Token).WaitAsync(deadline.Token);
                     RecordTokens(response.Usage?.InputTokens, "input");
                     RecordTokens(response.Usage?.OutputTokens, "output");
@@ -136,17 +136,17 @@ public sealed class NovaCardEvidenceExtractor : ICardEvidenceExtractor, IDisposa
             if (entered) _concurrency.Release();
             activity?.SetTag("scanner.outcome", outcome);
             var tag = new KeyValuePair<string, object?>("outcome", outcome);
-            Extractions.Add(1, tag);
-            Duration.Record(timer.Elapsed.TotalMilliseconds, tag);
+            Extractions.Add(1, tag, new("provider", "nova"), new("model", _options.ModelId));
+            Duration.Record(timer.Elapsed.TotalMilliseconds, tag, new("provider", "nova"), new("model", _options.ModelId));
         }
     }
 
     private static bool IsTransient(Exception exception) => exception is HttpRequestException
         || exception is AmazonServiceException aws && aws.StatusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.InternalServerError or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout;
 
-    private static void RecordTokens(int? count, string direction)
+    private void RecordTokens(int? count, string direction)
     {
-        if (count is >= 0 and <= 1_000_000) Tokens.Add(count.Value, new KeyValuePair<string, object?>("direction", direction));
+        if (count is >= 0 and <= 1_000_000) Tokens.Add(count.Value, new KeyValuePair<string, object?>("direction", direction), new("provider", "nova"), new("model", _options.ModelId));
     }
 
     public void Dispose() => _concurrency.Dispose();

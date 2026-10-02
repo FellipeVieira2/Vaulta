@@ -56,6 +56,34 @@ public sealed class CardEvidenceTests
         Assert.Null(CardEvidenceJsonParser.Parse(ValidJson.Replace("Pikachu", new string('x', 161)), "p", "m"));
     }
 
+    [Theory]
+    [InlineData("123a/200")]
+    [InlineData("TG001/TG030")]
+    public void Parser_PreservesCollectorSuffixAndPrefix(string number)
+    {
+        var json = JsonNode.Parse(ValidJson)!;
+        json["collectorNumber"]!["value"] = number;
+        Assert.Equal(number, CardEvidenceJsonParser.Parse(json.ToJsonString(), "p", "m")?.CollectorNumber.Value);
+    }
+
+    [Fact]
+    public async Task Matcher_InventedSetCannotOverrideLocalCatalog()
+    {
+        var matcher = new CardEvidenceCatalogMatcher(new Catalog([Card(Guid.NewGuid(), "Pikachu", "58", "en")]));
+        Assert.Empty((await matcher.MatchAsync(Evidence() with { SetName = new("Invented expansion", .99) }, "pokemon", default)).Candidates);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Matcher_UnknownGameOrLanguageCannotAuthorizeAutomaticAddition(bool game)
+    {
+        var evidence = game ? Evidence() with { GameCode = new(null, 0) } : Evidence() with { Language = new(null, 0) };
+        var result = await new CardEvidenceCatalogMatcher(new Catalog([Card(Guid.NewGuid(), "Pikachu", "58", "en")])).MatchAsync(evidence, "pokemon", default);
+        Assert.Equal(CardEvidenceMatchStatus.NeedsReview, result.Status);
+        Assert.True(Assert.Single(result.Candidates).ConfidenceScore <= .7);
+    }
+
     [Fact]
     public async Task Matcher_UsesCanonicalCatalogIdAndDoesNotInventPriceOrVariant()
     {

@@ -41,10 +41,12 @@ Copie `.env.production.example` para `.env.production`. Os scripts usam esse arq
 | `CORS_ORIGIN_0`, `CORS_ORIGIN_1` | `Cors__Origins__0`, `Cors__Origins__1` | HTTPS explícito ou vazio, não |
 | `AUTH_PERMIT_LIMIT` | `RateLimit__AuthPermitLimit` | 20/minuto/IP por padrão, não |
 | `IMAGE_TAG` | imagem ECR | SHA imutável, argumento do deploy ou último deploy saudável |
+| `OPENAI_API_KEY` | chave server-side do scanner | secret OpenAI, **sim**, nunca no MAUI |
+| `SCANNER_RECOGNITION_PROVIDER` | `Scanner__Recognition__Provider` | `openai` com OCR como fallback; `ocr` sem inferência paga |
 
 Os scripts aceitam senha PostgreSQL em hex/base64 com pelo menos 32 caracteres; isso evita injeção na connection string por `;`, aspas ou quebras de linha. Banco e usuário devem usar identificadores simples. Use segredos gerados, não frases previsíveis. Não imprima `docker compose config`, `docker inspect .Config.Env`, dumps ou arquivos `.env` em tickets/logs.
 
-`appsettings.Production.json` contém somente bucket, região, path style e migrations desativadas. O host valida a configuração efetiva **antes de migrations e comandos de Catalog**, além da validação atual do JWT. Production recusa secrets curtos/placeholders, campos essenciais ausentes, endpoint S3 customizado, chaves AWS estáticas, path style, migrations automáticas, Outbox desativado e origins CORS inválidas. Development/Testing mantêm o caminho MinIO com AccessKey + SecretKey; uma única chave configurada é erro.
+`appsettings.Production.json` contém bucket, região, path style, migrations desativadas e seleção OpenAI/OCR do scanner. O host valida a configuração efetiva **antes de migrations e comandos de Catalog**, além da validação atual do JWT. Production recusa secrets curtos/placeholders, campos essenciais ausentes, endpoint S3 customizado, chaves AWS estáticas, path style, migrations automáticas, Outbox desativado e origins CORS inválidas. Development/Testing mantêm o caminho MinIO com AccessKey + SecretKey; uma única chave configurada é erro.
 
 ## Pré-requisitos da infraestrutura existente
 

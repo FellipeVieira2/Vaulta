@@ -22,6 +22,9 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_HTTP_PORTS: 8080
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      Scanner__Recognition__Provider: ${SCANNER_RECOGNITION_PROVIDER:-openai}
+      Scanner__Recognition__FallbackProvider: ocr
       ConnectionStrings__Vaulta: Host=postgres;Database=${POSTGRES_DB:-vaulta};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       Jwt__Secret: ${JWT_SECRET:?Configure a random JWT_SECRET in .env}
       Jwt__Issuer: ${JWT_ISSUER:-vaulta}

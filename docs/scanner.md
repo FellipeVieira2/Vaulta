@@ -1,5 +1,19 @@
 # Scanner de cartas
 
+## Provedor de extração — 02/10/2026
+
+Development e Production estão configurados para `openai` com fallback `ocr`. A configuração base/Testing usa OCR. Defina **somente no servidor** `OPENAI_API_KEY` (ou `Scanner__OpenAI__ApiKey` via configuração segura); sem chave, OpenAI não faz requisição e o OCR continua disponível. O Compose encaminha essa variável explicitamente. Para testar só OCR, configure `Scanner__Recognition__Provider=ocr` no host ou `SCANNER_RECOGNITION_PROVIDER=ocr` no Compose. Nenhuma chave pertence ao MAUI.
+
+Fluxo existente preservado: cena estável → captura → `/identify` → extração visual estruturada GPT → `CardEvidenceCatalogMatcher` → IDs do catálogo local. O GPT não fornece ID, preço ou condição. Candidatos ambíguos permanecem para revisão e acabamentos vêm das variantes reais do catálogo. Sem evidência confiável de jogo/idioma, o matcher limita a confiança e impede inclusão automática.
+
+Modelo configurável `gpt-6-luna`, Responses API sem tools/web search e schema estrito de sete campos. Para Luna, `reasoning.effort=none` mantém a extração dentro do orçamento de saída e evita o raciocínio médio padrão; modelos antigos configurados por override não recebem esse parâmetro. Prompt `card-evidence-openai-v1`. Uma captura inicial e no máximo um refinamento por cena; cada extração admite um retry transitório por padrão. A cena consumida não se repete em cada tick. Não existe cache de identidade por semelhança de imagem.
+
+No Android, a captura automática exige presença geométrica local antes da estabilidade: quatro bordas coerentes de um retângulo vertical centralizado, proporção de carta e detalhe interno. Fundo vazio/contorno insuficiente permanece no celular; a verificação é refeita antes da foto, do upload e do refinamento. `ScannerCardPresence` opera em preview grayscale pequeno (maior lado 160 px), sem rede/dependência de ML. É um filtro geométrico, não identificação semântica de TCG: objetos semelhantes podem passar, e pouco contraste, oclusão ou inclinação podem bloquear uma carta real. `Opções → Capturar novamente` permite captura manual deliberada. [Implementação e limites](design/scanner-presence-2026-10-02.md).
+
+Após disparar a captura, um pequeno spinner com “Identificando… aguarde” aparece na própria câmera, sem navegação ou troca de tela. `_busy`/`_continuousInFlight` impedem novas capturas até concluir identificação, consulta de detalhes e resultado/revisão. O indicador sai em `finally` inclusive em erro/cancelamento, e é encerrado ao parar a câmera. Depois do upload, uma identificação válida pertence à foto capturada e não é descartada se a pessoa mover a carta física enquanto espera; apenas um refinamento exige que a mesma carta ainda esteja visível.
+
+`GET /printings/{id}` continua separado: snapshot PostgreSQL válido primeiro, atualização TCGdex/PTAX somente quando necessária, protegida por advisory lock. Identificação não consulta preço ou JustTCG. Nova permanece disponível por seleção explícita; não participa do fallback padrão de GPT. [Implementação, segurança, configuração e validações](design/scanner-openai-2026-10-02.md). [Dataset local autorizado](scanner-eval.md).
+
 O scanner está disponível no início e na coleção, inclusive quando a coleção já tem cartas. É necessário entrar na conta. A captura usa a câmera do Android; a API autenticada identifica candidatos no catálogo local, e o usuário confirma a edição antes de adicionar.
 
 O detalhe recupera a imagem e as informações da TCGdex. Preços por variante são convertidos para reais pela PTAX de venda do Banco Central. Veja [valores de mercado](market-pricing.md) para a definição das comparações por período. O custo de aquisição é um campo opcional separado, informado pelo usuário em reais.

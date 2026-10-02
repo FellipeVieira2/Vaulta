@@ -25,7 +25,7 @@ public static class CardEvidenceJsonParser
             var language = ReadField(root, "language", 12);
             var variant = ReadField(root, "variant", 32);
             if (game?.Value is not (null or "pokemon")
-                || number?.Value is { } n && !Regex.IsMatch(n, @"^(?:[A-Z]{0,4}\s*)?\d{1,4}(?:\s*/\s*(?:[A-Z]{0,4}\s*)?\d{1,4})?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+                || number?.Value is { } n && !Regex.IsMatch(n, @"^(?:[A-Z]{0,4}\s*)?\d{1,4}[A-Z]{0,2}(?:\s*/\s*(?:[A-Z]{0,4}\s*)?\d{1,4}[A-Z]{0,2})?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
                 || setCode?.Value is { } s && !Regex.IsMatch(s, @"^[a-zA-Z0-9][a-zA-Z0-9-]{0,39}$", RegexOptions.CultureInvariant)
                 || language?.Value is { } l && !Regex.IsMatch(l, @"^[a-z]{2}(?:-[A-Z]{2})?$", RegexOptions.CultureInvariant)
                 || variant?.Value is not (null or "normal" or "holo" or "reverse")) return null;

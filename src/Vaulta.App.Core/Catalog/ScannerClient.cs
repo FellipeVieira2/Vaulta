@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using Vaulta.App.Core.Http;
 using Vaulta.Catalog.Contracts;
+using System.Diagnostics;
 
 namespace Vaulta.App.Core.Catalog;
 
@@ -13,8 +14,10 @@ public interface IScannerClient
 
 public sealed class ScannerClient(HttpClient httpClient) : IScannerClient
 {
+    private static readonly ActivitySource Activities = new("Vaulta.Scanner");
     public async Task<ScannerCardDetailsDto> GetCardDetailsAsync(Guid printingId, CancellationToken cancellationToken = default)
     {
+        using var activity = Activities.StartActivity("scanner.client.details");
         using var response = await httpClient.GetAsync($"api/v1/scanner/printings/{printingId}", cancellationToken);
         return await response.ReadApiJsonAsync<ScannerCardDetailsDto>(cancellationToken);
     }
@@ -23,6 +26,7 @@ public sealed class ScannerClient(HttpClient httpClient) : IScannerClient
 
     public async Task<CardScanResultDto> ScanCardAsync(byte[] imageData, string? gameCode, CancellationToken cancellationToken = default)
     {
+        using var activity = Activities.StartActivity("scanner.client.identify");
         ArgumentNullException.ThrowIfNull(imageData);
         if (imageData.Length == 0 || imageData.Length > MaxImageBytes)
             throw new ArgumentException("Envie uma foto de até 15 MB.", nameof(imageData));

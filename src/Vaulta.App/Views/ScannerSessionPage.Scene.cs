@@ -16,6 +16,8 @@ public sealed partial class ScannerSessionPage
     private Border? _lastCardPanel;
     private Border? _resultPanel;
     private ProgressBar? _costProgress;
+    private Border? _identificationPanel;
+    private ActivityIndicator? _identificationSpinner;
     private readonly Label _revealTitle = Text("", 12, Color.FromArgb("#FFDA77"), true);
     private readonly Label _revealValue = Text("", 44, Colors.White, true);
     private readonly Label _revealName = Text("", 18, Colors.White, true);
@@ -67,6 +69,17 @@ public sealed partial class ScannerSessionPage
 
         var center = new Grid { InputTransparent = true };
         center.Children.Add(new GraphicsView { Drawable = new SessionFrameDrawable(), InputTransparent = true });
+        _identificationSpinner = new ActivityIndicator { Color = Color.FromArgb("#C8FFDD"), WidthRequest = 22, HeightRequest = 22 };
+        var identifying = new HorizontalStackLayout { Spacing = 10, VerticalOptions = LayoutOptions.Center,
+            Children = { _identificationSpinner, Text("Identificando… aguarde", 13, Colors.White, true) } };
+        _identificationPanel = Surface(identifying, "#E8111520");
+        _identificationPanel.IsVisible = false;
+        _identificationPanel.HorizontalOptions = LayoutOptions.Center;
+        _identificationPanel.VerticalOptions = LayoutOptions.End;
+        _identificationPanel.Margin = new Thickness(16, 0, 16, 14);
+        _identificationPanel.InputTransparent = true;
+        SemanticProperties.SetDescription(_identificationPanel, "Identificando esta carta. Aguarde antes de mostrar a próxima.");
+        center.Children.Add(_identificationPanel);
         var revealText = new VerticalStackLayout { Spacing = 6, Children = { _revealTitle, _revealValue, _revealName } };
         _revealTitle.HorizontalTextAlignment = TextAlignment.Center; _revealValue.HorizontalTextAlignment = TextAlignment.Center;
         _revealName.HorizontalTextAlignment = TextAlignment.Center; _revealName.MaxLines = 2;
@@ -184,6 +197,12 @@ public sealed partial class ScannerSessionPage
         _revealPanel?.CancelAnimations();
         if (_revealPanel is not null) { _revealPanel.IsVisible = false; _revealPanel.Scale = 1; }
         _revealDrawing.Visible = false; _revealCanvas?.Invalidate(); _total.TextColor = Colors.White; _total.Scale = 1;
+    }
+
+    private void SetIdentificationLoading(bool loading)
+    {
+        if (_identificationSpinner is not null) _identificationSpinner.IsRunning = loading;
+        if (_identificationPanel is not null) _identificationPanel.IsVisible = loading;
     }
 
     private sealed class SessionFrameDrawable : IDrawable

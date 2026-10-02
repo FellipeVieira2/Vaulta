@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using Vaulta.Catalog.Application;
 using Vaulta.Catalog.Infrastructure.Recognition;
 
@@ -17,12 +18,16 @@ public sealed class PokemonTcgRecognitionProvider(
 
     public async Task<IReadOnlyList<CardRecognitionCandidate>> IdentifyAsync(byte[] imageData, CancellationToken cancellationToken)
     {
+        using var activity = ScannerTelemetry.Activities.StartActivity("scanner.ocr.identify");
+        activity?.SetTag("scanner.provider", "ocr");
+        var timer = Stopwatch.StartNew(); var outcome = "unavailable";
         try
         {
             var ocrResult = await ocrService.ExtractTextAsync(imageData, cancellationToken);
             if (string.IsNullOrWhiteSpace(ocrResult.RawText))
             {
                 logger.LogWarning("OCR returned no text from card image");
+                outcome = "no_match";
                 return [];
             }
 
@@ -33,18 +38,28 @@ public sealed class PokemonTcgRecognitionProvider(
             if (candidates.Count == 0)
             {
                 logger.LogWarning("Fuzzy search found no matches for OCR-extracted text");
+                outcome = "no_match";
                 return [];
             }
 
             logger.LogInformation("Scanner identified {Count} candidate(s), best confidence: {Confidence:P1}",
                 candidates.Count, candidates[0].ConfidenceScore);
 
+            outcome = candidates.Count > 1 ? "ambiguous" : candidates[0].ConfidenceScore >= .93 && candidates[0].HasCollectorNumberMatch ? "success" : "needs_review";
             return candidates;
         }
+        catch (OperationCanceledException) { outcome = "cancelled"; throw; }
         catch (Exception ex) when (ex is not (OperationCanceledException or OcrUnavailableException or Vaulta.SharedKernel.DomainException))
         {
-            logger.LogError(ex, "Card recognition failed unexpectedly");
+            logger.LogError("Card recognition failed unexpectedly ({ErrorType}).", ex.GetType().Name);
             return [];
+        }
+        finally
+        {
+            activity?.SetTag("scanner.outcome", outcome);
+            var tags = new[] { new KeyValuePair<string, object?>("provider", "ocr"), new("outcome", outcome) };
+            ScannerTelemetry.Extractions.Add(1, tags);
+            ScannerTelemetry.Duration.Record(timer.Elapsed.TotalMilliseconds, tags);
         }
     }
 

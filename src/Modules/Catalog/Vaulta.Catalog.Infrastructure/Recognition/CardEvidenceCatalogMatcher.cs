@@ -29,7 +29,7 @@ public sealed class CardEvidenceCatalogMatcher(ICardRecognitionCatalog catalog)
             if (nameScore < 0.65) continue;
             var numberMatch = hasNumber && NumberMatches(evidence.CollectorNumber.Value!, card.CollectorNumber);
             if (hasNumber && !numberMatch) continue;
-            var score = hasNumber && Usable(evidence.Name) && nameScore >= 0.85
+            var score = hasNumber && Usable(evidence.Name) && Usable(evidence.GameCode) && Usable(evidence.Language) && nameScore >= 0.85
                 ? Math.Min(0.95, (nameScore + evidence.Name.Confidence + evidence.CollectorNumber.Confidence) / 3)
                 : Math.Min(0.7, nameScore * evidence.Name.Confidence);
             ranked.Add(new(card.PrintingId.ToString(), card.CardName, card.SetName, card.CollectorNumber, card.Rarity,

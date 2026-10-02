@@ -5,6 +5,7 @@
 .env
 TestResults/
 artifacts/
+**/scanner-eval/
 
 catalog-smoke-result.json
 TestResults/

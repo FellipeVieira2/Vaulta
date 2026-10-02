@@ -1,5 +1,7 @@
 # Scanner: evidências opcionais com Amazon Nova
 
+> Documento histórico da implementação Nova. A seleção atual foi generalizada: Development/Production escolhem OpenAI e OCR como fallback; Nova só participa quando selecionado explicitamente. Veja [scanner-openai-2026-10-02.md](scanner-openai-2026-10-02.md). As configurações anteriores habilitavam Nova, embora o texto abaixo descrevesse o padrão original OCR; não use este exemplo histórico como configuração atual.
+
 Data: 02/10/2026. Escopo: Task 4 do plano `docs/superpowers/plans/2026-10-02-marketplace-scanner.md`.
 
 ## Decisão e comportamento implementado

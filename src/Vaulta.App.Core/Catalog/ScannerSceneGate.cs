@@ -8,10 +8,11 @@ public sealed class ScannerSceneGate
     private long _stableSince;
     private bool _changed;
 
-    public bool Observe(byte[] signature, long timeMs)
+    public bool Observe(byte[] signature, long timeMs, bool cardPresent = true)
     {
         if (signature.Length == 0) return false;
         if (_consumed is not null && Distance(signature, _consumed) >= 22) _changed = true;
+        if (!cardPresent) { _stable = null; return false; }
         if (_stable is null || Distance(signature, _stable) > 9)
         {
             _stable = signature.ToArray(); _stableSince = timeMs; return false;
