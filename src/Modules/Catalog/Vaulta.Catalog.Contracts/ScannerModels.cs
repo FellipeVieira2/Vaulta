@@ -32,7 +32,13 @@ public sealed record CardCertificationDto(string? Company, string? Grade, string
 }
 public sealed record CardVisualAttributesDto(string? Rarity, int? Year, string? CardType, string? Stage);
 public sealed record CardScanResultDto(IReadOnlyList<CardScanCandidateDto> Candidates, CardVisualIdentificationDto? VisualIdentification = null,
-    string? ServiceIssue = null);
+    string? ServiceIssue = null, ScannerMarketEstimateDto? MarketEstimate = null, string? MarketIssue = null);
+
+public sealed record ScannerPriceSourceDto(string Url, string Title, decimal Amount, string Currency, string Basis,
+    DateTimeOffset? PriceUpdatedAt = null);
+public sealed record ScannerMarketEstimateDto(decimal AmountBrl, string Source, DateTimeOffset CheckedAt, double Confidence,
+    CardVisualIdentificationDto Identification, IReadOnlyList<ScannerPriceSourceDto> Sources, bool IsEstimate = true,
+    DateTimeOffset? NextRefreshAt = null);
 
 public sealed record ScannerCardDetailsDto(
     CatalogPrintingDetails Printing,

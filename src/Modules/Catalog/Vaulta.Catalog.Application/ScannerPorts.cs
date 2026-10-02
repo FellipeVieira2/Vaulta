@@ -1,5 +1,17 @@
 namespace Vaulta.Catalog.Application;
 
+public interface IScannerWebMarketResearchProvider
+{
+    Task<Vaulta.Catalog.Contracts.ScannerMarketEstimateDto?> ResearchAsync(
+        Vaulta.Catalog.Contracts.CardVisualIdentificationDto identification, byte[]? image, CancellationToken cancellationToken);
+}
+
+public interface IScannerMarketResearch
+{
+    Task<Vaulta.Catalog.Contracts.ScannerMarketEstimateDto?> ResearchAsync(
+        Vaulta.Catalog.Contracts.CardVisualIdentificationDto identification, byte[]? image, CancellationToken cancellationToken);
+}
+
 public interface IScannerCardDetailsReader
 {
     Task<Vaulta.Catalog.Contracts.ScannerCardDetailsDto?> GetAsync(Guid printingId, CancellationToken cancellationToken);
