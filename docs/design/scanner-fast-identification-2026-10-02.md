@@ -31,3 +31,15 @@ Repetição com schema de idioma corrigido: HTTP 200 em 3,17 segundos; `Golisopo
 Todas as suítes passaram: Identity.Unit 222, App.Core 159, Commerce 78, Architecture 6 e Identity.Integration 141: **606 testes, zero falhas**. Logs: `artifacts/scanner-fast-<projeto>.log`. A repetição encontrou colisão de bucket no MinIO externo de teste; o fixture agora usa bucket único por execução e a suíte completa passou novamente. Integrações exercitam PostgreSQL e MinIO em rede Docker isolada, sem acesso do runner ao socket do daemon. A política de execução do Windows bloqueou assemblies locais; os testes foram executados no SDK Linux.
 
 Build Android ARM64 Debug: zero avisos/erros, log `artifacts/scanner-fast-android-build.log`. Artefato destinado ao teste: `artifacts/Vaulta-scanner-fast-identification-2026-10-02-arm64.apk`. Instalação/câmera física e latência em condições reais continuam pendentes. Revisão independente final não encontrou P1/P2 reproduzível.
+
+## Implantação e diagnóstico do serviço em produção
+
+Imagem implantada pelo script existente: `4b5323e-scanner-20261002`, digest `sha256:b1fdced8bfd97745d659ea7174ebb0ce2a4cd553eda5be4591e11bbaa54ea3b0`. SSM deploy `dd2f26a4-7d03-4923-bcb2-8e00b5d1c6bf`, sucesso. Não houve nova migration; o PostgreSQL existente foi preservado.
+
+Diagnóstico de operador usando `ScannerService` e `IScannerCardDetailsReader` dentro do contêiner implantado, com chave/configuração presentes somente no runtime e artwork público TCGdex: identificação em 5,99 segundos. Resolveu `Golisopod`, `026/86`, `Caos Ascendente`, idioma `pt`, leitura visual `pt-BR`, HP 140, confiança do candidato 0,95; variantes canônicas normal/reverse. A impressão ausente foi importada, sem criar usuário de teste ou adicionar carta a uma coleção. O acabamento não foi afirmado pela visão.
+
+O detalhe consultou dados reais e persistiu snapshot com `fetchedAt=2026-10-02T19:49:11.7466854Z` e `nextRefreshAt=2026-10-03T08:00:00Z`. Referências internacionais convertidas por PTAX: normal/Cardmarket R$ 0,12, média de sete dias R$ 0,12; reverse/TCGplayer R$ 1,25, sem média inventada. São dados daquele momento, não uma cotação de vendas brasileiras nem preço recomendado.
+
+Comando SSM do diagnóstico final: `e30178ca-5bd9-4098-8650-0011f3ad640a`, saída 0. A primeira tentativa não executou a inferência porque o arquivo temporário de diagnóstico não era legível pelo usuário do contêiner; a permissão do arquivo de código foi corrigida e ele foi removido após executar. O diagnóstico percorreu os serviços reais, não o endpoint HTTP/autenticação; esses contratos são cobertos pelos testes de integração.
+
+APK SHA-256: `F6D63E0DC794DBB4F4F72A7A49FF8EC6A16E484CF65CEFEF4DDB45C0608CC9BC`. Assinaturas v2/v3 verificadas. É um build Debug para teste Android ARM64.
