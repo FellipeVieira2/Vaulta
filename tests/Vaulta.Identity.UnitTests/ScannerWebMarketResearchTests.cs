@@ -24,7 +24,7 @@ public sealed class ScannerWebMarketResearchTests
     {
         using var provider = Provider(Response(web, currency));
         var result = await provider.ResearchAsync(Card, null, default);
-        if (expected == 0) Assert.Null(result); else Assert.Equal(expected, result!.Estimate!.AmountBrl);
+        if (expected == 0) Assert.Null(result?.Estimate); else Assert.Equal(expected, result!.Estimate!.AmountBrl);
     }
     [Theory]
     [InlineData("062/066", "pt-BR", "normal", null)]
@@ -155,6 +155,32 @@ public sealed class ScannerWebMarketResearchTests
         Assert.Equal("asking", estimate.Sources.Single().Basis);
     }
     private sealed class FixedClock : IClock { public DateTimeOffset UtcNow { get; } = new(2026, 10, 2, 12, 0, 0, TimeSpan.Zero); }
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("stale")]
+    [InlineData("network")]
+    public async Task CorrectedPhotoIdentitySurvivesUnavailableExchangeRate(string mode)
+    {
+        using var response = await Mutate(p => { p["photoSupported"] = true; p["sources"]![0]!["currency"] = "USD"; });
+        using var photo = new Image<Rgba32>(128, 128);
+        using var stream = new MemoryStream(); photo.SaveAsJpeg(stream);
+        using var provider = new OpenAiScannerWebMarketResearchProvider(new(new Handler(_ => Task.FromResult(response))) { BaseAddress = new("https://api.openai.com/v1/") },
+            Options.Create(new OpenAiScannerOptions { Enabled = true, ApiKey = "test" }), new UnavailableFx(mode));
+        var result = await provider.ResearchAsync(Card with { CollectorNumber = "062/066" }, stream.ToArray(), default);
+        Assert.NotNull(result);
+        Assert.Equal("067/086", result.Identification.CollectorNumber);
+        Assert.Null(result.Estimate);
+        Assert.Equal("exchange_rate_unavailable", result.Issue);
+    }
+    private sealed class UnavailableFx(string mode) : IBrlExchangeRateProvider
+    {
+        public Task<BrlExchangeRate?> GetAsync(string currency, CancellationToken ct) => mode switch
+        {
+            "network" => throw new HttpRequestException("provider unavailable"),
+            "stale" => Task.FromResult<BrlExchangeRate?>(new(currency, 5, DateTimeOffset.UtcNow.AddDays(-20))),
+            _ => Task.FromResult<BrlExchangeRate?>(null)
+        };
+    }
     [Fact]
     public async Task UnsupportedGifIsRejectedBeforeWebCall()
     {

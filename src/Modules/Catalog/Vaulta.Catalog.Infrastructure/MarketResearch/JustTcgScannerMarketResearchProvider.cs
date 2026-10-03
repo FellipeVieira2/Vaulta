@@ -83,7 +83,7 @@ public sealed class JustTcgScannerMarketResearchProvider : IScannerWebMarketRese
     private static string? Language(string? value) => value?.ToLowerInvariant() switch
     { "en" => "English", "pt-br" or "pt" => "Portuguese", "ja" => "Japanese", "fr" => "French", "de" => "German", "es" => "Spanish", "it" => "Italian", "ko" => "Korean", "zh-hans" => "Chinese (S)", "zh-hant" => "Chinese (T)", "ru" => "Russian", _ => null };
     private static string? Game(string? value) => value?.ToLowerInvariant() switch
-    { "pokemon" => "pokemon", "yugioh" or "yu-gi-oh" => "yu-gi-oh", "onepiece" or "one-piece-card-game" => "one-piece-card-game", _ => null };
+    { "pokemon" => "pokemon", "yugioh" or "yu-gi-oh" or "yu-gi-oh!" => "yu-gi-oh", "onepiece" or "one-piece-card-game" or "one piece card game" => "one-piece-card-game", _ => null };
     private static string Number(string value) => string.Join('/', value.Split('/').Select(piece =>
     {
         var clean = piece.Trim();

@@ -56,14 +56,15 @@ public sealed class JustTcgScannerMarketResearchTests
         Assert.Equal(10m, (await composite.ResearchAsync(ScannerWebMarketResearchTests.Card, null, default))!.Estimate!.AmountBrl);
     }
     [Theory]
-    [InlineData("yugioh", "yu-gi-oh")]
-    [InlineData("onepiece", "one-piece-card-game")]
-    public async Task UsesOfficialGameIdentifiers(string inputGame, string providerGame)
+    [InlineData("pokemon", "pokemon", "Pokemon")]
+    [InlineData("yugioh", "yu-gi-oh", "Yu-Gi-Oh!")]
+    [InlineData("onepiece", "one-piece-card-game", "One Piece Card Game")]
+    public async Task UsesOfficialGameIdentifiers(string inputGame, string providerGame, string responseGame)
     {
         using var handler = new ScannerWebMarketResearchTests.Handler(request =>
         {
             Assert.Contains($"game={providerGame}", request.RequestUri!.Query);
-            var body = new { data = new[] { new { id = "example", name = "Sliggoo", game = providerGame, set_name = "Example", number = "067/086", variants = new[] { new { id = "v1", printing = "Normal", language = "Portuguese", condition = "Near Mint", price = 10, lastUpdated = DateTimeOffset.UtcNow.ToUnixTimeSeconds() } } } } };
+            var body = new { data = new[] { new { id = "example", name = "Sliggoo", game = responseGame, set_name = "Example", number = "067/086", variants = new[] { new { id = "v1", printing = "Normal", language = "Portuguese", condition = "Near Mint", price = 10, lastUpdated = DateTimeOffset.UtcNow.ToUnixTimeSeconds() } } } } };
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(body)) });
         });
         using var provider = new JustTcgScannerMarketResearchProvider(new(handler) { BaseAddress = new("https://api.justtcg.com/") }, Options.Create(new JustTcgScannerOptions { ApiKey = "test" }), new ScannerWebMarketResearchTests.Fx());

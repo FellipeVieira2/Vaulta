@@ -161,6 +161,7 @@ public sealed class OpenAiScannerWebMarketResearchProvider : IScannerWebMarketRe
             var title = MarketResearchValidation.String(source, "title");
             var currency = MarketResearchValidation.String(source, "currency");
             var basis = MarketResearchValidation.String(source, "basis");
+            if (currency is not ("BRL" or "USD" or "EUR")) return new(resolved, null, "price_unavailable");
             DateTimeOffset? date = null;
             if (source.GetProperty("date").ValueKind != JsonValueKind.Null)
             {
@@ -169,7 +170,7 @@ public sealed class OpenAiScannerWebMarketResearchProvider : IScannerWebMarketRe
                 date = parsed;
             }
             if (url is null || !urls.Contains(url) || string.IsNullOrWhiteSpace(title) || title.Length > 512
-                || currency is not ("BRL" or "USD" or "EUR") || basis is not ("asking" or "sold" or "market")
+                || basis is not ("asking" or "sold" or "market")
                 || !source.GetProperty("amount").TryGetDecimal(out var amount) || amount is <= 0 or > 1000000) return null;
             if (found.Any(x => x.Url == url)) return null;
             var reference = S("condition");
@@ -178,8 +179,12 @@ public sealed class OpenAiScannerWebMarketResearchProvider : IScannerWebMarketRe
         if (found.Count == 0) return new(resolved, null, "price_unavailable");
         if (found.Count > 8) return null;
         if (string.IsNullOrWhiteSpace(resolved.Language) || string.IsNullOrWhiteSpace(resolved.Finish)) return new(resolved, null, "variant_unresolved");
-        var value = await MarketResearchValidation.ConvertAsync(found, _fx, ct, Now);
-        if (value is null) return null;
+        decimal? value;
+        try { value = await MarketResearchValidation.ConvertAsync(found, _fx, ct, Now); }
+        catch (Exception ex) when (ex is HttpRequestException or IOException
+            || ex is OperationCanceledException && !ct.IsCancellationRequested)
+        { return new(resolved, null, "exchange_rate_unavailable"); }
+        if (value is null) return new(resolved, null, "exchange_rate_unavailable");
         return new(resolved, new(value.Value, "OpenAI web research", Now, confidence, resolved, found));
     }
     public void Dispose() => _capacity.Dispose();
