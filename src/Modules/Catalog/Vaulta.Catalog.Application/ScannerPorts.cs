@@ -2,13 +2,13 @@ namespace Vaulta.Catalog.Application;
 
 public interface IScannerWebMarketResearchProvider
 {
-    Task<Vaulta.Catalog.Contracts.ScannerMarketEstimateDto?> ResearchAsync(
+    Task<Vaulta.Catalog.Contracts.ScannerMarketResearchResultDto?> ResearchAsync(
         Vaulta.Catalog.Contracts.CardVisualIdentificationDto identification, byte[]? image, CancellationToken cancellationToken);
 }
 
 public interface IScannerMarketResearch
 {
-    Task<Vaulta.Catalog.Contracts.ScannerMarketEstimateDto?> ResearchAsync(
+    Task<Vaulta.Catalog.Contracts.ScannerMarketResearchResultDto?> ResearchAsync(
         Vaulta.Catalog.Contracts.CardVisualIdentificationDto identification, byte[]? image, CancellationToken cancellationToken);
 }
 

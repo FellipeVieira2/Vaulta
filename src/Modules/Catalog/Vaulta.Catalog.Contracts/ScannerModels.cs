@@ -40,6 +40,9 @@ public sealed record ScannerMarketEstimateDto(decimal AmountBrl, string Source, 
     CardVisualIdentificationDto Identification, IReadOnlyList<ScannerPriceSourceDto> Sources, bool IsEstimate = true,
     DateTimeOffset? NextRefreshAt = null);
 
+public sealed record ScannerMarketResearchResultDto(CardVisualIdentificationDto Identification,
+    ScannerMarketEstimateDto? Estimate, string? Issue = null);
+
 public sealed record ScannerCardDetailsDto(
     CatalogPrintingDetails Printing,
     IReadOnlyDictionary<string, string> Information,
