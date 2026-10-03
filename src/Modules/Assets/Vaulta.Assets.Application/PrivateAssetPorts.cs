@@ -4,5 +4,6 @@ public interface IPrivateAssetService
 {
  Task<PrivateAssetDetails?> GetOwnedAsync(Guid owner,Guid asset,CancellationToken ct);
  Task<byte[]?> ReadOwnedAsync(Guid owner,Guid asset,CancellationToken ct);
+ Task FinalizeOwnedAsync(Guid owner,Guid asset,CancellationToken ct)=>throw new NotSupportedException("Private asset finalization is required.");
  Task DeleteOwnedAsync(Guid owner,Guid asset,CancellationToken ct);
 }

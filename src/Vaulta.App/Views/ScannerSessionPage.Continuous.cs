@@ -56,7 +56,7 @@ public sealed partial class ScannerSessionPage
             else if(kind==ScannerFrameKind.NoCard) _status.Text="Mostre uma carta · captura automática.";
             if(!_frameLoop.TryBegin(observation.Signature,Environment.TickCount64,kind,true,_busy || _resultPanel?.IsVisible==true)) return;
             captureStarted=true; _continuousInFlight=true; _busy=true; SetActionsEnabled(false);
-            await CaptureCard(true,observation.FullImage??observation.Image);
+            await CaptureCard(true,observation.FullImage??observation.Image,observation.FullImage is null?null:observation.Image);
         }
         catch(OperationCanceledException) { }
         catch(Exception ex) { if(_visible) ShowError(ex); }

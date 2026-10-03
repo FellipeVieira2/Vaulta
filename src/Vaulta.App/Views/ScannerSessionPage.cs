@@ -135,7 +135,7 @@ public sealed partial class ScannerSessionPage : ContentPage
 
     private Task CaptureCard() => CaptureCard(false, null);
 
-    private async Task CaptureCard(bool continuous, byte[]? savedFrame)
+    private async Task CaptureCard(bool continuous, byte[]? savedFrame,byte[]? retrievalCrop=null)
     {
         var operation = BeginScannerOperation();
         if (!_cameraReady || _camera is null) throw new InvalidOperationException("Aguarde a câmera ou use a busca pelo nome.");
@@ -158,9 +158,9 @@ public sealed partial class ScannerSessionPage : ContentPage
             RequireScannerOperation(operation); SetIdentificationLoading(true,captured:true);
             _status.Text="Foto capturada · pode retirar a carta. Identificando…";
             var attempt=await ReserveHistory(operation.Context.Token);RequireScannerOperation(operation);
-            var result=await _scanner.ScanCardAsync(photo,null,attempt?.AttemptId,attempt is null?null:Guid.NewGuid().ToString("N"),operation.Context.Token);RequireScannerOperation(operation);
+            var result=await _scanner.ScanCardAsync(photo,null,attempt?.AttemptId,attempt is null?null:Guid.NewGuid().ToString("N"),retrievalCrop,operation.Context.Token);RequireScannerOperation(operation);
             if(attempt is not null && result.History?.PersistenceStatus=="saved" && (_archiveTask is null || _archiveTask.IsCompleted))
-                _archiveTask=_captureArchive.ArchiveAsync(photo,attempt.AttemptId,operation.Context.Token);
+                _archiveTask=_captureArchive.ArchiveAsync(retrievalCrop??photo,attempt.AttemptId,operation.Context.Token);
             await HandleContinuousResult(result,operation);
         }
         finally { SetIdentificationLoading(false); }

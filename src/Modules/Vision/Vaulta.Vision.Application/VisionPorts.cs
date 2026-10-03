@@ -16,6 +16,7 @@ public interface IVisualReferenceBuilder
 {
     Task<VisualReferenceBuildReport> BuildAsync(Guid? setId,CancellationToken ct);
     Task<VisualIndexStatus> LoadAsync(CancellationToken ct);
+    Task<VisualIndexStatus> LoadForEvaluationAsync(IReadOnlyCollection<Guid> excludedAssetIds,CancellationToken ct)=>throw new NotSupportedException("An isolated evaluation index is required.");
 }
 public sealed record VisualReferenceBuildReport(int Generated,int Unchanged,int Pending,int Failed,VisualIndexStatus Index)
 { public bool Complete=>Pending==0 && Failed==0; }
@@ -30,5 +31,5 @@ public interface IVisionEvidenceReader
     Task<VisionEvidenceReading> ReadAsync(byte[] image,IReadOnlyList<VisionCatalogPrinting> candidates,CancellationToken ct);
 }
 public sealed record VisionEvidenceReading(Vaulta.Catalog.Application.CardEvidence? Evidence,string? Issue,string? OcrText);
-public sealed record VisionCaptureInput(byte[] Image,string? FrameId=null);
+public sealed record VisionCaptureInput(byte[] Image,string? Role=null);
 public sealed record VisionScanInput(IReadOnlyList<VisionCaptureInput> Captures,string? GameCode=null);

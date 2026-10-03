@@ -20,13 +20,31 @@ public sealed class VisionCatalog(CatalogDbContext db) : IVisionCatalog
         var normalized=CatalogNormalizer.NormalizeName(evidence.Name.Value!);
         var query=Query().Where(x=>x.Card.NormalizedName==normalized);
         if(VisionPrintingResolver.Usable(evidence.GameCode)) query=query.Where(x=>x.Card.Game.Code==evidence.GameCode.Value);
-        return await ReadAsync(query,ct);
+        if(VisionPrintingResolver.Usable(evidence.Language)) query=query.Where(x=>x.Language==evidence.Language.Value);
+        if(VisionPrintingResolver.Usable(evidence.CollectorNumber))
+        {
+            var parts=evidence.CollectorNumber.Value!.Split('/');
+            static string NumberPart(string value)=>System.Text.RegularExpressions.Regex.Replace(CatalogNormalizer.NormalizeCollectorNumber(value),@"^([A-Z]*)0+(?=\d)","$1");
+            var first=NumberPart(parts[0]);
+            // Same equivalence as the resolver, applied before candidate limiting in PostgreSQL.
+            var numbered=db.Printings.FromSqlInterpolated($"SELECT * FROM catalog.printings WHERE regexp_replace(split_part(normalized_collector_number,'/',1),'^([A-Z]*)0+(?=[0-9])','\\1')={first}");
+            if(parts.Length==2)
+            {
+                var total=NumberPart(parts[1]);
+                numbered=db.Printings.FromSqlInterpolated($"SELECT * FROM catalog.printings WHERE regexp_replace(split_part(normalized_collector_number,'/',1),'^([A-Z]*)0+(?=[0-9])','\\1')={first} AND regexp_replace(split_part(normalized_collector_number,'/',2),'^([A-Z]*)0+(?=[0-9])','\\1')={total}");
+            }
+            query=query.Where(x=>numbered.Select(n=>n.Id).Contains(x.Id));
+        }
+        if(VisionPrintingResolver.Usable(evidence.SetName)) { var set=CatalogNormalizer.NormalizeName(evidence.SetName.Value!);query=query.Where(x=>x.Set.NormalizedName==set); }
+        return await ReadAsync(query,ct,true);
     }
     private IQueryable<Printing> Query()=>db.Printings.AsNoTracking().Where(x=>x.IsActive)
         .Include(x=>x.Card).ThenInclude(x=>x.Game).Include(x=>x.Set).Include(x=>x.Variants.Where(v=>v.IsActive));
-    private static async Task<IReadOnlyList<VisionCatalogPrinting>> ReadAsync(IQueryable<Printing> query,CancellationToken ct)
+    private static async Task<IReadOnlyList<VisionCatalogPrinting>> ReadAsync(IQueryable<Printing> query,CancellationToken ct,bool rejectOverflow=false)
     {
-        var rows=await query.OrderBy(x=>x.Id).Take(100).ToArrayAsync(ct); var result=new List<VisionCatalogPrinting>();
+        var rows=await query.OrderBy(x=>x.Id).Take(rejectOverflow?101:100).ToArrayAsync(ct);
+        if(rejectOverflow && rows.Length>100) throw new VisionEvidenceCandidateLimitException();
+        var result=new List<VisionCatalogPrinting>();
         foreach(var row in rows)
         {
             using var metadata=JsonDocument.Parse(row.MetadataJson??"{}"); var root=metadata.RootElement;

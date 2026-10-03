@@ -20,13 +20,14 @@ public sealed class VisionHistoryService(VisionDbContext db,IPrivateAssetService
  private async Task<ScanAttempt> Owned(Guid owner,Guid id,CancellationToken ct,bool allowExpired=false)
  {
   var row=await db.ScanAttempts.SingleOrDefaultAsync(x=>x.Id==id && x.OwnerId==owner,ct)??throw new NotFoundException("Attempt not found.");
+  await db.Entry(row).ReloadAsync(ct);
   if(!allowExpired && (!options.Enabled || row.OperationalPolicyVersion!=options.OperationalPolicyVersion || row.RetentionUntil<=clock.UtcNow || row.DeletionRequestedAt is not null)) throw new ConflictException("Attempt expired or withdrawn.");return row;
  }
  private async Task Lock(Guid attempt,CancellationToken ct)=>await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({attempt.ToString()}))",ct);
  public async Task<ScanRun> ReserveAsync(Guid owner,Guid attempt,string key,string sha,CancellationToken ct)
  {
-  await Owned(owner,attempt,ct);VisionDatasetRules.ValidateKey(key);sha=VisionDatasetRules.Sha(sha);
-  await using var tx=await db.Database.BeginTransactionAsync(ct);await Lock(attempt,ct);
+  VisionDatasetRules.ValidateKey(key);sha=VisionDatasetRules.Sha(sha);
+  await using var tx=await db.Database.BeginTransactionAsync(ct);await Lock(attempt,ct);await Owned(owner,attempt,ct);
   var prior=await db.ScanRuns.SingleOrDefaultAsync(x=>x.AttemptId==attempt && x.ExecutionKey==key,ct);
   if(prior is not null)
   { if(prior.InputSha256!=sha || prior.Status!="completed") throw new ConflictException("Execution is in progress, failed, or belongs to another image.");await tx.CommitAsync(ct);return prior; }
@@ -35,12 +36,14 @@ public sealed class VisionHistoryService(VisionDbContext db,IPrivateAssetService
  }
  public async Task CompleteAsync(Guid runId,VisionScanResultDto result,ImageEmbedding embedding,CancellationToken ct)
  {
-  var run=await db.ScanRuns.SingleAsync(x=>x.Id==runId,ct);if(run.Status!="running") throw new ConflictException("Run already completed.");
+  var identity=await (from r in db.ScanRuns.AsNoTracking() join a in db.ScanAttempts.AsNoTracking() on r.AttemptId equals a.Id where r.Id==runId select new {r.AttemptId,a.OwnerId}).SingleAsync(ct);
+  await using var tx=await db.Database.BeginTransactionAsync(ct);await Lock(identity.AttemptId,ct);await Owned(identity.OwnerId,identity.AttemptId,ct);
+  var run=await db.ScanRuns.SingleAsync(x=>x.Id==runId,ct);await db.Entry(run).ReloadAsync(ct);if(run.Status!="running") throw new ConflictException("Run already completed.");
   VisionDatasetRules.ValidateConfidence(result.PrintingConfidence);VisionDatasetRules.ValidateConfidence(result.VariantConfidence);
   if(embedding.Identity!=result.Trace.Encoder || embedding.Vector.Length!=embedding.Identity.Dimension) throw new DomainException("Run embedding does not match its executed manifest.");
   run.PredictionJson=JsonSerializer.Serialize(result with {Price=null,PriceStatus=result.PriceStatus=="available"?"unavailable":result.PriceStatus,History=null},Json);
   run.ManifestJson=JsonSerializer.Serialize(result.Trace,Json);run.Embedding=EmbeddingMath.Normalize(embedding.Vector,embedding.Identity.Dimension);run.Status="completed";run.CompletedAt=clock.UtcNow;
-  db.ScanRunCandidates.AddRange(result.Candidates.Take(10).Select((c,i)=>new ScanRunCandidate {RunId=runId,Rank=i+1,PrintingId=c.Printing.PrintingId,RetrievalScore=c.RetrievalScore}));await db.SaveChangesAsync(ct);
+  db.ScanRunCandidates.AddRange(result.Candidates.Take(10).Select((c,i)=>new ScanRunCandidate {RunId=runId,Rank=i+1,PrintingId=c.Printing.PrintingId,RetrievalScore=c.RetrievalScore}));await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);
  }
  public async Task<VisionAttemptDetailsDto> GetAsync(Guid owner,Guid attempt,CancellationToken ct)
  {
@@ -51,36 +54,42 @@ public sealed class VisionHistoryService(VisionDbContext db,IPrivateAssetService
  }
  public async Task<VisionCaptureUploadResponse> UploadAsync(Guid owner,Guid attempt,CreateVisionCaptureRequest request,IAssetService uploads,CancellationToken ct)
  {
-  await Owned(owner,attempt,ct);var sha=VisionDatasetRules.Sha(request.Sha256);
+  var sha=VisionDatasetRules.Sha(request.Sha256);
   if(request.Sequence is <0 or >2 || request.Role is not ("full-frame" or "card-crop" or "finish")) throw new DomainException("Invalid capture sequence/role.");
-  await using var tx=await db.Database.BeginTransactionAsync(ct);await Lock(attempt,ct);
+  await using var tx=await db.Database.BeginTransactionAsync(ct);await Lock(attempt,ct);await Owned(owner,attempt,ct);
   if(await db.ScanCaptures.AnyAsync(x=>x.AttemptId==attempt && x.Sequence==request.Sequence,ct)) throw new ConflictException("Capture sequence already reserved.");
   var upload=await uploads.CreateUpload(owner,new("vision-scan",request.ContentType,request.ContentLength,sha),ct);
   var row=new ScanCapture {Id=Guid.NewGuid(),AttemptId=attempt,AssetId=upload.AssetId,Sequence=request.Sequence,Role=request.Role,Sha256=sha,CreatedAt=clock.UtcNow};db.ScanCaptures.Add(row);await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);return new(row.Id,row.AssetId,upload.UploadUrl,upload.ExpiresAt);
  }
  public async Task<VisionCaptureDto> ConfirmAsync(Guid owner,Guid attempt,Guid capture,IAssetService uploads,CancellationToken ct)
  {
-  await Owned(owner,attempt,ct);var row=await db.ScanCaptures.SingleOrDefaultAsync(x=>x.Id==capture && x.AttemptId==attempt,ct)??throw new NotFoundException("Capture not found.");
+  await using var tx=await db.Database.BeginTransactionAsync(ct);await Lock(attempt,ct);await Owned(owner,attempt,ct);
+  var row=await db.ScanCaptures.SingleOrDefaultAsync(x=>x.Id==capture && x.AttemptId==attempt,ct)??throw new NotFoundException("Capture not found.");
   var details=await assets.GetOwnedAsync(owner,row.AssetId,ct);if(details is null || details.Purpose!="vision-scan" || details.Sha256!=row.Sha256) throw new DomainException("Capture asset mismatch.");
-  await uploads.ConfirmUpload(owner,row.AssetId,ct);details=await assets.GetOwnedAsync(owner,row.AssetId,ct);
+  await uploads.ConfirmUpload(owner,row.AssetId,ct);await assets.FinalizeOwnedAsync(owner,row.AssetId,ct);details=await assets.GetOwnedAsync(owner,row.AssetId,ct);
   if(details?.Status!="ready" || details.Sha256!=row.Sha256) throw new DomainException("Capture is not verified in storage.");
-  row.Status="ready";row.ConfirmedAt??=clock.UtcNow;await db.SaveChangesAsync(ct);return new(row.Id,row.AssetId,row.Sequence,row.Role,row.Sha256,row.Status);
+  row.Status="ready";row.ConfirmedAt??=clock.UtcNow;await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);return new(row.Id,row.AssetId,row.Sequence,row.Role,row.Sha256,row.Status);
  }
  public async Task<VisionFeedbackDto> FeedbackAsync(Guid owner,Guid attempt,string key,VisionFeedbackRequest request,CancellationToken ct)
  {
-  await Owned(owner,attempt,ct);VisionDatasetRules.ValidateKey(key);VisionDatasetRules.ValidateFeedback(request.Source,request.ConfirmedPrintingId,request.ConfirmedVariantId,request.Orientation,request.Presence,request.Notes);
+  await using var tx=await db.Database.BeginTransactionAsync(ct);await Lock(attempt,ct);await Owned(owner,attempt,ct);
+  VisionDatasetRules.ValidateKey(key);VisionDatasetRules.ValidateFeedback(request.Source,request.ConfirmedPrintingId,request.ConfirmedVariantId,request.Orientation,request.Presence,request.Notes);
   if(!await db.ScanRuns.AnyAsync(x=>x.Id==request.RunId && x.AttemptId==attempt && x.Status=="completed",ct)) throw new DomainException("Feedback must match a completed run.");
   if(request.ConfirmedPrintingId is { } p)
   { var canonical=(await catalog.GetPrintingsAsync([p],ct)).SingleOrDefault();if(canonical is null || request.ConfirmedVariantId is { } v && !canonical.Printing.Variants.Any(x=>x.Id==v)) throw new DomainException("Printing/variant does not exist or does not match."); }
-  await using var tx=await db.Database.BeginTransactionAsync(ct);await Lock(attempt,ct);
   var prior=await db.Feedback.SingleOrDefaultAsync(x=>x.AttemptId==attempt && x.IdempotencyKey==key,ct);
   if(prior is not null)
   { var previous=new VisionFeedbackRequest(prior.RunId,prior.Source,prior.PrintingId,prior.VariantId,prior.Orientation,prior.Presence,prior.Notes);if(previous!=request) throw new ConflictException("Feedback key already has different content.");await tx.CommitAsync(ct);return new(prior.Id,previous,prior.CreatedAt); }
   if(await db.Feedback.CountAsync(x=>x.AttemptId==attempt,ct)>=100) throw new DomainException("Feedback limit reached.");
-  var row=new VisionFeedback {Id=Guid.NewGuid(),AttemptId=attempt,RunId=request.RunId,IdempotencyKey=key,Source=request.Source,PrintingId=request.ConfirmedPrintingId,VariantId=request.ConfirmedVariantId,Orientation=request.Orientation,Presence=request.Presence,Notes=request.Notes,CreatedAt=clock.UtcNow};db.Feedback.Add(row);await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);return new(row.Id,request,row.CreatedAt);
+  var latestAt=await db.Feedback.Where(x=>x.RunId==request.RunId).MaxAsync(x=>(DateTimeOffset?)x.CreatedAt,ct);
+  var createdAt=latestAt is { } last && last.AddTicks(10)>clock.UtcNow?last.AddTicks(10):clock.UtcNow;
+  var captureAssets=await db.ScanCaptures.Where(x=>x.AttemptId==attempt).Select(x=>x.AssetId).ToArrayAsync(ct);
+  await db.VisualReferences.Where(x=>x.Origin=="verified_capture" && x.SourceAssetId!=null && captureAssets.Contains(x.SourceAssetId.Value)).ExecuteDeleteAsync(ct);
+  var row=new VisionFeedback {Id=Guid.NewGuid(),AttemptId=attempt,RunId=request.RunId,IdempotencyKey=key,Source=request.Source,PrintingId=request.ConfirmedPrintingId,VariantId=request.ConfirmedVariantId,Orientation=request.Orientation,Presence=request.Presence,Notes=request.Notes,CreatedAt=createdAt};db.Feedback.Add(row);await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);return new(row.Id,request,row.CreatedAt);
  }
  public async Task DeleteAsync(Guid owner,Guid attempt,CancellationToken ct)
  {
+  await using var tx=await db.Database.BeginTransactionAsync(ct);await Lock(attempt,ct);
   var a=await Owned(owner,attempt,ct,true);a.DeletionRequestedAt??=clock.UtcNow;a.Status="deletion_pending";await db.SaveChangesAsync(ct);
   var captures=await db.ScanCaptures.Where(x=>x.AttemptId==attempt).ToArrayAsync(ct);var ids=captures.Select(x=>x.AssetId).ToArray();
   await db.VisualReferences.Where(x=>x.Origin=="verified_capture" && x.SourceAssetId!=null && ids.Contains(x.SourceAssetId.Value)).ExecuteDeleteAsync(ct);
@@ -88,29 +97,35 @@ public sealed class VisionHistoryService(VisionDbContext db,IPrivateAssetService
   foreach(var run in await db.ScanRuns.Where(x=>x.AttemptId==attempt).ToArrayAsync(ct)) { run.Embedding=null;run.PredictionJson=null;run.ManifestJson=null; }
   await db.ReviewedSamples.Where(x=>x.AttemptId==attempt).ExecuteDeleteAsync(ct);await db.Feedback.Where(x=>x.AttemptId==attempt).ExecuteDeleteAsync(ct);
   // A signed PUT can outlive logical withdrawal. Repeat physical deletion until every issued URL has expired.
-  a.Status=captures.Any(x=>x.CreatedAt.AddMinutes(11)>clock.UtcNow)?"deletion_pending":"deleted";await db.SaveChangesAsync(ct);
+  a.Status=captures.Any(x=>x.CreatedAt.AddMinutes(11)>clock.UtcNow)?"deletion_pending":"deleted";await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);
  }
  public async Task<int> PurgeExpiredAsync(CancellationToken ct)
  { var expired=await db.ScanAttempts.AsNoTracking().Where(x=>x.RetentionUntil<=clock.UtcNow && x.Status!="deleted" || x.Status=="deletion_pending").OrderBy(x=>x.RetentionUntil).Take(100).Select(x=>new{x.Id,x.OwnerId}).ToArrayAsync(ct);foreach(var row in expired) await DeleteAsync(row.OwnerId,row.Id,ct);return expired.Length; }
  public async Task<Guid> PromoteAsync(Guid attempt,Guid feedback,CancellationToken ct)
  {
-  var a=await db.ScanAttempts.SingleOrDefaultAsync(x=>x.Id==attempt,ct)??throw new NotFoundException("Attempt not found.");await Owned(a.OwnerId,attempt,ct);
-  var f=await db.Feedback.SingleOrDefaultAsync(x=>x.Id==feedback && x.AttemptId==attempt,ct)??throw new NotFoundException("Feedback not found.");
-  var run=await db.ScanRuns.SingleAsync(x=>x.Id==f.RunId,ct);var capture=await db.ScanCaptures.Where(x=>x.AttemptId==attempt && x.Status=="ready" && x.Sha256==run.InputSha256).OrderBy(x=>x.Sequence).FirstOrDefaultAsync(ct);
-  VisionDatasetRules.RequirePromotion(a.ImprovementPolicyVersion==options.ImprovementPolicyVersion && a.ImprovementPolicyVersion is not null,f.Source is "UserConfirmation" or "UserCorrection",capture is not null);
-  var asset=await assets.GetOwnedAsync(a.OwnerId,capture!.AssetId,ct);if(asset?.Status!="ready" || asset.Purpose!="vision-scan" || asset.Sha256!=run.InputSha256) throw new DomainException("Verified capture is unavailable.");
   await using var tx=await db.Database.BeginTransactionAsync(ct);await Lock(attempt,ct);
+  var owner=await db.ScanAttempts.AsNoTracking().Where(x=>x.Id==attempt).Select(x=>(Guid?)x.OwnerId).SingleOrDefaultAsync(ct)??throw new NotFoundException("Attempt not found.");
+  var a=await Owned(owner,attempt,ct);
+  var f=await db.Feedback.SingleOrDefaultAsync(x=>x.Id==feedback && x.AttemptId==attempt,ct)??throw new NotFoundException("Feedback not found.");
+  if(await db.Feedback.AnyAsync(x=>x.RunId==f.RunId && x.CreatedAt>f.CreatedAt,ct))throw new ConflictException("Feedback was superseded by a newer revision.");
+  var run=await db.ScanRuns.SingleAsync(x=>x.Id==f.RunId,ct);
+  var trace=run.ManifestJson is null?null:JsonSerializer.Deserialize<VisionScanTraceDto>(run.ManifestJson,Json);var imageSha=trace?.RetrievalImageSha256??run.InputSha256;
+  var capture=await db.ScanCaptures.Where(x=>x.AttemptId==attempt && x.Status=="ready" && x.Sha256==imageSha).OrderBy(x=>x.Sequence).FirstOrDefaultAsync(ct);
+  VisionDatasetRules.RequirePromotion(a.ImprovementPolicyVersion==options.ImprovementPolicyVersion && a.ImprovementPolicyVersion is not null,f.Source is "UserConfirmation" or "UserCorrection",capture is not null);
+  var asset=await assets.GetOwnedAsync(a.OwnerId,capture!.AssetId,ct);if(asset?.Status!="ready" || asset.Purpose!="vision-scan" || asset.Sha256!=imageSha) throw new DomainException("Verified capture is unavailable.");
+  var verified=await assets.ReadOwnedAsync(a.OwnerId,capture.AssetId,ct);
+  if(verified is null || !Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(verified)).Equals(imageSha,StringComparison.OrdinalIgnoreCase))throw new DomainException("Capture content does not match its executed input.");
   var prior=await db.ReviewedSamples.SingleOrDefaultAsync(x=>x.FeedbackId==feedback && x.CaptureId==capture.Id,ct);if(prior is not null) {await tx.CommitAsync(ct);return prior.Id;}
   var sample=new VisionReviewedSample {Id=Guid.NewGuid(),AttemptId=attempt,FeedbackId=feedback,CaptureId=capture.Id,ReviewedAt=clock.UtcNow};db.ReviewedSamples.Add(sample);
   await db.VisualReferences.Where(x=>x.Origin=="verified_capture" && x.SourceAssetId==capture.AssetId).ExecuteDeleteAsync(ct);
   if(f.PrintingId is { } printing && f.Orientation=="front" && f.Presence=="card-present" && run.Embedding is not null)
   {
    var canonical=(await catalog.GetPrintingsAsync([printing],ct)).SingleOrDefault();if(canonical is null || f.VariantId is { } v && !canonical.Printing.Variants.Any(x=>x.Id==v)) throw new DomainException("Reviewed identity is no longer active.");
-   var trace=JsonSerializer.Deserialize<VisionScanTraceDto>(run.ManifestJson!,Json)!;var vector=EmbeddingMath.Normalize(run.Embedding,trace.Encoder.Dimension);
+   if(trace is null)throw new DomainException("Executed manifest is unavailable.");var vector=EmbeddingMath.Normalize(run.Embedding,trace.Encoder.Dimension);
    var version=VisualReferenceBuilder.ModelVersion(trace.Encoder);
    // Each asset has at most one live identity per model. A later correction replaces its reference, never the run/feedback.
    await db.VisualReferences.Where(x=>x.Origin=="verified_capture" && x.SourceAssetId==capture.AssetId && x.ModelVersion==version).ExecuteDeleteAsync(ct);
-   db.VisualReferences.Add(new VisualReference {Id=Guid.NewGuid(),PrintingId=printing,SourceAssetId=capture.AssetId,Origin="verified_capture",Status="ready",ModelVersion=version,ModelManifestJson=JsonSerializer.Serialize(trace.Encoder),Dimension=trace.Encoder.Dimension,Vector=vector,ImageSha256=run.InputSha256,VectorSha256=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Runtime.InteropServices.MemoryMarshal.AsBytes(vector.AsSpan()))).ToLowerInvariant(),CreatedAt=clock.UtcNow,UpdatedAt=clock.UtcNow});
+   db.VisualReferences.Add(new VisualReference {Id=Guid.NewGuid(),PrintingId=printing,SourceAssetId=capture.AssetId,Origin="verified_capture",Status="ready",ModelVersion=version,ModelManifestJson=JsonSerializer.Serialize(trace.Encoder),Dimension=trace.Encoder.Dimension,Vector=vector,ImageSha256=imageSha,VectorSha256=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Runtime.InteropServices.MemoryMarshal.AsBytes(vector.AsSpan()))).ToLowerInvariant(),CreatedAt=clock.UtcNow,UpdatedAt=clock.UtcNow});
   }
   await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);return sample.Id;
  }
@@ -123,12 +138,22 @@ public sealed class VisionHistoryService(VisionDbContext db,IPrivateAssetService
    var active=await (from sample in db.ReviewedSamples join a in db.ScanAttempts on sample.AttemptId equals a.Id where ids.Contains(sample.Id) && a.DeletionRequestedAt==null && a.RetentionUntil>clock.UtcNow select sample.Id).CountAsync(ct);
    if(active!=ids.Length)throw new ConflictException("Frozen benchmark contains withdrawn/expired samples; create a new version.");return stored;
   }
-  var rows=await (from sample in db.ReviewedSamples join a in db.ScanAttempts on sample.AttemptId equals a.Id join c in db.ScanCaptures on sample.CaptureId equals c.Id join f in db.Feedback on sample.FeedbackId equals f.Id where a.DeletionRequestedAt==null && a.RetentionUntil>clock.UtcNow && c.Status=="ready" orderby sample.ReviewedAt descending,sample.Id select new {sample.AttemptId,sample.ReviewedAt,Sample=new VisionBenchmarkSampleDto(sample.Id,c.Id,c.Sha256,c.Sha256,f.PrintingId,f.VariantId,f.Orientation,f.Presence,f.Id)}).Take(10001).ToArrayAsync(ct);
+  var rows=await (from sample in db.ReviewedSamples join a in db.ScanAttempts on sample.AttemptId equals a.Id join c in db.ScanCaptures on sample.CaptureId equals c.Id join f in db.Feedback on sample.FeedbackId equals f.Id where a.DeletionRequestedAt==null && a.RetentionUntil>clock.UtcNow && c.Status=="ready" && !db.Feedback.Any(newer=>newer.RunId==f.RunId && newer.CreatedAt>f.CreatedAt) orderby sample.ReviewedAt descending,sample.Id select new {sample.AttemptId,a.SessionCorrelationId,sample.ReviewedAt,Sample=new VisionBenchmarkSampleDto(sample.Id,c.Id,c.Sha256,c.Sha256,f.PrintingId,f.VariantId,f.Orientation,f.Presence,f.Id)}).Take(10001).ToArrayAsync(ct);
   if(rows.Length>10000)throw new DomainException("Benchmark limit exceeded; select a smaller evaluation scope.");
   var latest=rows.GroupBy(x=>x.Sample.CaptureId).Select(x=>x.First()).ToArray();
-  var groups=VisionBenchmarkGrouping.Assign(latest.Select(x=>(x.AttemptId,x.Sample.Sha256)).ToArray());
+  var groups=VisionBenchmarkGrouping.Assign(latest.Select(x=>(x.AttemptId,x.Sample.Sha256)).ToArray(),latest.GroupBy(x=>x.AttemptId).ToDictionary(x=>x.Key,x=>x.First().SessionCorrelationId));
   var samples=latest.Select(x=>x.Sample with {SplitGroup=groups[(x.AttemptId,x.Sample.Sha256)]}).OrderBy(x=>x.SampleId).ToArray();
   var manifest=new VisionBenchmarkManifestDto(version,clock.UtcNow,samples);db.FrozenBenchmarks.Add(new() {Version=version,CreatedAt=clock.UtcNow,ManifestJson=JsonSerializer.Serialize(manifest,Json)});await db.SaveChangesAsync(ct);return manifest;
+ }
+ public async Task<IReadOnlyCollection<Guid>> EvaluationExcludedAssetsAsync(VisionBenchmarkManifestDto manifest,CancellationToken ct)
+ {
+  var rows=await (from c in db.ScanCaptures.AsNoTracking() join a in db.ScanAttempts.AsNoTracking() on c.AttemptId equals a.Id where c.Status=="ready" && a.DeletionRequestedAt==null && a.RetentionUntil>clock.UtcNow select new {c.Id,c.AssetId,c.AttemptId,c.Sha256,a.SessionCorrelationId}).Take(100001).ToArrayAsync(ct);
+  if(rows.Length>100000)throw new DomainException("Evaluation grouping limit exceeded.");
+  var sessions=rows.GroupBy(x=>x.AttemptId).ToDictionary(x=>x.Key,x=>x.First().SessionCorrelationId);
+  var groups=VisionBenchmarkGrouping.Assign(rows.Select(x=>(x.AttemptId,x.Sha256)).ToArray(),sessions);
+  var heldOut=manifest.Samples.Select(x=>x.CaptureId).ToHashSet();
+  var excludedGroups=rows.Where(x=>heldOut.Contains(x.Id)).Select(x=>groups[(x.AttemptId,x.Sha256)]).ToHashSet();
+  return rows.Where(x=>excludedGroups.Contains(groups[(x.AttemptId,x.Sha256)])).Select(x=>x.AssetId).Distinct().ToArray();
  }
  public static VisionScanResultDto Replay(ScanRun run)=>JsonSerializer.Deserialize<VisionScanResultDto>(run.PredictionJson!,Json)!;
 }

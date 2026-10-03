@@ -96,7 +96,7 @@ internal sealed partial class TcgDexProvider(HttpClient httpClient, IOptions<Tcg
         return new(new ProviderSet(set.Id, set.Name, null, releaseDate, set.Serie is { } series ? new ProviderSeries(series.Id, series.Name) : null), printings);
     }
 
-    private static ProviderVariant DetailedVariant(JsonElement detail)
+    internal static ProviderVariant DetailedVariant(JsonElement detail)
     {
         if (detail.ValueKind != JsonValueKind.Object || !detail.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String)
             throw ContractError("Detailed variant type is missing.");

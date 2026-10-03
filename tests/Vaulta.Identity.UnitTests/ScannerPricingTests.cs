@@ -49,4 +49,12 @@ public sealed class ScannerPricingTests
         Assert.DoesNotContain("pricing", info.Keys);
         Assert.DoesNotContain("image", info.Keys);
     }
+    [Fact] public void NextProviderObservationKeepsSeparatelyPricedDetailedEditions()
+    {
+        using var data=JsonDocument.Parse("""{"pricing":{"cardmarket":{"unit":"EUR","updated":"2026-10-03T00:00:00Z","trend-holo":999}},"variants_detailed":[{"type":"holo","subtype":"unlimited","pricing":{"cardmarket":{"unit":"EUR","updated":"2026-10-03T00:00:00Z","trend-holo":10}}},{"type":"holo","subtype":"shadowless","pricing":{"cardmarket":{"unit":"EUR","updated":"2026-10-03T00:00:00Z","trend-holo":30}}}]}""");
+        var unlimited=new CatalogVariantDto(Guid.NewGuid(),"holo-unlimited","Unlimited");var shadowless=new CatalogVariantDto(Guid.NewGuid(),"holo-shadowless","Shadowless");
+        var quotes=TcgDexScannerDetailsReader.ReadQuotes(data.RootElement,[unlimited,shadowless],new Dictionary<string,BrlExchangeRate>{{"EUR",new("EUR",6m,DateTimeOffset.UtcNow)}});
+        Assert.Equal(60m,Assert.Single(quotes,x=>x.VariantId==unlimited.Id).MarketValueBrl);Assert.Equal(180m,Assert.Single(quotes,x=>x.VariantId==shadowless.Id).MarketValueBrl);
+    }
+
 }

@@ -2,8 +2,8 @@
 
 ## Evidência observada antes do deploy
 
-- Backend: 346/346 unitários; aplicativo: 208/208; PostgreSQL/MinIO: 177/177 integrações; arquitetura: 6/6. Total: 737 testes aprovados.
-- Compilação API Release e Android ARM64 Debug: zero avisos/erros. APK com assinatura v2/v3 verificada, 135.989.065 bytes; SHA256 `2453459da33918169c021f7e7aa42a5375b9e05fe6678c01cfc237a1687af5fc`.
+- Backend: 349/349 unitários; aplicativo: 211/211; PostgreSQL/MinIO: 183/183 integrações; arquitetura: 6/6. Total: 749 testes aprovados, além de 7/7 testes de operação em Linux.
+- Compilação API Release e Android ARM64 Debug: zero avisos/erros. APK com assinatura v2/v3 verificada, 135.993.161 bytes; SHA256 `040c8eeeb132198f270d311eca838bd7dc982c1297579bc1a9466398b6df705d`.
 - Pesos reais CLIP: 89.117.001 bytes, SHA256 `583fd1110a514667812fee7d684952aaf82a99b959760c8d7dca7e0ab9839299`. Pesos, manifesto e biblioteca ONNX nativa ARM64 verificados dentro do APK.
 - Catálogo de validação: 102 impressões Base Set em inglês, 102 artworks/miniaturas internos e 102 embeddings reais de 512 dimensões. O sistema realizou a ingestão e a geração, não downloads manuais por carta.
 - Recuperação real: 16/16 artworks oficiais recuperaram sua própria impressão. Isto não mede precisão em fotos de celular.
@@ -23,3 +23,13 @@ Histórico privado é opcional. A política operacional e contribuição à melh
 ## Limites ainda a verificar
 
 Câmera/inferência no aparelho real, negativos/verso/reflexos, precisão de acabamento, latência em rede móvel e cobertura integral do catálogo. APK compilado e assinado não comprova esses casos. Deploy e smoke GPT reais serão registrados em relatório separado; em 03/10 o usuário autorizou publicá-los e iniciar a importação remota.
+
+## Revisão final e regressões
+
+A revisão independente apontou nove problemas importantes, reproduzidos antes das correções: retirada de consentimento durante execução, atualização de preços detalhados, endereços de artwork no aplicativo, recorte descartado no envio, limite silencioso de candidatos, foto confirmada mutável, feedback antigo sobrescrevendo correção, vazamento de referências para avaliação e falha de reserva interrompendo leitura. Todos receberam correções no mesmo passe. Nenhum ponto menor foi adiado.
+
+A busca por número também segue a mesma equivalência de zeros à esquerda do resolvedor (`026/086` e `026/86`). O teste de integração foi observado falhando antes da alteração. Os testes passam sem exportar chaves da produção.
+
+A primeira execução remota usou por engano o usuário PostgreSQL `vision`, cujo `search_path` passou a resolver tabelas no schema homônimo criado pelo módulo. A validação foi refeita com usuário exclusivo `vaulta_test` e base vazia; esse problema do ambiente de testes não levou a alterações nas migrações da produção.
+
+CodeBuild não iniciou nenhuma compilação porque todas as cotas de concorrência da conta são zero. A criação de um ambiente EC2 temporário foi recusada pela revisão automática por exigir expansão persistente de IAM; não foi aplicada. Os testes e a publicação usam contêineres com limites no servidor atual, PostgreSQL/MinIO separados e nenhuma conexão com a base de produção durante testes.

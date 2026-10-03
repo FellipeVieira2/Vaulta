@@ -102,4 +102,23 @@ public sealed class VisionCatalogPersistenceTests(ApiFixture fixture)
         public Task<IReadOnlyList<ProviderSet>> GetSets(CancellationToken ct)=>Task.FromResult<IReadOnlyList<ProviderSet>>([details.Set]);
         public Task<ProviderSetDetails> GetSetDetails(string id,CancellationToken ct)=>Task.FromResult(details);
     }
+    [Fact] public async Task MoreThanOneHundredMatchingReprintsCannotBecomeArtificialCertainty()
+    {
+        await using var scope=fixture.Factory.Services.CreateAsyncScope();var db=scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+        var name="Overflow "+Guid.NewGuid().ToString("N");var game=Guid.Parse("f18fd4d1-2514-4b19-9eaa-f33c04564c7b");
+        var card=new Vaulta.Catalog.Domain.Card{Id=Guid.NewGuid(),GameId=game,Name=name,NormalizedName=name.ToLowerInvariant()};
+        for(var i=0;i<101;i++)db.Printings.Add(new(){Id=Guid.NewGuid(),Card=card,Set=new(){Id=Guid.NewGuid(),GameId=game,Name=name+i,NormalizedName=(name+i).ToLowerInvariant()},CollectorNumber="1/100",NormalizedCollectorNumber="1/100",Language="en",MetadataJson="{\"hp\":90}"});
+        await db.SaveChangesAsync();var evidence=new CardEvidence(new("pokemon",.9),new(name,.9),new(null,0),new(null,0),new(null,0),new("en",.9),new(null,0),"fixture","fixture",Hp:new("90",.9));
+        await Assert.ThrowsAsync<Vaulta.Vision.Application.VisionEvidenceCandidateLimitException>(()=>new Vaulta.Vision.Infrastructure.VisionCatalog(db).FindEvidenceCandidatesAsync(evidence,default));
+    }
+
+    [Fact] public async Task StrongCollectorEvidenceUsesTheSamePaddingRulesAsTheResolver()
+    {
+        await using var scope=fixture.Factory.Services.CreateAsyncScope();var db=scope.ServiceProvider.GetRequiredService<CatalogDbContext>();var id=Guid.NewGuid().ToString("N");var name="Padding "+id;
+        var cards=new[]{new ProviderPrinting("first-"+id,name,"026/86","en",null,null,[new("normal","Normal","normal")]),new ProviderPrinting("second-"+id,name,"25/86","en",null,null,[new("normal","Normal","normal")])};
+        var source=new Source("padding-"+id,new(new(id,"Padding set "+id,null,null),cards));await new CatalogSyncService(db,[source],scope.ServiceProvider.GetRequiredService<IClock>(),NullLogger<CatalogSyncService>.Instance).Synchronize(source.Code,id,default);
+        var evidence=new CardEvidence(new("pokemon",.95),new(name,.95),new("026/086",.95),new(null,0),new(null,0),new("en",.95),new("normal",.95),"fixture","fixture");
+        var candidates=await new Vaulta.Vision.Infrastructure.VisionCatalog(db).FindEvidenceCandidatesAsync(evidence,default);Assert.Equal("026/86",Assert.Single(candidates).Printing.CollectorNumber);
+    }
+
 }

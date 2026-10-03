@@ -7,11 +7,29 @@ using Vaulta.Vision.Infrastructure;
 namespace Vaulta.Web.Api;
 public sealed class ScannerVisionCoordinator(VisionScannerService scanner,VisionHistoryService history,VisionDbContext db,IScannerCardDetailsReader prices,ILogger<ScannerVisionCoordinator> logger)
 {
- public async Task<VisionScanResultDto> IdentifyAsync(Guid owner,byte[] image,string? game,Guid? attempt,string? executionKey,CancellationToken ct)
+ public async Task<VisionScanResultDto> IdentifyAsync(Guid owner,byte[] image,string? game,Guid? attempt,string? executionKey,CancellationToken ct,byte[]? retrievalCrop=null)
  {
   if((attempt is null)!=(executionKey is null)) throw new Vaulta.SharedKernel.DomainException("Attempt and execution key must be supplied together.");
-  if(attempt is null) return await scanner.IdentifyAsync(new([new(image)],game),ct);
-  var run=await history.ReserveAsync(owner,attempt.Value,executionKey!,Convert.ToHexString(SHA256.HashData(image)).ToLowerInvariant(),ct);
+  var input=new VisionScanInput(retrievalCrop is null?[new(image,"full-frame")]:[new(retrievalCrop,"card-crop"),new(image,"full-frame")],game);
+  if(attempt is null) return await scanner.IdentifyAsync(input,ct);
+  var fingerprint=Convert.ToHexString(SHA256.HashData(image)).ToLowerInvariant();
+  if(retrievalCrop is not null)
+  {
+   using var hash=IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+   foreach(var capture in input.Captures) { hash.AppendData(System.Text.Encoding.UTF8.GetBytes(capture.Role!));hash.AppendData(BitConverter.GetBytes(System.Net.IPAddress.HostToNetworkOrder(capture.Image.Length)));hash.AppendData(capture.Image); }
+   fingerprint=Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
+  }
+  Vaulta.Vision.Domain.ScanRun run;
+  using(var reserveTimeout=CancellationTokenSource.CreateLinkedTokenSource(ct))
+  {
+   reserveTimeout.CancelAfter(TimeSpan.FromSeconds(2));
+   try {run=await history.ReserveAsync(owner,attempt.Value,executionKey!,fingerprint,reserveTimeout.Token);}
+   catch(Exception error) when(error is DbUpdateException or Npgsql.NpgsqlException or TimeoutException || error is OperationCanceledException && !ct.IsCancellationRequested)
+   {
+    db.ChangeTracker.Clear();logger.LogWarning("Vision reservation metadata unavailable: {ErrorType}",error.GetType().Name);
+    var unsaved=await scanner.IdentifyAsync(input,ct);return unsaved with {History=new(attempt.Value,null,"failed")};
+   }
+  }
   if(run.Status=="completed")
   {
    var replay=VisionHistoryService.Replay(run);
@@ -20,7 +38,7 @@ public sealed class ScannerVisionCoordinator(VisionScannerService scanner,Vision
    return replay with {History=new(attempt.Value,run.Id,"replayed")};
   }
   VisionScanExecution execution;
-  try {execution=await scanner.ExecuteAsync(new([new(image)],game),ct);}
+  try {execution=await scanner.ExecuteAsync(input,ct);}
   catch
   {
    run.Status="failed";using var failTimeout=new CancellationTokenSource(TimeSpan.FromSeconds(2));

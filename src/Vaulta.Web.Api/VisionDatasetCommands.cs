@@ -20,7 +20,7 @@ internal static class VisionDatasetCommands
    else if(command=="--vision-rerun-benchmark")
    {
     if(args.Length<=i+3 || !int.TryParse(args[i+2],out var limit) || limit is <1 or >100)throw new ArgumentException("Usage: --vision-rerun-benchmark <version> <maxSamples1-100> <outputPath>");
-    var manifest=await service.ExportAsync(args[i+1],CancellationToken.None);await scope.ServiceProvider.GetRequiredService<IVisualReferenceBuilder>().LoadAsync(CancellationToken.None);
+    var manifest=await service.ExportAsync(args[i+1],CancellationToken.None);var excluded=await service.EvaluationExcludedAssetsAsync(manifest,CancellationToken.None);await scope.ServiceProvider.GetRequiredService<IVisualReferenceBuilder>().LoadForEvaluationAsync(excluded,CancellationToken.None);
     var db=scope.ServiceProvider.GetRequiredService<VisionDbContext>();var assets=scope.ServiceProvider.GetRequiredService<IPrivateAssetService>();var scanner=scope.ServiceProvider.GetRequiredService<ScannerVisionCoordinator>();var expected=new List<VisionBenchmarkLabel>();var predicted=new List<VisionBenchmarkLabel>();
     foreach(var sample in manifest.Samples.Take(limit))
     {

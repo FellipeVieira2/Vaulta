@@ -48,8 +48,6 @@ public sealed class TcgDexScannerDetailsReader(HttpClient httpClient, CatalogDbC
             var card = document.RootElement;
             if (card.ValueKind != JsonValueKind.Object || !card.TryGetProperty("id", out var id)
                 || id.ValueKind != JsonValueKind.String || id.GetString() != externalId) throw new JsonException("Provider returned a different card.");
-            if (card.TryGetProperty("image", out var image) && image.ValueKind == JsonValueKind.String)
-                printing = printing with { ArtworkUrl = TcgDexProvider.ArtworkUrl(image.GetString()) ?? printing.ArtworkUrl };
             var identityRates = new Dictionary<string, BrlExchangeRate>
             {
                 ["EUR"] = new("EUR", 1, clock.UtcNow), ["USD"] = new("USD", 1, clock.UtcNow)
@@ -97,7 +95,7 @@ public sealed class TcgDexScannerDetailsReader(HttpClient httpClient, CatalogDbC
         if (!hit) return null;
         var result = JsonSerializer.Deserialize<ScannerCardDetailsDto>(snapshot!.Payload)
             ?? throw new JsonException("Invalid persisted market snapshot.");
-        return result with { Printing = printing with { ArtworkUrl = result.Printing.ArtworkUrl ?? printing.ArtworkUrl } };
+        return result with { Printing = printing };
     }
 
     internal static IReadOnlyDictionary<string, string> ReadInformation(JsonElement card)
@@ -135,6 +133,14 @@ public sealed class TcgDexScannerDetailsReader(HttpClient httpClient, CatalogDbC
 
     internal static IReadOnlyList<CardMarketQuoteDto> ReadQuotes(JsonElement card, IReadOnlyList<CatalogVariantDto> variants, IReadOnlyDictionary<string, BrlExchangeRate> rates)
     {
+        if (card.TryGetProperty("variants_detailed", out var detailed) && detailed.ValueKind == JsonValueKind.Array)
+        {
+            var current = detailed.EnumerateArray().Select(TcgDexProvider.DetailedVariant).DistinctBy(x => x.Code).ToDictionary(x => x.Code);
+            var exact = variants.Where(x => current.ContainsKey(x.Code)).Select(x => new Vaulta.Catalog.Domain.Variant
+                { Id = x.Id, Code = x.Code, Name = x.Name, RawValue = current[x.Code].RawValue, IsActive = true }).ToArray();
+            var rootPricing = card.TryGetProperty("pricing", out var root) && root.ValueKind == JsonValueKind.Object ? root.GetRawText() : null;
+            return CatalogPriceParser.Read(rootPricing, exact, rates);
+        }
         if (!card.TryGetProperty("pricing", out var pricing) || pricing.ValueKind != JsonValueKind.Object) return [];
         var quotes = new List<CardMarketQuoteDto>();
         foreach (var variant in variants)

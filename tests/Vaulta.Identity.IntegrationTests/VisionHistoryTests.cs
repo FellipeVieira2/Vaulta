@@ -61,4 +61,29 @@ public class VisionHistoryTests(ApiFixture fixture)
     }
     private static VisionScanResultDto Prediction()=>new(Guid.NewGuid(),"not_a_card",null,null,.9,0,[],null,"unresolved",null,new Dictionary<string,VisionFieldDto>(),new(new("fixture","fixture","fixture","fixture",3,"test","input","output"),"fixture-index","fixture-resolver",null,null,2));
     private static VisionHistoryService Service(AsyncServiceScope scope)=>new(scope.ServiceProvider.GetRequiredService<VisionDbContext>(),scope.ServiceProvider.GetRequiredService<Vaulta.Assets.Application.IPrivateAssetService>(),scope.ServiceProvider.GetRequiredService<Vaulta.Vision.Application.IVisionCatalog>(),scope.ServiceProvider.GetRequiredService<IClock>(),new VisionHistoryOptions {Enabled=true,OperationalPolicyVersion="ops-v1",ImprovementPolicyVersion="improve-v1",RetentionDays=7});
+    [Fact] public async Task WithdrawalBeforeCompletionNeverRestoresPrivatePredictionOrVector()
+    {
+        await using var scope=fixture.Factory.Services.CreateAsyncScope();var service=Service(scope);var owner=Guid.NewGuid();var a=await service.CreateAsync(owner,new("ops-v1"),default);
+        var run=await service.ReserveAsync(owner,a.AttemptId,"paused",Sha,default);await service.DeleteAsync(owner,a.AttemptId,default);var prediction=Prediction();
+        await Assert.ThrowsAsync<ConflictException>(()=>service.CompleteAsync(run.Id,prediction,new(prediction.Trace.Encoder,[1,0,0]),default));
+        var row=await scope.ServiceProvider.GetRequiredService<VisionDbContext>().ScanRuns.AsNoTracking().SingleAsync(x=>x.Id==run.Id);Assert.Null(row.Embedding);Assert.Null(row.PredictionJson);
+    }
+    [Fact] public async Task OlderFeedbackCannotRevertANewerReviewedLabel()
+    {
+        await using var scope=fixture.Factory.Services.CreateAsyncScope();var db=scope.ServiceProvider.GetRequiredService<VisionDbContext>();var owner=Guid.NewGuid();
+        var assets=new SampleAssets();var service=new VisionHistoryService(db,assets,scope.ServiceProvider.GetRequiredService<Vaulta.Vision.Application.IVisionCatalog>(),scope.ServiceProvider.GetRequiredService<IClock>(),new(){Enabled=true,OperationalPolicyVersion="ops-v1",ImprovementPolicyVersion="improve-v1"});
+        var a=await service.CreateAsync(owner,new("ops-v1","improve-v1"),default);var run=await service.ReserveAsync(owner,a.AttemptId,"exec",assets.Sha,default);var prediction=Prediction();await service.CompleteAsync(run.Id,prediction,new(prediction.Trace.Encoder,[1,0,0]),default);
+        db.ScanCaptures.Add(new(){Id=Guid.NewGuid(),AttemptId=a.AttemptId,AssetId=assets.Id,Sequence=0,Role="card-crop",Sha256=assets.Sha,Status="ready",CreatedAt=DateTimeOffset.UtcNow});await db.SaveChangesAsync();
+        var old=await service.FeedbackAsync(owner,a.AttemptId,"old",new(run.Id,"UserCorrection",Orientation:"front",Presence:"card-present"),default);
+        var current=await service.FeedbackAsync(owner,a.AttemptId,"new",new(run.Id,"UserCorrection",Orientation:"back",Presence:"card-present"),default);
+        await service.PromoteAsync(a.AttemptId,current.Id,default);await Assert.ThrowsAsync<ConflictException>(()=>service.PromoteAsync(a.AttemptId,old.Id,default));
+    }
+    private sealed class SampleAssets:Vaulta.Assets.Application.IPrivateAssetService
+    {
+      public Guid Id=Guid.NewGuid();public byte[] Image=[1,2,3];public string Sha=>Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Image)).ToLowerInvariant();
+      public Task<Vaulta.Assets.Application.PrivateAssetDetails?> GetOwnedAsync(Guid owner,Guid asset,CancellationToken ct)=>Task.FromResult<Vaulta.Assets.Application.PrivateAssetDetails?>(new(Id,"vision-scan","ready","image/png",3,Sha));
+      public Task<byte[]?> ReadOwnedAsync(Guid owner,Guid asset,CancellationToken ct)=>Task.FromResult<byte[]?>(Image);
+      public Task DeleteOwnedAsync(Guid owner,Guid asset,CancellationToken ct)=>Task.CompletedTask;
+    }
+
 }

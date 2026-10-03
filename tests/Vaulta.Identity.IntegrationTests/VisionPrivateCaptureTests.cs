@@ -33,6 +33,10 @@ public class VisionPrivateCaptureTests(ApiFixture fixture)
   await Assert.ThrowsAsync<DomainException>(()=>service.ConfirmAsync(owner,attempt.AttemptId,upload.CaptureId,uploads,default));
   using var http=new HttpClient();using var body=new ByteArrayContent(image);body.Headers.ContentType=new MediaTypeHeaderValue("image/png");(await http.PutAsync(upload.UploadUrl,body)).EnsureSuccessStatusCode();
   await service.ConfirmAsync(owner,attempt.AttemptId,upload.CaptureId,uploads,default);Assert.Equal(image,await assets.ReadOwnedAsync(owner,upload.AssetId,default));
+  // The previously issued upload URL must not alter the finalized reviewed input.
+  using(var changed=new ByteArrayContent(image.Concat(new byte[]{0}).ToArray())){changed.Headers.ContentType=new MediaTypeHeaderValue("image/png");(await http.PutAsync(upload.UploadUrl,changed)).EnsureSuccessStatusCode();}
+  Assert.Equal(image,await assets.ReadOwnedAsync(owner,upload.AssetId,default));
+
   var catalogDb=scope.ServiceProvider.GetRequiredService<Vaulta.Catalog.Infrastructure.CatalogDbContext>();var unique="Memory "+Guid.NewGuid().ToString("N");var game=Guid.Parse("f18fd4d1-2514-4b19-9eaa-f33c04564c7b");
   var p=new Vaulta.Catalog.Domain.Printing {Id=Guid.NewGuid(),Card=new(){Id=Guid.NewGuid(),GameId=game,Name=unique,NormalizedName=unique.ToLowerInvariant()},Set=new(){Id=Guid.NewGuid(),GameId=game,Name=unique,NormalizedName=unique.ToLowerInvariant()},CollectorNumber="1",NormalizedCollectorNumber="1",Language="en",Variants=[new(){Id=Guid.NewGuid(),Code="normal",Name="Normal"}]};catalogDb.Printings.Add(p);await catalogDb.SaveChangesAsync();var canonical=(await catalog.GetPrintingsAsync([p.Id],default)).Single();var variant=canonical.Printing.Variants[0].Id;
   // Artificial vector tests persistence/promotion only; visual accuracy uses the separate real encoder harness.

@@ -60,4 +60,16 @@ public sealed class VisionScannerServiceTests
             return Task.FromResult<ScannerCardDetailsDto?>(new(card.Printing,new Dictionary<string,string>(),priced?[quote]:[],null));
         }
     }
+    [Fact] public async Task LocalizedCropDrivesRetrievalWhileFullFrameDrivesEvidence()
+    {
+        var card=VisionPrintingResolverTests.Printing("067/086","pt-BR");var calls=new List<string>();
+        var encoder=new CropProbe();var evidence=new FullProbe(VisionPrintingResolverTests.Evidence("067/086"));
+        var result=await new VisionScannerService(encoder,new Index(encoder.Identity,card),new Catalog(card),evidence,new Quotes(card,false),new()).ExecuteAsync(new([new([1,2,3],"card-crop"),new([4,5,6],"full-frame")]),default);
+        Assert.Equal(new byte[]{1,2,3},encoder.Input);Assert.Equal(new byte[]{4,5,6},evidence.Input);Assert.Equal("identified",result.Result.Status);
+    }
+    private sealed class CropProbe:IImageEncoder
+    {public byte[]? Input;public EncoderIdentity Identity=>new("fixture","fixture","fixture","fixture",3,"test","input","output");public async Task<ImageEmbedding> EncodeAsync(Stream image,CancellationToken ct){using var data=new MemoryStream();await image.CopyToAsync(data,ct);Input=data.ToArray();return new(Identity,[1,0,0]);}}
+    private sealed class FullProbe(CardEvidence evidence):IVisionEvidenceReader
+    {public byte[]? Input;public Task<VisionEvidenceReading> ReadAsync(byte[] image,IReadOnlyList<VisionCatalogPrinting> candidates,CancellationToken ct){Input=image;return Task.FromResult(new VisionEvidenceReading(evidence,null,null));}}
+
 }
