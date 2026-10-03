@@ -10,6 +10,39 @@ namespace Vaulta.App.Core.UnitTests.Catalog;
 public sealed class ScannerOccurrenceImporterTests
 {
     [Fact]
+    public async Task PendingOccurrenceAndAllPendingSessionAreBlockedBeforeWritesOrFreeze()
+    {
+        var initial = Session();
+        var visual = new Vaulta.Catalog.Contracts.CardVisualIdentificationDto("Card", null, "pt", null, .8);
+        var session = initial with { Cards = initial.Cards.Select(x => x with { PrintingId = Guid.Empty, VisualIdentification = visual }).ToArray() };
+        var store = new MemoryStore(session); var handler = new Receipts();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Service(store, handler, () => session.OwnerId).Import(session, session.Cards[0].ScanId));
+        Assert.Same(session, store.Value);
+        var completed = session.Complete(); await store.Save(completed);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new ScannerSessionImporter(Client(handler), store, () => session.OwnerId).Import(completed));
+        Assert.Same(completed, store.Value);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task MixedSessionImportsResolvedCopiesIdempotentlyAndLeavesPendingVisible()
+    {
+        var initial = Session();
+        var pending = initial.Cards[0] with { ScanId = Guid.NewGuid(), PrintingId = Guid.Empty,
+            VisualIdentification = new("Card", null, "pt", null, .8) };
+        var session = initial.Add(pending).Complete();
+        var store = new MemoryStore(session); var handler = new Receipts();
+        var importer = new ScannerSessionImporter(Client(handler), store, () => session.OwnerId);
+        var imported = await importer.Import(session);
+        Assert.Equal(ScannerSessionPhase.Imported, imported.Phase);
+        Assert.Equal(3, imported.Cards.Count);
+        Assert.Null(imported.Cards.Single(x => x.ScanId == pending.ScanId).ImportedItemId);
+        await importer.Import(imported);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.All(handler.Requests, x => Assert.NotEqual(Guid.Empty, x.PrintingId));
+    }
+
+    [Fact]
     public async Task CertificateFromThePhotoIsRetainedInCollectionNotesOnBothImportPaths()
     {
         var initial = Session();

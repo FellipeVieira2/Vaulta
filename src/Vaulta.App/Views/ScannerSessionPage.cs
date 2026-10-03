@@ -186,7 +186,7 @@ public sealed partial class ScannerSessionPage : ContentPage
     private void ShowCandidates(CardScanResultDto result, bool requireNumber = true)
     {
         ClearResults();
-        if (requireNumber && result.Candidates.Count > 0 && result.Candidates.All(x => !x.HasCollectorNumberMatch))
+        if (requireNumber && result.VisualIdentification is null && result.Candidates.Count > 0 && result.Candidates.All(x => !x.HasCollectorNumberMatch))
         {
             _status.Text = "Li o nome, mas não confirmei a edição. Aproxime o rodapé com o número da carta ou use a busca.";
             return;
@@ -196,23 +196,32 @@ public sealed partial class ScannerSessionPage : ContentPage
             : result.Candidates.Count == 0 && result.ServiceIssue is not null ? "O serviço de identificação está indisponível. Use a busca pelo nome."
             : result.Candidates.Count == 0 ? "Não confirmei esta edição. Mostre nome e número nítidos ou busque a carta." : "Confira a edição para somar o valor correto.";
         foreach (var candidate in result.Candidates.Where(x => !requireNumber || x.HasCollectorNumberMatch).Take(3).Where(x => x.PrintingId != Guid.Empty))
-            _result.Children.Add(Action($"{candidate.Name} · {candidate.SetName} · {candidate.CollectorNumber}", () => ShowCard(candidate.PrintingId, result.VisualIdentification)));
-        if (result.Candidates.Count == 0 && result.VisualIdentification is { } reading)
+            _result.Children.Add(Action($"{candidate.Name} · {candidate.SetName} · {candidate.CollectorNumber}", () => ShowCard(candidate.PrintingId, result.VisualIdentification, result.MarketEstimate)));
+        if (result.MarketEstimate is { } research && ScannerValuation.ResearchValue(research, result.VisualIdentification, confirmed: true) is { } preview)
+        {
+            _result.Children.Add(Text($"Estimativa pesquisada: {Money(preview.AmountBrl)} · {research.Confidence:P0} de confiança · {research.CheckedAt.ToLocalTime():dd/MM/yyyy HH:mm}", 12, Colors.White));
+            AddResearchSources(_result, research.Sources);
+        }
+        if (requireNumber && result.VisualIdentification is { } reading && ScannerValuation.IsValidVisual(reading)
+            && ScannerAutomaticRecognition.Select(result) is null)
         {
             _result.Children.Add(Text(DescribeVisual(reading), 18, Colors.White, true));
             _result.Children.Add(Text($"{reading.GameCode ?? "TCG"} · {reading.Language ?? "idioma não legível"}", 12, Color.FromArgb("#B4B5C8")));
             AddVisualDetails(reading);
-            _result.Children.Add(Text("Leitura do GPT concluída. Esta edição ainda não foi encontrada no catálogo; o valor está pendente.", 12, Color.FromArgb("#B4B5C8")));
+            _result.Children.Add(Text("Edição pendente no catálogo. Confira a leitura antes de somar; estoque e venda aguardam a edição.", 12, Color.FromArgb("#B4B5C8")));
+            var operation = BeginScannerOperation();
+            _result.Children.Add(Action("Confirmar leitura pendente", () => AddProvisional(result, operation, confirmed: true)));
+            _result.Children.Add(Action("Tentar novamente", () => { ClearResults(); _status.Text = "Mostre a carta novamente."; return Task.CompletedTask; }));
         }
         if (_result.Children.Count > 0) _result.Children.Add(Action("Pular carta", () => { ClearResults(); _status.Text = "Mostre a próxima carta."; return Task.CompletedTask; }));
         if (_resultPanel is not null) _resultPanel.IsVisible = _result.Children.Count > 0;
     }
 
-    private async Task ShowCard(Guid printing, CardVisualIdentificationDto? visual = null)
+    private async Task ShowCard(Guid printing, CardVisualIdentificationDto? visual = null, ScannerMarketEstimateDto? estimate = null)
     {
         var operation = BeginScannerOperation();
         var details = await _scanner.GetCardDetailsAsync(printing, operation.Context.Token); RequireScannerOperation(operation);
-        await AcceptOrConfirmCard(details, visual, operation);
+        await AcceptOrConfirmCard(details, visual, operation, estimate, confirmed: true);
     }
 
     private void ShowCardDetails(ScannerCardDetailsDto details, CardVisualIdentificationDto? visual, ScannerOperation operation)
@@ -263,6 +272,13 @@ public sealed partial class ScannerSessionPage : ContentPage
         }
     }
 
+    private void AddResearchSources(VerticalStackLayout target, IReadOnlyList<ScannerPriceSourceDto>? sources)
+    {
+        foreach (var source in sources ?? [])
+            if (Uri.TryCreate(source.Url, UriKind.Absolute, out var url) && url.Scheme == Uri.UriSchemeHttps)
+                target.Children.Add(Action(string.IsNullOrWhiteSpace(source.Title) ? source.Url : source.Title, () => Launcher.Default.OpenAsync(url)));
+    }
+
     private static string DescribeVisual(CardVisualIdentificationDto visual) => visual.Name
         + (visual.Hp is { } hp ? $" · {hp} PS" : "")
         + (visual.CollectorNumber is { } number ? $" · {number}" : "");
@@ -276,18 +292,24 @@ public sealed partial class ScannerSessionPage : ContentPage
     private void ShowReview()
     {
         StopReveal(); StopCamera(); DetachSharedViews(); var session = _session!; _status.Text = "";
+        var resolvedCount = session.Cards.Count(x => x.PrintingId != Guid.Empty);
         var body = new VerticalStackLayout { Padding = 24, Spacing = 18, Children = { Text("VAULTA / SUA ABERTURA", 12, Color.FromArgb("#BBA4FF"), true),
             Text("Sessão concluída", 30, Colors.White, true), Text(Money(session.EstimatedValueBrl), 38, Colors.White, true),
             Text(session.CostBrl.HasValue ? $"Custo {Money(session.CostBrl.Value)} · diferença estimada {Money(session.EstimatedDifferenceBrl!.Value)}" : "Custo não informado", 16, Colors.White),
             Text($"{session.Cards.Count} cartas · {session.UnpricedCards} sem cotação", 14, Color.FromArgb("#B4B5C8")) } };
         if (session.IsPartialValuation) body.Children.Add(Text("Total parcial: cartas sem cotação não entram na estimativa.", 14, Color.FromArgb("#FFDA77")));
         body.Children.Add(Text("Valores de referência por variante. A condição da carta e o mercado brasileiro podem alterar o preço de venda.", 13, Color.FromArgb("#B4B5C8")));
-        if (session.Phase == ScannerSessionPhase.Importing) body.Children.Add(Text($"{session.Cards.Count(x => x.ImportedItemId.HasValue)} de {session.Cards.Count} cartas adicionadas ao estoque.", 14, Color.FromArgb("#C8FFDD")));
+        if (session.Phase == ScannerSessionPhase.Importing) body.Children.Add(Text($"{session.Cards.Count(x => x.ImportedItemId.HasValue)} de {resolvedCount} cartas resolvidas adicionadas ao estoque.", 14, Color.FromArgb("#C8FFDD")));
         foreach (var card in session.Cards)
         {
             var row = new VerticalStackLayout { Spacing = 4, Children = { Text(card.Name, 17, Colors.White, true), Text($"{card.SetName} · {card.CollectorNumber} · {card.VariantName}", 12, Color.FromArgb("#B4B5C8")),
                 Text(card.MarketValue is { } quote ? $"{Money(quote.AmountBrl)} · {quote.Source} · {quote.QuotedAt.ToLocalTime():dd/MM HH:mm}" : "Sem cotação", 14, Colors.White) } };
             AddVisualDetails(card.VisualIdentification, row);
+            if (card.PrintingId == Guid.Empty)
+                row.Children.Add(Text("Edição pendente no catálogo · estoque e venda indisponíveis", 12, Color.FromArgb("#FFDA77")));
+            if (card.MarketValue is { IsEstimate: true } researched)
+                row.Children.Add(Text($"Estimativa pesquisada · consultada em {researched.QuotedAt.ToLocalTime():dd/MM/yyyy HH:mm}", 12, Color.FromArgb("#B4B5C8")));
+            AddResearchSources(row, card.MarketValue?.Sources);
             if (session.Phase == ScannerSessionPhase.Completed)
                 row.Children.Add(Action("Remover da sessão", async () =>
                 {
@@ -297,13 +319,14 @@ public sealed partial class ScannerSessionPage : ContentPage
                     if (removed.Phase == ScannerSessionPhase.Completed) ShowReview(); else ShowLive();
                 }));
             body.Children.Add(Surface(row, "#151726"));
-            row.Children.Add(Action(card.ListingDraftId.HasValue ? "Retomar anúncio" : "Vender esta carta", () => OpenSale(card.ScanId)));
+            if (card.PrintingId != Guid.Empty)
+                row.Children.Add(Action(card.ListingDraftId.HasValue ? "Retomar anúncio" : "Vender esta carta", () => OpenSale(card.ScanId)));
         }
-        if (session.Phase != ScannerSessionPhase.Imported)
-            body.Children.Add(Action(session.Phase == ScannerSessionPhase.Importing ? "Retomar adição ao estoque" : "Adicionar todas ao estoque", async () =>
+        if (session.Phase != ScannerSessionPhase.Imported && session.Cards.Any(x => x.PrintingId != Guid.Empty))
+            body.Children.Add(Action(session.Phase == ScannerSessionPhase.Importing ? "Retomar adição ao estoque" : "Adicionar cartas resolvidas ao estoque", async () =>
             {
                 RequireOwner();
-                if (session.Phase == ScannerSessionPhase.Completed && !await DisplayAlertAsync("Adicionar ao estoque?", $"Adicionar as {session.Cards.Count} cartas revisadas à sua coleção?", "Adicionar todas", "Agora não")) return;
+                if (session.Phase == ScannerSessionPhase.Completed && !await DisplayAlertAsync("Adicionar ao estoque?", $"Adicionar as {resolvedCount} cartas com edição resolvida à sua coleção? As pendentes continuam na sessão.", "Adicionar", "Agora não")) return;
                 try { _session = await _importer.Import(_session!, _lifetime.Token); }
                 finally
                 {
@@ -314,7 +337,8 @@ public sealed partial class ScannerSessionPage : ContentPage
                     }
                 }
             }));
-        else body.Children.Add(Text("Todas as cartas foram adicionadas ao estoque.", 16, Color.FromArgb("#C8FFDD")));
+        else body.Children.Add(Text(session.Cards.All(x => x.PrintingId == Guid.Empty) ? "Resolva uma edição no catálogo para adicionar ao estoque."
+            : "As cartas com edição resolvida foram adicionadas ao estoque.", 16, Color.FromArgb("#C8FFDD")));
         AddVideoReview(body, session);
         if (session.Phase == ScannerSessionPhase.Completed)
             body.Children.Add(Action("Continuar sessão", async () => { RequireOwner(); var resumed = _session!.Resume(); await _store.Save(resumed, _lifetime.Token); RequireOwner(); _session = resumed; ShowLive(); }));
@@ -327,6 +351,7 @@ public sealed partial class ScannerSessionPage : ContentPage
         var session = _session!; _total.Text = Money(session.EstimatedValueBrl);
         _cost.Text = session.CostBrl.HasValue ? $"/ {Money(session.CostBrl.Value)} investidos" : "estimativa de mercado";
         _count.Text = $"{session.Cards.Count} {(session.Cards.Count == 1 ? "carta" : "cartas")}" + (session.PackCount.HasValue ? $" · {session.PackCount} pacotes" : "");
+        if (session.IsPartialValuation) _count.Text += $" · {session.UnpricedCards} sem cotação · total parcial";
         _difference.Text = session.EstimatedDifferenceBrl.HasValue && session.Cards.Count > 0 ? $"{(session.IsPartialValuation ? "Parcial" : "Estimado")}: {Money(session.EstimatedDifferenceBrl.Value)}" : "";
         _difference.TextColor = session.EstimatedDifferenceBrl >= 0 ? Color.FromArgb("#C8FFDD") : Color.FromArgb("#FFB8BE");
         if (_costProgress is not null)

@@ -76,7 +76,12 @@ public sealed class ScannerSaleFlow(ScannerOccurrenceImporter importer, ICollect
         if (saved?.Id != session.Id) throw new InvalidOperationException("Reabra a sessão salva antes de publicar.");
         return saved;
     }
-    private static ScannerSessionCard Card(ScannerSession session, Guid scanId) => session.Cards.SingleOrDefault(x => x.ScanId == scanId) ?? throw new ArgumentException("Carta fora da sessão.");
+    private static ScannerSessionCard Card(ScannerSession session, Guid scanId)
+    {
+        var card = session.Cards.SingleOrDefault(x => x.ScanId == scanId) ?? throw new ArgumentException("Carta fora da sessão.");
+        if (card.PrintingId == Guid.Empty) throw new InvalidOperationException("Resolva a edição no catálogo antes de vender esta carta.");
+        return card;
+    }
     private void RequireOwner(ScannerSession session)
     {
         if (session.OwnerId != currentOwner()) throw new InvalidOperationException("Entre na conta que iniciou esta sessão para vender a carta.");

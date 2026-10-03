@@ -7,6 +7,20 @@ namespace Vaulta.App.Core.UnitTests.Catalog;
 public sealed class ScannerValuationTests
 {
     [Fact]
+    public void ExistingMatchingQuoteWinsOverResearchAndResearchCannotPriceAnotherCatalogPrint()
+    {
+        var details = Details(); var visual = Visual() with { Finish = "reverse" };
+        var variant = details.Printing.Variants[1];
+        var estimate = new ScannerMarketEstimateDto(500m, "Web", DateTimeOffset.UtcNow, .98, visual,
+            [new("https://example.com/card", "Card", 500m, "BRL", "sale")]);
+        Assert.Equal(1.25m, Assert.IsType<SessionMarketValue>(ScannerValuation.SessionValue(details, variant.Id, visual, estimate)).AmountBrl);
+        details = details with { MarketQuotes = [] };
+        Assert.Equal(500m, Assert.IsType<SessionMarketValue>(ScannerValuation.SessionValue(details, variant.Id, visual, estimate)).AmountBrl);
+        Assert.Null(ScannerValuation.SessionValue(details with { Printing = details.Printing with { CollectorNumber = "027/086" } }, variant.Id, visual, estimate));
+        Assert.Null(ScannerValuation.SessionValue(details with { Printing = details.Printing with { Language = "en" } }, variant.Id, visual, estimate));
+    }
+
+    [Fact]
     public void UnknownModelFinishCannotTakeTheOnlyCatalogVariantsPrice()
     {
         var details = Details();

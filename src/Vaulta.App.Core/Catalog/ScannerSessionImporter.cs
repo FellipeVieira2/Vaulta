@@ -8,9 +8,10 @@ public sealed class ScannerSessionImporter(ICollectionClient collection, IScanne
     public async Task<ScannerSession> Import(ScannerSession session, CancellationToken ct = default)
     {
         RequireOwner(session);
+        ct.ThrowIfCancellationRequested();
         session = session.BeginImport();
         await store.Save(session, ct); // freeze before the first request; retry payloads must remain identical
-        foreach (var card in session.Cards.Where(x => !x.ImportedItemId.HasValue).ToArray())
+        foreach (var card in session.Cards.Where(x => x.PrintingId != Guid.Empty && !x.ImportedItemId.HasValue).ToArray())
         {
             RequireOwner(session); ct.ThrowIfCancellationRequested();
             // Pack expense belongs to the session. A card's purchase price is unknown;

@@ -4,7 +4,8 @@ public enum ScannerSessionPhase { Scanning, Completed, Importing, Imported }
 public enum PackCostMode { NotProvided, PerPack, Total }
 
 public sealed record SessionMarketValue(decimal AmountBrl, string Source, DateTimeOffset QuotedAt,
-    decimal? OriginalAmount = null, string? OriginalCurrency = null, decimal? ExchangeRate = null, DateTimeOffset? ExchangeRateAt = null);
+    decimal? OriginalAmount = null, string? OriginalCurrency = null, decimal? ExchangeRate = null, DateTimeOffset? ExchangeRateAt = null,
+    IReadOnlyList<Vaulta.Catalog.Contracts.ScannerPriceSourceDto>? Sources = null, bool IsEstimate = false, DateTimeOffset? NextRefreshAt = null);
 public sealed record ScannerSessionCard(Guid ScanId, Guid PrintingId, Guid? VariantId, string Name, string SetName,
     string CollectorNumber, string VariantName, string Condition, string? ArtworkUrl, SessionMarketValue? MarketValue,
     DateTimeOffset ScannedAt, Guid? ImportedItemId = null, bool ImportStarted = false,
@@ -49,7 +50,7 @@ public sealed record ScannerSession(Guid Id, Guid OwnerId, DateTimeOffset Starte
     public ScannerSession Add(ScannerSessionCard card)
     {
         RequireScanning();
-        if (card.ScanId == Guid.Empty || card.PrintingId == Guid.Empty || card.VariantId == Guid.Empty || card.ImportedItemId is not null
+        if (card.ScanId == Guid.Empty || card.PrintingId == Guid.Empty && (card.VisualIdentification is null || !ScannerValuation.IsValidVisual(card.VisualIdentification)) || card.VariantId == Guid.Empty || card.ImportedItemId is not null
             || string.IsNullOrWhiteSpace(card.Name) || string.IsNullOrWhiteSpace(card.Condition))
             throw new ArgumentException("Confira a carta e a variante antes de somar à sessão.");
         if (card.MarketValue is { } value && (value.AmountBrl < 0m || decimal.Round(value.AmountBrl, 2) != value.AmountBrl
@@ -75,28 +76,29 @@ public sealed record ScannerSession(Guid Id, Guid OwnerId, DateTimeOffset Starte
     public ScannerSession BeginOccurrenceImport(Guid scanId)
     {
         var card = Cards.SingleOrDefault(x => x.ScanId == scanId) ?? throw new ArgumentException("Carta fora da sessão.");
+        if (card.PrintingId == Guid.Empty) throw new InvalidOperationException("Resolva a edição no catálogo antes de adicionar ao estoque ou vender.");
         return this with { Cards = Cards.Select(x => x.ScanId == card.ScanId ? x with { ImportStarted = true } : x).ToArray() };
     }
 
     public ScannerSession RecordOccurrenceImported(Guid scanId, Guid itemId)
     {
         var card = Cards.SingleOrDefault(x => x.ScanId == scanId) ?? throw new ArgumentException("Carta fora da sessão.");
-        if (!card.ImportStarted || itemId == Guid.Empty) throw new InvalidOperationException("Adição não iniciada.");
+        if (card.PrintingId == Guid.Empty || !card.ImportStarted || itemId == Guid.Empty) throw new InvalidOperationException("Adição não iniciada.");
         if (card.ImportedItemId.HasValue && card.ImportedItemId != itemId) throw new InvalidOperationException("Carta já vinculada a outra unidade do estoque.");
         var cards = Cards.Select(x => x.ScanId == scanId ? x with { ImportedItemId = itemId } : x).ToArray();
-        return this with { Cards = cards, Phase = Phase == ScannerSessionPhase.Importing && cards.All(x => x.ImportedItemId.HasValue) ? ScannerSessionPhase.Imported : Phase };
+        return this with { Cards = cards, Phase = Phase == ScannerSessionPhase.Importing && cards.Where(x => x.PrintingId != Guid.Empty).All(x => x.ImportedItemId.HasValue) ? ScannerSessionPhase.Imported : Phase };
     }
 
     public ScannerSession RecordListingDraft(Guid scanId, Guid draftId) => ChangeOccurrence(scanId, card =>
     {
-        if (!card.ImportedItemId.HasValue || draftId == Guid.Empty || card.ListingDraftId.HasValue && card.ListingDraftId != draftId)
+        if (card.PrintingId == Guid.Empty || !card.ImportedItemId.HasValue || draftId == Guid.Empty || card.ListingDraftId.HasValue && card.ListingDraftId != draftId)
             throw new InvalidOperationException("O rascunho não corresponde à unidade desta leitura.");
         return card with { ListingDraftId = draftId };
     });
 
     public ScannerSession BeginListingPublication(Guid scanId, Guid version) => ChangeOccurrence(scanId, card =>
     {
-        if (!card.ListingDraftId.HasValue || version == Guid.Empty) throw new InvalidOperationException("Prepare o anúncio antes de publicar.");
+        if (card.PrintingId == Guid.Empty || !card.ListingDraftId.HasValue || version == Guid.Empty) throw new InvalidOperationException("Prepare o anúncio antes de publicar.");
         return card with { PublicationVersion = card.PublicationVersion ?? version };
     });
 
@@ -104,7 +106,7 @@ public sealed record ScannerSession(Guid Id, Guid OwnerId, DateTimeOffset Starte
 
     public ScannerSession RecordListingPublished(Guid scanId, Guid listingId) => ChangeOccurrence(scanId, card =>
     {
-        if (card.ListingDraftId != listingId) throw new InvalidOperationException("Anúncio fora desta leitura.");
+        if (card.PrintingId == Guid.Empty || card.ListingDraftId != listingId) throw new InvalidOperationException("Anúncio fora desta leitura.");
         return card with { PublishedListingId = listingId };
     });
 
@@ -131,16 +133,18 @@ public sealed record ScannerSession(Guid Id, Guid OwnerId, DateTimeOffset Starte
     {
         if (Phase is not (ScannerSessionPhase.Completed or ScannerSessionPhase.Importing or ScannerSessionPhase.Imported))
             throw new InvalidOperationException("Finalize e revise a sessão antes de adicionar ao estoque.");
-        return Phase == ScannerSessionPhase.Completed ? this with { Phase = ScannerSessionPhase.Importing } : this;
+        if (!Cards.Any(x => x.PrintingId != Guid.Empty)) throw new InvalidOperationException("Resolva ao menos uma edição no catálogo antes de adicionar ao estoque.");
+        return Phase == ScannerSessionPhase.Completed ? this with { Phase = Cards.Where(x => x.PrintingId != Guid.Empty).All(x => x.ImportedItemId.HasValue) ? ScannerSessionPhase.Imported : ScannerSessionPhase.Importing } : this;
     }
 
     public ScannerSession RecordImported(Guid scanId, Guid itemId)
     {
         if (Phase != ScannerSessionPhase.Importing || itemId == Guid.Empty) throw new InvalidOperationException("Importação não iniciada.");
         var card = Cards.SingleOrDefault(x => x.ScanId == scanId) ?? throw new ArgumentException("Carta fora da sessão.");
+        if (card.PrintingId == Guid.Empty) throw new InvalidOperationException("Edição pendente no catálogo.");
         if (card.ImportedItemId.HasValue && card.ImportedItemId != itemId) throw new InvalidOperationException("Carta já vinculada a outra unidade do estoque.");
         var cards = Cards.Select(x => x.ScanId == scanId ? x with { ImportedItemId = itemId } : x).ToArray();
-        return this with { Cards = cards, Phase = cards.All(x => x.ImportedItemId.HasValue) ? ScannerSessionPhase.Imported : Phase };
+        return this with { Cards = cards, Phase = cards.Where(x => x.PrintingId != Guid.Empty).All(x => x.ImportedItemId.HasValue) ? ScannerSessionPhase.Imported : Phase };
     }
 
     public bool IsHighlight(ScannerSessionCard card, decimal thresholdBrl = 100m) => card.MarketValue?.AmountBrl >= thresholdBrl;

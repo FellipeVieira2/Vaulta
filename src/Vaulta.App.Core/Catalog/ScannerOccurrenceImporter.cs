@@ -19,6 +19,7 @@ public sealed class ScannerOccurrenceImporter(ICollectionClient collection, ISca
             if (saved is null || saved.Id != session.Id) throw new InvalidOperationException("Reabra a sessão salva antes de adicionar esta carta.");
             session = saved;
             var card = session.Cards.SingleOrDefault(x => x.ScanId == scanId) ?? throw new ArgumentException("Carta fora da sessão.");
+            if (card.PrintingId == Guid.Empty) throw new InvalidOperationException("Resolva a edição no catálogo antes de adicionar ao estoque ou vender.");
             if (card.ImportedItemId.HasValue) return session;
             session = session.BeginOccurrenceImport(scanId);
             await store.Save(session, ct); // Freeze before HTTP; a lost response retries the exact same payload.

@@ -12,6 +12,19 @@ namespace Vaulta.App.Core.UnitTests.Marketplace;
 public sealed class ScannerSaleFlowTests
 {
     [Fact]
+    public async Task PendingRestoredPrintingCannotWriteInventoryOrPublishExistingDraft()
+    {
+        var f = new Fixture(); var draft = await f.Flow.Prepare(f.Session, f.ScanId);
+        var pending = f.Store.Value with { Cards = f.Store.Value.Cards.Select(x => x with { PrintingId = Guid.Empty }).ToArray() };
+        await f.Store.Save(pending);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => f.Flow.Publish(pending, f.ScanId, draft with { Condition = "NEAR_MINT" }));
+        Assert.Equal(1, f.Items.Calls); // Only the resolved Prepare call before corrupting the restored identity.
+        Assert.Equal(0, f.Items.Updates);
+        Assert.Empty(f.Drafts.Publishes);
+        Assert.Same(pending, f.Store.Value);
+    }
+
+    [Fact]
     public async Task LostDraftResponseRetriesOriginalEmptyPriceWithoutNewUnit()
     {
         var f = new Fixture(); f.Drafts.LoseCreate = true;
@@ -92,11 +105,13 @@ public sealed class ScannerSaleFlowTests
     }
     private sealed class Items : HttpMessageHandler
     {
+        public int Calls { get; private set; }
         public int Copies { get; private set; }
         public int Updates { get; private set; }
         public CollectibleItemDto Item { get; private set; } = new(Guid.NewGuid(), Guid.NewGuid(), "UNKNOWN", new(9m, "BRL"), new(2025, 1, 1), "private notes", "owned", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, Guid.NewGuid(), []);
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
+            Calls++;
             object payload = Item;
             if (request.Method == HttpMethod.Post) { Copies++; payload = new AddCollectibleItemsResponse(Item.CollectionEntryId, [new(Item.Id, Item.Version)], 1); }
             if (request.Method == HttpMethod.Put)
