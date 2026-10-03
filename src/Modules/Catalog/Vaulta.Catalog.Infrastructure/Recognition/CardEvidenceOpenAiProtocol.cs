@@ -4,7 +4,7 @@ namespace Vaulta.Catalog.Infrastructure.Recognition;
 
 internal static class CardEvidenceOpenAiProtocol
 {
-    public const string PromptVersion = "card-evidence-openai-v7";
+    public const string PromptVersion = "card-evidence-openai-v8";
     public const string Prompt = """
         You are the visual extraction engine for the Vaulta card scanner. Read only visible information from the photographed TCG card.
         Your responsibility ends at visual evidence; the Vaulta catalog resolves canonical identity afterwards.
@@ -47,7 +47,7 @@ internal static class CardEvidenceOpenAiProtocol
         {
             object value = key switch
             {
-                "language" => new { type = new[] { "string", "null" }, @enum = new string?[] { "pt-BR", "pt", "en", "ja", "es", "fr", "de", "it", "ko", "id", "th", "zh-TW", "zh-CN", null } },
+                "language" => new { type = new[] { "string", "null" }, @enum = new string?[] { "pt-BR", "pt", "en", "ja", "es", "fr", "de", "it", "ko", "id", "th", "zh-TW", "zh-CN", "nl", "pl", "ru", "es-MX", "pt-PT", null } },
                 "variant" => new { type = new[] { "string", "null" }, @enum = new string?[] { "normal", "holo", "reverse", null } },
                 "cardSide" => new { type = new[] { "string", "null" }, @enum = new string?[] { "front", "back", null } },
                 "isCard" or "isGraded" => new { type = new[] { "string", "null" }, @enum = new string?[] { "true", "false", null } },

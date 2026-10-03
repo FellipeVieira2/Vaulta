@@ -73,8 +73,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    mem_limit: 512m
-    memswap_limit: 1024m
+    mem_limit: 1024m
+    memswap_limit: 1536m
     stop_grace_period: 30s
     restart: unless-stopped
     logging: *logs

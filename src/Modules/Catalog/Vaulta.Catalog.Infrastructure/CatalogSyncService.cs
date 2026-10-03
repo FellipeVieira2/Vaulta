@@ -349,7 +349,8 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
     {
         // Only reached after every printing in this provider batch has been upserted successfully; a Printing
         // previously known for this Set that the provider no longer returns becomes unavailable, not deleted.
-        var toDeactivate = await db.Printings.Where(x => x.SetId == set.Id && x.IsActive && (language == null || x.Language == language)
+        var normalizedLanguage=language?.ToLowerInvariant();
+        var toDeactivate = await db.Printings.Where(x => x.SetId == set.Id && x.IsActive && (normalizedLanguage == null || x.Language.ToLower() == normalizedLanguage)
             && !seenPrintingIds.Contains(x.Id)).ToArrayAsync(ct);
         foreach (var printing in toDeactivate)
         {

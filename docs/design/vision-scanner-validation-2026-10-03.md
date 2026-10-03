@@ -3,7 +3,7 @@
 ## Evidência observada antes do deploy
 
 - Backend: 349/349 unitários; aplicativo: 211/211; PostgreSQL/MinIO: 183/183 integrações; arquitetura: 6/6. Total: 749 testes aprovados, além de 7/7 testes de operação em Linux.
-- Compilação API Release e Android ARM64 Debug: zero avisos/erros. APK com assinatura v2/v3 verificada, 135.993.161 bytes; SHA256 `040c8eeeb132198f270d311eca838bd7dc982c1297579bc1a9466398b6df705d`.
+- Compilação API Release e Android ARM64 Debug: zero avisos/erros. APK com assinatura v2/v3 verificada, 135.621.316 bytes; SHA256 `a37fa62fd8677a00dd3ced2897bc2f1ec5b8d959ee6d7864f604fc17f80aafee`.
 - Pesos reais CLIP: 89.117.001 bytes, SHA256 `583fd1110a514667812fee7d684952aaf82a99b959760c8d7dca7e0ab9839299`. Pesos, manifesto e biblioteca ONNX nativa ARM64 verificados dentro do APK.
 - Catálogo de validação: 102 impressões Base Set em inglês, 102 artworks/miniaturas internos e 102 embeddings reais de 512 dimensões. O sistema realizou a ingestão e a geração, não downloads manuais por carta.
 - Recuperação real: 16/16 artworks oficiais recuperaram sua própria impressão. Isto não mede precisão em fotos de celular.

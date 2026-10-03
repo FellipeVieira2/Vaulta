@@ -72,4 +72,17 @@ public sealed class VisionPrintingResolverTests
         return new(new(id,Guid.NewGuid(),Guid.NewGuid(),"pokemon","Example set","Golisopod",number,language,null,null,[new(normal,"normal","Normal"),new(reverse,"reverse","Reverse")]),140,"Stage1",null,
             [new(normal,"normal","Normal","normal",null),new(reverse,"reverse","Reverse","reverse",null)]);
     }
+    [Fact] public void ProviderPortugueseAndVisibleBrazilianPortugueseResolveWithoutAcceptingAnotherRegion()
+    {
+        var card=Printing("026/86","pt");var evidence=Evidence("026/086");
+        Assert.Equal(card.Printing.PrintingId,new VisionPrintingResolver().Resolve([card],evidence).PrintingId);
+        Assert.Null(new VisionPrintingResolver().Resolve([Printing("026/86","pt-PT")],evidence).PrintingId);
+    }
+
+    [Fact] public void ExactRegionalLanguagePrecedesItsLegacyProviderAlias()
+    {
+        var legacy=Printing("026/86","pt");var regional=Printing("026/86","pt-BR");
+        Assert.Equal(regional.Printing.PrintingId,new VisionPrintingResolver().Resolve([legacy,regional],Evidence("026/086")).PrintingId);
+    }
+
 }

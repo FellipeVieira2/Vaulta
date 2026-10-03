@@ -40,4 +40,23 @@ public sealed class VisualReferenceIndexTests
         Assert.Throws<InvalidOperationException>(()=>index.Publish(Model,"v2",[entry,entry with { ReferenceId=Guid.NewGuid() }]));
         Assert.Equal("v1",index.Status.Version);
     }
+    [Fact]
+    public async Task MultilingualCatalogueCanExceedTheFormerHundredThousandReferenceLimit()
+    {
+        var model=Model with {Dimension=512};var index=new CosineReferenceIndex(model);var vector=new float[512];vector[0]=1;
+        var rows=Enumerable.Range(0,100001).Select(_=>new VisualIndexEntry(Guid.NewGuid(),Guid.NewGuid(),vector,"official")).ToArray();
+        index.Publish(model,"multilingual",rows);
+        Assert.Equal(rows.Length,index.Status.ReferenceCount);
+        var result=await index.SearchAsync(new(model,vector),1,default);Assert.Equal(1d,Assert.Single(result).Similarity,5);
+    }
+
+    [Fact]
+    public void AnInvalidStreamedPageCannotPublishAnIncompleteReplacement()
+    {
+        var index=new CosineReferenceIndex(Model);index.Publish(Model,"before",[new(Guid.NewGuid(),Guid.NewGuid(),[1f,0f,0f],"official")]);
+        var build=index.BeginSnapshot(Model);build.Add(new(Guid.NewGuid(),Guid.NewGuid(),[0f,1f,0f],"official"));
+        Assert.Throws<ArgumentException>(()=>build.Add(new(Guid.NewGuid(),Guid.NewGuid(),[float.NaN,0f,0f],"official")));
+        Assert.Throws<InvalidOperationException>(()=>build.Publish("incomplete"));Assert.Equal("before",index.Status.Version);
+    }
+
 }

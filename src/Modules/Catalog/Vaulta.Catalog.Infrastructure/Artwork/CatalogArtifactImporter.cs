@@ -39,9 +39,11 @@ public sealed class CatalogArtifactImporter(CatalogDbContext db,CatalogArtworkDo
                 foreach(var printing in page)
                 {
                     ct.ThrowIfCancellationRequested();
+                    var recent=printing.ArtworkImportStatus=="ready" && printing.ArtworkAssetId is not null && printing.ThumbnailAssetId is not null && printing.ArtworkSha256 is not null && printing.ArtworkCheckedAt is { } checkedAt && checkedAt+TimeSpan.FromHours(24)>clock.UtcNow;
                     try
                     {
-                        if(printing.ExternalArtworkUrl is null) { printing.ArtworkImportStatus="missing"; missing++; }
+                        if(recent) { unchanged++; }
+                        else if(printing.ExternalArtworkUrl is null) { printing.ArtworkImportStatus="missing"; missing++; }
                         else
                         {
                             var result=await download.DownloadAsync(printing.ExternalArtworkUrl,printing.ArtworkAssetId is null ? null : printing.ArtworkETag,printing.ArtworkAssetId is null ? null : printing.ArtworkLastModified,ct);
@@ -59,7 +61,7 @@ public sealed class CatalogArtifactImporter(CatalogDbContext db,CatalogArtworkDo
                             if(result.Status=="ready") { printing.ArtworkETag=result.ETag; printing.ArtworkLastModified=result.LastModified; }
                         }
                         printing.ArtworkImportError=null;
-                        if(printing.SourcePricingJson is not null)
+                        if(printing.SourcePricingJson is not null || printing.Variants.Any(x=>x.RawValue?.TrimStart().StartsWith('{')==true))
                         {
                             var details=await catalog.GetPrinting(printing.Id,ct);
                             var quotes=CatalogPriceParser.Read(printing.SourcePricingJson,printing.Variants.ToArray(),rates);
@@ -69,13 +71,13 @@ public sealed class CatalogArtifactImporter(CatalogDbContext db,CatalogArtworkDo
                                 var snapshot=await db.DailyMarketSnapshots.SingleOrDefaultAsync(x=>x.PrintingId==printing.Id && x.MarketDay==day.Date,ct);
                                 if(snapshot is null) { snapshot=new() { PrintingId=printing.Id,MarketDay=day.Date }; db.DailyMarketSnapshots.Add(snapshot); }
                                 snapshot.FetchedAt=clock.UtcNow; snapshot.RefreshAfter=day.RefreshAfter;
-                                snapshot.Payload=JsonSerializer.Serialize(new ScannerCardDetailsDto(details!,new Dictionary<string,string>(),quotes,"Referência internacional convertida pela PTAX, importada para o catálogo local.",clock.UtcNow,day.RefreshAfter)); priced++;
+                                snapshot.Payload=JsonSerializer.Serialize(new ScannerCardDetailsDto(details!,new Dictionary<string,string>(),quotes,"ReferÃªncia internacional convertida pela PTAX, importada para o catÃ¡logo local.",clock.UtcNow,day.RefreshAfter)); priced++;
                             }
                         }
                     }
                     catch(Exception error) when(error is not OperationCanceledException)
                     { printing.ArtworkImportStatus="failed"; printing.ArtworkImportError=error.GetType().Name; failed++; logger.LogWarning("Catalog artifact failed for {PrintingId}: {ErrorType}",printing.Id,error.GetType().Name); }
-                    printing.ArtworkCheckedAt=clock.UtcNow; await db.SaveChangesAsync(ct);
+                    if(!recent) printing.ArtworkCheckedAt=clock.UtcNow; await db.SaveChangesAsync(ct);
                 }
                 after=page[^1].Id; db.ChangeTracker.Clear();
             }

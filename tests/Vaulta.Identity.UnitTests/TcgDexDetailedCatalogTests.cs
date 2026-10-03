@@ -45,4 +45,11 @@ public sealed class TcgDexDetailedCatalogTests
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") });
         }
     }
+    [Theory][InlineData("Normal","Padrão")][InlineData("Normale","Standard")][InlineData("normal","standard")]
+    public void StandardSizesAndLocalizedTypeShareCanonicalSurfaceCode(string type,string size)
+    {
+        using var raw=JsonDocument.Parse(JsonSerializer.Serialize(new {type,size}));
+        Assert.Equal("normal",TcgDexProvider.DetailedVariant(raw.RootElement).Code);
+    }
+
 }

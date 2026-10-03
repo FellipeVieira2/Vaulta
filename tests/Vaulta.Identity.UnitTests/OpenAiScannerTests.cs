@@ -68,7 +68,7 @@ public sealed class OpenAiScannerTests
         Assert.Equal("058/102", evidence.CollectorNumber.Value);
         Assert.Equal("en", evidence.Language.Value);
         Assert.Null(evidence.Variant.Value);
-        Assert.Equal("card-evidence-openai-v7", evidence.PromptVersion);
+        Assert.Equal("card-evidence-openai-v8", evidence.PromptVersion);
         Assert.Equal("gpt-6-luna", evidence.ModelVersion);
         Assert.Equal(1, handler.Calls);
     }

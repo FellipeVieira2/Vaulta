@@ -81,7 +81,7 @@ public sealed class VisualReferenceBuilder(VisionDbContext db,CatalogDbContext c
     public Task<VisualIndexStatus> LoadForEvaluationAsync(IReadOnlyCollection<Guid> excludedAssetIds,CancellationToken ct)=>LoadCoreAsync(excludedAssetIds.ToArray(),ct);
     private async Task<VisualIndexStatus> LoadCoreAsync(Guid[] excludedAssetIds,CancellationToken ct)
     {
-        var model=ModelVersion(encoder.Identity); var references=new List<VisualIndexEntry>(); var versions=new List<string>(); Guid? after=null;
+        var model=ModelVersion(encoder.Identity); var references=index.BeginSnapshot(encoder.Identity); var versions=new List<string>(); Guid? after=null;
         while(true)
         {
             var page=await db.VisualReferences.FromSql($"SELECT r.* FROM vision.visual_references r JOIN catalog.printings p ON p.id=r.printing_id WHERE p.is_active AND r.status='ready' AND ((r.origin='official' AND r.source_asset_id=p.artwork_asset_id) OR (r.origin='verified_capture' AND EXISTS (SELECT 1 FROM vision.scan_captures c JOIN vision.scan_attempts a ON a.id=c.attempt_id JOIN vision.reviewed_samples s ON s.capture_id=c.id JOIN vision.feedback f ON f.id=s.feedback_id WHERE c.asset_id=r.source_asset_id AND c.status='ready' AND a.deletion_requested_at IS NULL AND a.retention_until>now() AND a.improvement_policy_version IS NOT NULL AND f.printing_id=r.printing_id AND f.orientation='front' AND f.presence='card-present' AND NOT EXISTS (SELECT 1 FROM vision.feedback newer WHERE newer.run_id=f.run_id AND newer.created_at>f.created_at)))) AND r.model_version={model}")
@@ -96,7 +96,7 @@ public sealed class VisualReferenceBuilder(VisionDbContext db,CatalogDbContext c
             }
             after=page[^1].Id;
         }
-        var version=Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(model+":"+string.Join(";",versions)))).ToLowerInvariant();
-        index.Publish(encoder.Identity,version,references); return index.Status;
+        var version=Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(model+":"+CosineReferenceIndex.StorageVersion+":"+string.Join(";",versions)))).ToLowerInvariant();
+        return references.Publish(version);
     }
 }

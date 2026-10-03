@@ -1,0 +1,851 @@
+{
+  "source": "https://github.com/tcgdex/cards-database",
+  "revision": "c5c0a8a63fe81746d05b9c95e8f51ed6931f7e78",
+  "groups": {
+    "type": {
+      "normal": [
+        "Normal",
+        "Normale",
+        "básico"
+      ],
+      "holo": [
+        "Holo",
+        "Olografica",
+        "holo"
+      ],
+      "reverse": [
+        "Reverse",
+        "reversa"
+      ],
+      "metal": [
+        "Metal",
+        "Métal",
+        "Metall",
+        "Metallo",
+        "metal"
+      ],
+      "lenticular": [
+        "lenticular"
+      ]
+    },
+    "size": {
+      "standard": [
+        "Padrão",
+        "Standard",
+        "estándar"
+      ],
+      "jumbo": [
+        "Jumbo",
+        "jumbo"
+      ]
+    },
+    "foil": {
+      "pokeball": [
+        "Poké Bola",
+        "Pokéball",
+        "Poké Ball"
+      ],
+      "greatball": [
+        "Great Bola",
+        "Greatball",
+        "Great Ball"
+      ],
+      "ultraball": [
+        "Ultra Bola",
+        "Ultraball",
+        "Ultra Ball",
+        "UltraBall"
+      ],
+      "masterball": [
+        "Master Bola",
+        "Masterball",
+        "Meisterball",
+        "Master Ball",
+        "MasterBall"
+      ],
+      "gold": [
+        "Ouro",
+        "Or",
+        "Gold",
+        "Oro"
+      ],
+      "cosmos": [
+        "Cosmos",
+        "Kosmos",
+        "Cosmo"
+      ],
+      "galaxy": [
+        "Galáxia",
+        "Galaxie",
+        "Galassia",
+        "Galaxia"
+      ],
+      "starlight": [
+        "Luz Estelar",
+        "Lumière d'étoile",
+        "Sternenlicht",
+        "Luce Stellare",
+        "Luz de estrella"
+      ],
+      "energy": [
+        "Energia",
+        "Énergie",
+        "Energie",
+        "Energía"
+      ],
+      "cracked-ice": [
+        "cracked-ice"
+      ],
+      "mirror": [
+        "mirror"
+      ],
+      "league": [
+        "league"
+      ],
+      "player-reward": [
+        "player-reward"
+      ],
+      "professor-program": [
+        "professor-program"
+      ],
+      "tinsel": [
+        "tinsel"
+      ],
+      "loveball": [
+        "Bola de Amor",
+        "Love Ball",
+        "Sympaball",
+        "Amor Ball"
+      ],
+      "friendball": [
+        "Bola de Amizade",
+        "Copain Ball",
+        "Freundesball",
+        "Friend Ball",
+        "Amigo Ball"
+      ],
+      "quickball": [
+        "Bola Rápida",
+        "Rapide Ball",
+        "Flottball",
+        "Velox Ball",
+        "Veloz Ball"
+      ],
+      "duskball": [
+        "Bola Crepúsculo",
+        "Sombre Ball",
+        "Finsterball",
+        "Scuro Ball",
+        "Ocaso Ball"
+      ],
+      "team-rocket": [
+        "Team Rocket"
+      ],
+      "rainbow": [
+        "Rainbow"
+      ],
+      "glitter": [
+        "Cintilante",
+        "Scintillant",
+        "Glitzer",
+        "Luccichio",
+        "Purpurina"
+      ]
+    },
+    "stamp": {
+      "1st-edition": [
+        "1ª Edição",
+        "1re Édition",
+        "1. Auflage",
+        "1a Edizione",
+        "1ra Edición"
+      ],
+      "w-promo": [
+        "w-promo"
+      ],
+      "pre-release": [
+        "Pré-lançamento",
+        "Pré-release",
+        "Vorveröffentlichung",
+        "Pre-release",
+        "pre-lanzamiento"
+      ],
+      "set-logo": [
+        "Logo da coleção",
+        "Logo de la série",
+        "Set-Logo",
+        "Logo set",
+        "logo del set"
+      ],
+      "pokemon-center": [
+        "Pokémon Center",
+        "Pokémon-Center",
+        "pokemon-center"
+      ],
+      "staff": [
+        "Equipe",
+        "Staff",
+        "Mitarbeiter",
+        "Personal"
+      ],
+      "pikachu-tail": [
+        "Cauda de Pikachu",
+        "Queue de Pikachu",
+        "Pikachu-Schwanz",
+        "Coda di Pikachu",
+        "Cola de Pikachu"
+      ],
+      "wotc": [
+        "WOTC"
+      ],
+      "d-edition-error": [
+        "Erro de edição D",
+        "Erreur édition D",
+        "D-Edition Fehler",
+        "Errore edizione D",
+        "Error de edición D"
+      ],
+      "1st-edition-scratch-error": [
+        "Erro de arranhão 1ª Edição",
+        "Erreur de rayure 1re Édition",
+        "1. Auflage Kratzer Fehler",
+        "Errore graffio 1a Edizione",
+        "Error de rasguño 1ra Edición"
+      ],
+      "1st-edition-error": [
+        "Erro 1ª Edição",
+        "Erreur 1re Édition",
+        "1. Auflage Fehler",
+        "Errore 1a Edizione",
+        "Error de 1ra Edición"
+      ],
+      "1st-movie": [
+        "1º Filme",
+        "1er Film",
+        "1. Film",
+        "1° Film",
+        "1ra Película"
+      ],
+      "1st-movie-inverted": [
+        "1º Filme (invertido)",
+        "1er Film (inversé)",
+        "1. Film (invertiert)",
+        "1° Film (invertito)",
+        "1ra Película (invertida)"
+      ],
+      "pokemon-4-ever": [
+        "Pokémon 4 Ever"
+      ],
+      "pokemon-center-ny": [
+        "Pokémon Center NY",
+        "Pokémon-Center NY"
+      ],
+      "winner": [
+        "Vencedor",
+        "Gagnant",
+        "Gewinner",
+        "Vincitore",
+        "Ganador"
+      ],
+      "25th-celebration": [
+        "25º Aniversário",
+        "25e Anniversaire",
+        "25. Jubiläum",
+        "25° Anniversario",
+        "25º Aniversario"
+      ],
+      "chris-fulop": [
+        "Chris Fulop"
+      ],
+      "tsuguyoshi-yamato": [
+        "Tsuguyoshi Yamato"
+      ],
+      "reed-weichler": [
+        "Reed Weichler"
+      ],
+      "kevin-nguyen": [
+        "Kevin Nguyen"
+      ],
+      "professor-program": [
+        "Programa Professor",
+        "Programme Professeur",
+        "Professorenprogramm",
+        "Programma Professore",
+        "Programa de Profesor"
+      ],
+      "takashi-yoneda": [
+        "Takashi Yoneda"
+      ],
+      "michael-gonzalez": [
+        "Michael Gonzalez"
+      ],
+      "curran-hill": [
+        "Curran Hill"
+      ],
+      "jeremy-maron": [
+        "Jeremy Maron"
+      ],
+      "jimmy-ballard": [
+        "Jimmy Ballard"
+      ],
+      "miska-saari": [
+        "Miska Saari"
+      ],
+      "hiroki-yano": [
+        "Hiroki Yano"
+      ],
+      "jason-klaczynski": [
+        "Jason Klaczynski"
+      ],
+      "state-championships": [
+        "Campeonatos Estaduais",
+        "Championnats Régionaux",
+        "Landesmeisterschaften",
+        "Campionati Regionali",
+        "Campeonatos Estatales"
+      ],
+      "national-championships": [
+        "Campeonatos Nacionais",
+        "Championnats Nationaux",
+        "Nationale Meisterschaften",
+        "Campionati Nazionali",
+        "Campeonatos Nacionales"
+      ],
+      "gym-challenge": [
+        "Desafio de Ginásio",
+        "Défi d'Arène",
+        "Arenen-Herausforderung",
+        "Sfida Palestra",
+        "Desafío de Gimnasio"
+      ],
+      "city-championships": [
+        "Campeonatos Municipais",
+        "Championnats de Ville",
+        "Stadtmeisterschaften",
+        "Campionati Cittadini",
+        "Campeonatos de Ciudad"
+      ],
+      "jeremy-scharff-kim": [
+        "jeremy scharff kim"
+      ],
+      "destiny-deoxys": [
+        "Destiny Deoxys"
+      ],
+      "pokemon-day": [
+        "pokemon-day"
+      ],
+      "regional-championships": [
+        "regional-championships"
+      ],
+      "stadium-challenge": [
+        "stadium-challenge"
+      ],
+      "10th-anniversary": [
+        "10th-anniversary"
+      ],
+      "wizard-world-philadelphia": [
+        "wizard-world-philadelphia"
+      ],
+      "wizard-world-chicago": [
+        "wizard-world-chicago"
+      ],
+      "comic-con": [
+        "comic-con"
+      ],
+      "nintendo-world": [
+        "nintendo-world"
+      ],
+      "gen-con": [
+        "gen-con"
+      ],
+      "akira-miyazaki": [
+        "akira-miyazaki"
+      ],
+      "tom-roos": [
+        "tom-roos"
+      ],
+      "pokemon-rocks-america": [
+        "pokemon-rocks-america"
+      ],
+      "jun-hasebe": [
+        "jun-hasebe"
+      ],
+      "origins": [
+        "origins"
+      ],
+      "games-expo": [
+        "games-expo"
+      ],
+      "kraze-club": [
+        "kraze-club"
+      ],
+      "dylan-lefavour": [
+        "dylan-lefavour"
+      ],
+      "tristan-robinson": [
+        "tristan-robinson"
+      ],
+      "paul-atanassov": [
+        "paul-atanassov"
+      ],
+      "david-cohen": [
+        "david-cohen"
+      ],
+      "tsubasa-nakamura": [
+        "tsubasa-nakamura"
+      ],
+      "worlds-2007": [
+        "worlds-2007"
+      ],
+      "finalist": [
+        "finalist"
+      ],
+      "quarter-finalist": [
+        "quarter-finalist"
+      ],
+      "semi-finalist": [
+        "semi-finalist"
+      ],
+      "top-sixteen": [
+        "top-sixteen"
+      ],
+      "top-thirty-two": [
+        "top-thirty-two"
+      ],
+      "worlds-2004": [
+        "worlds-2004"
+      ],
+      "worlds-2005": [
+        "worlds-2005"
+      ],
+      "worlds-2008": [
+        "worlds-2008"
+      ],
+      "worlds-2009": [
+        "worlds-2009"
+      ],
+      "countdown-calendar": [
+        "countdown-calendar"
+      ],
+      "michael-pramawat": [
+        "michael-pramawat"
+      ],
+      "distributor-meeting": [
+        "distributor-meeting"
+      ],
+      "mychael-bryan": [
+        "mychael-bryan"
+      ],
+      "stephen-silvestro": [
+        "stephen-silvestro"
+      ],
+      "yuka-furusawa": [
+        "yuka-furusawa"
+      ],
+      "jason-martinez": [
+        "jason-martinez"
+      ],
+      "yuta-komatsuda": [
+        "yuta-komatsuda"
+      ],
+      "origins-2008": [
+        "origins-2008"
+      ],
+      "platinum": [
+        "platinum"
+      ],
+      "worlds-2010": [
+        "worlds-2010"
+      ],
+      "ross-cawthorn": [
+        "ross-cawthorn"
+      ],
+      "gustavo-wada": [
+        "gustavo-wada"
+      ],
+      "snowflake": [
+        "snowflake",
+        "Schneeflocke"
+      ],
+      "christopher-kan": [
+        "christopher-kan"
+      ],
+      "player-rewards-program": [
+        "player-rewards-program"
+      ],
+      "igor-costa": [
+        "igor-costa"
+      ],
+      "zachary-bokhari": [
+        "zachary-bokhari"
+      ],
+      "shuto-itagaki": [
+        "shuto-itagaki"
+      ],
+      "gamestop": [
+        "GameStop"
+      ],
+      "eb-games": [
+        "EB Games"
+      ],
+      "horizons": [
+        "horizons"
+      ],
+      "illustration-contest-2022": [
+        "illustration-contest-2022"
+      ],
+      "illustration-contest-2024": [
+        "illustration-contest-2024"
+      ],
+      "worlds-2025": [
+        "worlds-2025"
+      ],
+      "top-eight": [
+        "top-eight"
+      ],
+      "trick-or-trade": [
+        "trick-or-trade"
+      ],
+      "champion": [
+        "campeão",
+        "champion",
+        "campione",
+        "campeón"
+      ],
+      "master-ball-league": [
+        "liga-master-ball",
+        "ligue-master-ball",
+        "master-ball-league",
+        "lega-master-ball"
+      ],
+      "ultra-ball-league": [
+        "liga-ultra-ball",
+        "ligue-ultra-ball",
+        "ultra-ball-league",
+        "lega-ultra-ball"
+      ],
+      "poke-ball-league": [
+        "liga-poke-ball",
+        "ligue-poke-ball",
+        "poke-ball-league",
+        "lega-poke-ball"
+      ],
+      "great-ball-league": [
+        "liga-great-ball",
+        "ligue-great-ball",
+        "great-ball-league",
+        "lega-great-ball"
+      ],
+      "asia-promo": [
+        "asia-promo"
+      ],
+      "judge": [
+        "juiz",
+        "juge",
+        "richter",
+        "giudice",
+        "juez"
+      ],
+      "international-championship-europe": [
+        "campeonato-internacional-europa",
+        "championnat-international-europe",
+        "international-championship-europe",
+        "campionato-internazionale-europa"
+      ],
+      "international-championship-latin-america": [
+        "campeonato-internacional-américa-latina",
+        "championnat-international-amérique-latine",
+        "international-championship-latin-america",
+        "campionato-internazionale-america-latina"
+      ],
+      "international-championship-north-america": [
+        "campeonato-internacional-américa-do-norte",
+        "championnat-international-amérique-du-nord",
+        "international-championship-north-america",
+        "campionato-internazionale-america-del-nord",
+        "campeonato-internacional-américa-del-norte"
+      ],
+      "ace-trainer": [
+        "Ace Trainer",
+        "Entraîneur d'as"
+      ],
+      "30th-pokeday": [
+        "30th-pokeday"
+      ],
+      "pikachu": [
+        "pikachu"
+      ],
+      "bulbasaur": [
+        "bulbasaur",
+        "bulbizarre"
+      ],
+      "squirtle": [
+        "squirtle",
+        "carapuce"
+      ],
+      "charmander": [
+        "charmander",
+        "salamèche"
+      ],
+      "pokeball": [
+        "pokeball"
+      ],
+      "mcdonalds": [
+        "mcdonalds"
+      ],
+      "pokemon-together": [
+        "pokemon-together"
+      ],
+      "rain-city": [
+        "rain-city"
+      ],
+      "tournament-collection": [
+        "tournament-collection"
+      ],
+      "worlds-2024": [
+        "worlds-2024"
+      ],
+      "worlds-2022": [
+        "worlds-2022"
+      ],
+      "worlds-2023": [
+        "worlds-2023"
+      ],
+      "asia-2023-24": [
+        "asia-2023-24"
+      ],
+      "thank-you": [
+        "thank-you"
+      ],
+      "jr-stamp-rally": [
+        "jr-stamp-rally"
+      ],
+      "grey-star": [
+        "estrela cinza",
+        "étoile grise",
+        "grauer stern",
+        "grey-star",
+        "estrella gris"
+      ],
+      "scrye": [
+        "scrye"
+      ],
+      "inquest-gamer": [
+        "inquest-gamer"
+      ],
+      "pop-tournament": [
+        "pop-tournament"
+      ],
+      "chicago-2009": [
+        "chicago-2009"
+      ],
+      "chase-moloney": [
+        "chase-moloney"
+      ],
+      "jesse-parker": [
+        "jesse-parker"
+      ],
+      "gabriel-fernandez": [
+        "gabriel-fernandez"
+      ],
+      "shao-tong-yen": [
+        "shao-tong-yen"
+      ],
+      "liao-fu-guan": [
+        "liao-fu-guan"
+      ],
+      "jose-cruz-galindo-resendiz": [
+        "Jose Cruz Galindo-Resendiz"
+      ],
+      "sakuya-ota": [
+        "sakuya-ota"
+      ],
+      "poketour-99": [
+        "PokeTour 1999"
+      ],
+      "fossil-museum": [
+        "Fossil Museum"
+      ]
+    },
+    "subtype": {
+      "shadowless": [
+        "sem sombra",
+        "sans ombre",
+        "schattenlos",
+        "senza ombra",
+        "sin sombra"
+      ],
+      "unlimited": [
+        "ilimitado",
+        "illimité",
+        "unbegrenzt",
+        "illimitato"
+      ],
+      "1999-2000-copyright": [
+        "Copyright 1999-2000"
+      ],
+      "missing-expansion-symbol": [
+        "Símbolo de expansão ausente",
+        "Symbole d’extension manquant",
+        "Fehlendes Erweiterungssymbol",
+        "Simbolo di espansione mancante",
+        "Símbolo de expansión faltante"
+      ],
+      "gold-border": [
+        "Borda dourada",
+        "Bord doré",
+        "Goldener Rand",
+        "Bordo dorato",
+        "Borde dorado"
+      ],
+      "missing-hp": [
+        "PS ausentes",
+        "PV manquants",
+        "Fehlende KP",
+        "PS mancanti",
+        "Faltan PS"
+      ],
+      "aoki-error": [
+        "Erro Aoki",
+        "Erreur Aoki",
+        "Aoki-Fehler",
+        "Errore Aoki",
+        "Error de Aoki"
+      ],
+      "1999-copyright": [
+        "Copyright 1999"
+      ],
+      "evolution-box-error": [
+        "Erro na caixa de evolução",
+        "Erreur boîte d’évolution",
+        "Evolutionskasten-Fehler",
+        "Errore riquadro evoluzione",
+        "Error en la caja de evolución"
+      ],
+      "no-holo-error": [
+        "Erro sem holo",
+        "Erreur sans holo",
+        "Kein Holo-Fehler",
+        "Errore senza holo",
+        "Error sin holo"
+      ],
+      "d-ink-dot-error": [
+        "Erro de ponto de tinta D",
+        "Erreur point d’encre D",
+        "D-Tintenpunkt-Fehler",
+        "Errore punto d'inchiostro D",
+        "Error de punto de tinta D"
+      ],
+      "energy-symbol-error": [
+        "Erro de símbolo de energia",
+        "Erreur symbole d’énergie",
+        "Energiesymbol-Fehler",
+        "Errore simbolo energia",
+        "Error de símbolo de energía"
+      ],
+      "text-error": [
+        "Erro de texto",
+        "Erreur de texte",
+        "Textfehler",
+        "Errore di testo",
+        "Error de texto"
+      ],
+      "shifted-energy-cost": [
+        "Custo de energia deslocado",
+        "Coût d’énergie décalé",
+        "Verschobene Energiekosten",
+        "Costo energia spostato",
+        "Coste de energía desplazado"
+      ],
+      "japanese-back": [
+        "Verso japonês",
+        "Dos japonais",
+        "Japanische Rückseite",
+        "Retro giapponese",
+        "Reverso japonés"
+      ],
+      "no-e-reader": [
+        "Sem e-Reader",
+        "Sans e-Reader",
+        "Kein e-Reader",
+        "Senza e-Reader",
+        "Sin e-Reader"
+      ],
+      "rarity-error": [
+        "Erro de raridade",
+        "Erreur de rareté",
+        "Seltenheitsfehler",
+        "Errore rarità",
+        "Error de rareza"
+      ],
+      "cosmos": [
+        "cosmos"
+      ],
+      "glossy": [
+        "lustrosa",
+        "brillante",
+        "Hochglanz",
+        "patinato",
+        "con brillo"
+      ],
+      "shadowless-red-cheek": [
+        "bochecha vermelha sem sombras",
+        "Sans ombre aux joues rouges",
+        "schattenlose rote Wange",
+        "guancia rossa senza ombre",
+        "mejilla roja sin sombras"
+      ],
+      "2019-copyright": [
+        "Copyright 2019 ",
+        "Copyright 2019"
+      ],
+      "2020-copyright": [
+        "Copyright 2020 ",
+        "Copyright 2020"
+      ],
+      "nintedo-error": [
+        "Erro de Nintedo",
+        "Erreur Nintedo",
+        "Nintedo-Fehler",
+        "Errore Nintedo",
+        "Error Nintedo"
+      ],
+      "1995-1998-copyright": [
+        "Copyright 1995-1998"
+      ],
+      "no-rarity": [
+        "Sem raridade",
+        "Sans rareté",
+        "Ohne Seltenheit",
+        "Senza rarità",
+        "Sin rareza"
+      ],
+      "phanphy-error": [
+        "error de phanphy",
+        "Erreur de phanphy",
+        "phanphy-fehler",
+        "Errore di phanphy",
+        "Error de phanphy"
+      ],
+      "peelable-ditto": [
+        "Ditto destacável",
+        "Ditto décollable",
+        "Abziehbares Ditto",
+        "Ditto rimovibile",
+        "Ditto despegable"
+      ],
+      "misisng-retreat-cost": [
+        "Custo de recuo ausente"
+      ],
+      "blue-border": [
+        "bordure bleue"
+      ],
+      "missing-retreat-cost": [
+        "Coût de retraite manquant",
+        "Fehlende Rückzugskosten",
+        "Costo di ritirata mancante",
+        "Coste de retirada ausente"
+      ]
+    }
+  }
+}

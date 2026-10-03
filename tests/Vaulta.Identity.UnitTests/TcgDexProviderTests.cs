@@ -174,4 +174,14 @@ public sealed class TcgDexProviderTests
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => send(request, cancellationToken);
     }
+    [Theory]
+    [InlineData("nl")][InlineData("pl")][InlineData("ru")][InlineData("es-mx")][InlineData("pt-br")][InlineData("pt-pt")]
+    public void AdditionalProviderLocalesCanBeImportedAndReturnedByVision(string path)
+    {
+        Assert.Equal(path,TcgDexProvider.NormalizeLanguage(path));
+        var locale=System.Globalization.CultureInfo.GetCultureInfo(path).Name;
+        var permitted=Vaulta.Catalog.Infrastructure.Recognition.CardEvidenceOpenAiProtocol.Schema.GetProperty("properties").GetProperty("language").GetProperty("properties").GetProperty("value").GetProperty("enum");
+        Assert.Contains(permitted.EnumerateArray(),x=>x.ValueKind==JsonValueKind.String && x.GetString()==locale);
+    }
+
 }

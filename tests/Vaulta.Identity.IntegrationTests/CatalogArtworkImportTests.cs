@@ -29,6 +29,8 @@ public sealed class CatalogArtworkImportTests(ApiFixture fixture)
         Assert.Equal(1,(await importer.ImportAsync(setId,default)).Ready);
         var first=await db.Printings.AsNoTracking().SingleAsync(x=>x.Id==originalId);
         Assert.NotNull(first.ArtworkAssetId); Assert.NotNull(first.ArtworkSha256);
+        // Recheck expiry must still exercise validators/hash; freshness must not be extended by a skipped load.
+        await db.Printings.Where(x=>x.Id==originalId).ExecuteUpdateAsync(x=>x.SetProperty(p=>p.ArtworkCheckedAt,DateTimeOffset.UtcNow.AddDays(-2)));
         Assert.Equal(1,(await importer.ImportAsync(setId,default)).Unchanged);
         var second=await db.Printings.AsNoTracking().SingleAsync(x=>x.Id==originalId);
         Assert.Equal(first.ArtworkAssetId,second.ArtworkAssetId); Assert.Equal(2,assets.Puts); Assert.Equal(2,handler.Requests);
@@ -44,10 +46,23 @@ public sealed class CatalogArtworkImportTests(ApiFixture fixture)
         var handler=new Handler(output.ToArray(),false); using var http=new HttpClient(handler); var assets=new Assets();
         var importer=new CatalogArtifactImporter(db,new(http),assets,scope.ServiceProvider.GetRequiredService<ICatalogSearch>(),new Rates(),scope.ServiceProvider.GetRequiredService<IClock>(),NullLogger<CatalogArtifactImporter>.Instance);
         await importer.ImportAsync(printing.SetId,default); var first=await db.Printings.AsNoTracking().SingleAsync(x=>x.Id==printing.Id);
+        await db.Printings.Where(x=>x.Id==printing.Id).ExecuteUpdateAsync(x=>x.SetProperty(p=>p.ArtworkCheckedAt,DateTimeOffset.UtcNow.AddDays(-2)));
         image[0,0]=new Rgb24(200,30,70); using var changed=new MemoryStream(); image.SaveAsPng(changed); handler.Bytes=changed.ToArray();
         Assert.Equal(1,(await importer.ImportAsync(printing.SetId,default)).Ready);
         var second=await db.Printings.AsNoTracking().SingleAsync(x=>x.Id==printing.Id);
         Assert.NotEqual(first.ArtworkSha256,second.ArtworkSha256); Assert.NotEqual(first.ArtworkAssetId,second.ArtworkAssetId);
+    }
+    [Fact]
+    public async Task RecentReadyArtworkIsReusedWithoutAnotherRequestOrMovingItsRevalidationDeadline()
+    {
+        await using var scope=fixture.Factory.Services.CreateAsyncScope();var db=scope.ServiceProvider.GetRequiredService<CatalogDbContext>();var printing=await Seed(db);
+        using var image=new Image<Rgb24>(30,40);using var output=new MemoryStream();image.SaveAsPng(output);
+        var handler=new Handler(output.ToArray(),false);using var http=new HttpClient(handler);var assets=new Assets();
+        var importer=new CatalogArtifactImporter(db,new(http),assets,scope.ServiceProvider.GetRequiredService<ICatalogSearch>(),new Rates(),scope.ServiceProvider.GetRequiredService<IClock>(),NullLogger<CatalogArtifactImporter>.Instance);
+        await importer.ImportAsync(printing.SetId,default);var first=await db.Printings.AsNoTracking().SingleAsync(x=>x.Id==printing.Id);
+        Assert.Equal(1,(await importer.ImportAsync(printing.SetId,default)).Unchanged);
+        var second=await db.Printings.AsNoTracking().SingleAsync(x=>x.Id==printing.Id);
+        Assert.Equal(1,handler.Requests);Assert.Equal(2,assets.Puts);Assert.Equal(first.ArtworkCheckedAt,second.ArtworkCheckedAt);
     }
     private static async Task<Printing> Seed(CatalogDbContext db)
     {

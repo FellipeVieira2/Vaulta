@@ -95,10 +95,10 @@ public sealed class VisionCatalogPersistenceTests(ApiFixture fixture)
             return ValueTask.FromResult(result);
         }
     }
-    private sealed class Source(string code,ProviderSetDetails details) : ICatalogProvider
+    private sealed class Source(string code,ProviderSetDetails details,string language="en") : ICatalogProvider
     {
         public string Code=>code;
-        public string? Language=>"en";
+        public string? Language=>language;
         public Task<IReadOnlyList<ProviderSet>> GetSets(CancellationToken ct)=>Task.FromResult<IReadOnlyList<ProviderSet>>([details.Set]);
         public Task<ProviderSetDetails> GetSetDetails(string id,CancellationToken ct)=>Task.FromResult(details);
     }
@@ -119,6 +119,38 @@ public sealed class VisionCatalogPersistenceTests(ApiFixture fixture)
         var source=new Source("padding-"+id,new(new(id,"Padding set "+id,null,null),cards));await new CatalogSyncService(db,[source],scope.ServiceProvider.GetRequiredService<IClock>(),NullLogger<CatalogSyncService>.Instance).Synchronize(source.Code,id,default);
         var evidence=new CardEvidence(new("pokemon",.95),new(name,.95),new("026/086",.95),new(null,0),new(null,0),new("en",.95),new("normal",.95),"fixture","fixture");
         var candidates=await new Vaulta.Vision.Infrastructure.VisionCatalog(db).FindEvidenceCandidatesAsync(evidence,default);Assert.Equal("026/86",Assert.Single(candidates).Printing.CollectorNumber);
+    }
+
+    [Fact] public async Task BrazilianPortugueseEvidenceFindsProviderPortugueseButRejectsExplicitOtherRegion()
+    {
+        await using var scope=fixture.Factory.Services.CreateAsyncScope();var db=scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+        var name="Portuguese "+Guid.NewGuid().ToString("N");var game=Guid.Parse("f18fd4d1-2514-4b19-9eaa-f33c04564c7b");
+        var card=new Vaulta.Catalog.Domain.Card{Id=Guid.NewGuid(),GameId=game,Name=name,NormalizedName=name.ToLowerInvariant()};
+        foreach(var language in new[]{"pt","pt-PT"}) db.Printings.Add(new(){Id=Guid.NewGuid(),Card=card,Set=new(){Id=Guid.NewGuid(),GameId=game,Name=name+language,NormalizedName=(name+language).ToLowerInvariant()},CollectorNumber="026/86",NormalizedCollectorNumber="026/86",Language=language,MetadataJson="{}"});
+        await db.SaveChangesAsync();var evidence=new CardEvidence(new("pokemon",.95),new(name,.95),new("026/086",.95),new(null,0),new(null,0),new("pt-BR",.95),new(null,0),"fixture","fixture");
+        var candidates=await new Vaulta.Vision.Infrastructure.VisionCatalog(db).FindEvidenceCandidatesAsync(evidence,default);
+        Assert.Equal("pt",Assert.Single(candidates).Printing.Language);
+        Assert.NotNull(new Vaulta.Vision.Application.VisionPrintingResolver().Resolve(candidates,evidence).PrintingId);
+    }
+
+    [Fact] public async Task RegionalCaseDoesNotLeaveRemovedPrintingsActive()
+    {
+        await using var scope=fixture.Factory.Services.CreateAsyncScope();var db=scope.ServiceProvider.GetRequiredService<CatalogDbContext>();var id=Guid.NewGuid().ToString("N");
+        var card=new ProviderPrinting("card-"+id,"Region "+id,"1/100","pt-BR",null,null,[new("normal","Normal","normal")]);var set=new ProviderSet(id,"Region set "+id,null,null);
+        var source=new Source("region-"+id,new(set,[card]),"pt-br");var clock=scope.ServiceProvider.GetRequiredService<IClock>();
+        await new CatalogSyncService(db,[source],clock,NullLogger<CatalogSyncService>.Instance).Synchronize(source.Code,id,default);
+        await new CatalogSyncService(db,[new Source(source.Code,new(set,[]),"pt-br")],clock,NullLogger<CatalogSyncService>.Instance).Synchronize(source.Code,id,default);
+        Assert.False(await db.Printings.Where(x=>x.Card.Name==card.Name).Select(x=>x.IsActive).SingleAsync());
+    }
+    [Fact] public async Task LocalizedSetUpdateKeepsItsEarlierVisibleNameResolvable()
+    {
+        await using var scope=fixture.Factory.Services.CreateAsyncScope();var db=scope.ServiceProvider.GetRequiredService<CatalogDbContext>();var id=Guid.NewGuid().ToString("N");var name="Aliases "+id;var english="English set "+id;
+        var card=new ProviderPrinting("card-"+id,name,"1/100","en",null,null,[new("normal","Normal","normal")]);var clock=scope.ServiceProvider.GetRequiredService<IClock>();
+        await new CatalogSyncService(db,[new Source("tcgdex",new(new(id,english,null,null),[card]))],clock,NullLogger<CatalogSyncService>.Instance).Synchronize("tcgdex",id,default);
+        await new CatalogSyncService(db,[new Source("tcgdex",new(new(id,"Portuguese set "+id,null,null),[card with {Language="pt"}]),"pt")],clock,NullLogger<CatalogSyncService>.Instance).Synchronize("tcgdex",id,default);
+        var evidence=new CardEvidence(new("pokemon",.95),new(name,.95),new("1/100",.95),new(null,0),new(english,.95),new("en",.95),new("normal",.95),"fixture","fixture");
+        var candidates=await new Vaulta.Vision.Infrastructure.VisionCatalog(db).FindEvidenceCandidatesAsync(evidence,default);
+        Assert.NotNull(new Vaulta.Vision.Application.VisionPrintingResolver().Resolve(candidates,evidence).PrintingId);
     }
 
 }

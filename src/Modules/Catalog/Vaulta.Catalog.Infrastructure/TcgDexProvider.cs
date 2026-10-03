@@ -100,12 +100,13 @@ internal sealed partial class TcgDexProvider(HttpClient httpClient, IOptions<Tcg
     {
         if (detail.ValueKind != JsonValueKind.Object || !detail.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String)
             throw ContractError("Detailed variant type is missing.");
-        var parts = new List<string> { type.GetString()! };
-        if (detail.TryGetProperty("subtype", out var subtype) && subtype.ValueKind == JsonValueKind.String) parts.Add(subtype.GetString()!);
+        var parts = new List<string> { TcgDexVariantSemantics.Canonical("type",type.GetString()!) };
+        if (detail.TryGetProperty("subtype", out var subtype) && subtype.ValueKind == JsonValueKind.String) parts.Add(TcgDexVariantSemantics.Canonical("subtype",subtype.GetString()!));
         if (detail.TryGetProperty("stamp", out var stamps) && stamps.ValueKind == JsonValueKind.Array)
-            parts.AddRange(stamps.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString() == "1st-edition" ? "first-edition" : x.GetString()!).Order(StringComparer.Ordinal));
-        if (detail.TryGetProperty("foil", out var foil) && foil.ValueKind == JsonValueKind.String) parts.Add(foil.GetString()!);
-        if (detail.TryGetProperty("size", out var size) && size.ValueKind == JsonValueKind.String && size.GetString() != "standard") parts.Add(size.GetString()!);
+            parts.AddRange(stamps.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => TcgDexVariantSemantics.Canonical("stamp",x.GetString()!)).Order(StringComparer.Ordinal));
+        if (detail.TryGetProperty("foil", out var foil) && foil.ValueKind == JsonValueKind.String) parts.Add(TcgDexVariantSemantics.Canonical("foil",foil.GetString()!));
+        if (detail.TryGetProperty("size", out var size) && size.ValueKind == JsonValueKind.String && TcgDexVariantSemantics.Canonical("size",size.GetString()!) != "standard") parts.Add(TcgDexVariantSemantics.Canonical("size",size.GetString()!));
+        parts = parts.Select(x=>x=="1st-edition" ? "first-edition" : x).ToList();
         var code = VariantCode(string.Join("-", parts));
         return new ProviderVariant(code, string.Join(" / ", parts), detail.GetRawText());
     }
@@ -163,7 +164,7 @@ internal sealed partial class TcgDexProvider(HttpClient httpClient, IOptions<Tcg
         // Provider path codes are not arbitrary BCP47 locales. Portuguese is `pt`, not `pt-BR`.
         return normalized switch
         {
-            "en" or "fr" or "es" or "it" or "pt" or "de" or "ja" or "ko" or "id" or "th" => normalized,
+            "en" or "fr" or "es" or "it" or "pt" or "de" or "ja" or "ko" or "id" or "th" or "nl" or "pl" or "ru" or "es-mx" or "pt-br" or "pt-pt" => normalized,
             "zh-tw" => "zh-tw", "zh-cn" => "zh-cn",
             _ => throw ContractError("Unsupported TCGdex language code.")
         };

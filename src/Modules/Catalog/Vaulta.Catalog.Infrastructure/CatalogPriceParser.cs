@@ -15,7 +15,7 @@ internal static class CatalogPriceParser
             if(detailed is not null)
             {
                 var detail=detailed.RootElement;
-                code=detail.TryGetProperty("type",out var type) && type.ValueKind==JsonValueKind.String ? type.GetString()! : "unknown";
+                code=detail.TryGetProperty("type",out var type) && type.ValueKind==JsonValueKind.String ? TcgDexVariantSemantics.Canonical("type",type.GetString()!) : "unknown";
                 if(detail.TryGetProperty("pricing",out var specific) && specific.ValueKind==JsonValueKind.Object) source=specific.Clone();
                 // A generated single variant has no separate provider identity; only this explicit case may use root pricing.
                 else if(variants.Count==1 && detail.TryGetProperty("variantId",out var id) && id.GetString()=="generated" && pricing is not null)

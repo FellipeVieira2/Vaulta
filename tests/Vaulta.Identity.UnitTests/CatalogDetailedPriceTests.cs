@@ -14,4 +14,13 @@ public sealed class CatalogDetailedPriceTests
         var quotes=CatalogPriceParser.Read(root,[unlimited,first],new Dictionary<string,BrlExchangeRate> { ["USD"]=new("USD",6m,DateTimeOffset.UtcNow) });
         var quote=Assert.Single(quotes); Assert.Equal(unlimited.Id,quote.VariantId); Assert.Equal("Holo unlimited",quote.VariantName); Assert.Equal(60m,quote.MarketValueBrl);
     }
+    [Theory][InlineData("Normal")][InlineData("Normale")]
+    public void LocalizedDetailedSurfaceRetainsItsOwnPrice(string type)
+    {
+        var raw=System.Text.Json.JsonSerializer.Serialize(new { type,size="Standard",pricing=new { tcgplayer=new { unit="USD",updated="2026-10-02T10:00:00Z",normal=new {marketPrice=.04m} } } });
+        var variant=new Variant{Id=Guid.NewGuid(),Code="normal",Name=type,RawValue=raw};
+        var quote=Assert.Single(CatalogPriceParser.Read(null,[variant],new Dictionary<string,BrlExchangeRate>{{"USD",new("USD",5m,DateTimeOffset.UtcNow)}}));
+        Assert.Equal(variant.Id,quote.VariantId);Assert.Equal(.20m,quote.MarketValueBrl);
+    }
+
 }
