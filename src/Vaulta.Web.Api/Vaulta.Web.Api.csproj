@@ -10,6 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../Modules/Vision/Vaulta.Vision.Infrastructure/Vaulta.Vision.Infrastructure.csproj" />
     <ProjectReference Include="../Modules/Identity/Vaulta.Identity.Infrastructure/Vaulta.Identity.Infrastructure.csproj" />
     <ProjectReference Include="../Modules/Catalog/Vaulta.Catalog.Infrastructure/Vaulta.Catalog.Infrastructure.csproj" />
     <ProjectReference Include="../Modules/Assets/Vaulta.Assets.Infrastructure/Vaulta.Assets.Infrastructure.csproj" />

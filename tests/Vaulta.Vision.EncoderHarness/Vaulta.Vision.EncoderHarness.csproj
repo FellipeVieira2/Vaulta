@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+ <ItemGroup><ProjectReference Include="../../src/Vaulta.Vision.Encoding/Vaulta.Vision.Encoding.csproj" /><PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.23.2" /></ItemGroup>
+</Project>

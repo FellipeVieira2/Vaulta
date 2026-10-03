@@ -76,4 +76,13 @@
     <Project Path="tests/Vaulta.Identity.IntegrationTests/Vaulta.Identity.IntegrationTests.csproj" />
     <Project Path="tests/Vaulta.Identity.UnitTests/Vaulta.Identity.UnitTests.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Vision/">
+    <Project Path="src/Modules/Vision/Vaulta.Vision.Contracts/Vaulta.Vision.Contracts.csproj" />
+    <Project Path="src/Modules/Vision/Vaulta.Vision.Domain/Vaulta.Vision.Domain.csproj" />
+    <Project Path="src/Modules/Vision/Vaulta.Vision.Application/Vaulta.Vision.Application.csproj" />
+    <Project Path="src/Modules/Vision/Vaulta.Vision.Infrastructure/Vaulta.Vision.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Vision/">
+    <Project Path="src/Vaulta.Vision.Encoding/Vaulta.Vision.Encoding.csproj" />
+  </Folder>
 </Solution>

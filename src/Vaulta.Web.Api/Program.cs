@@ -18,15 +18,19 @@ using Vaulta.Payments.Infrastructure;
 using Vaulta.Shipping.Infrastructure;
 using Vaulta.Reviews.Infrastructure;
 using Vaulta.Wallets.Infrastructure;
+using Vaulta.Vision.Infrastructure;
 using Vaulta.Web.Api;
 
+if (await VisionCommands.TryInstallModelAsync(args)) return;
 var builder = WebApplication.CreateBuilder(CatalogCommands.HostArguments(args));
+VisionCommands.Configure(builder.Configuration,args);
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole(o => o.IncludeScopes = true);
 builder.Services.AddTrustedReverseProxy(builder.Configuration);
 builder.Services.AddIdentityModule(builder.Configuration);
 builder.Services.AddCatalogModule(builder.Configuration);
 builder.Services.AddAssetsModule(builder.Configuration);
+builder.Services.AddVisionModule(builder.Configuration);
 builder.Services.AddCollectionModule(builder.Configuration);
 builder.Services.AddMarketplaceModule(builder.Configuration);
 builder.Services.AddOrdersModule(builder.Configuration);
@@ -80,6 +84,7 @@ if (args.Contains("--migrate") || builder.Configuration.GetValue<bool>("Database
     await DatabaseMigrations.ApplyAsync(app.Services);
     if (args.Contains("--migrate")) return;
 }
+if (await VisionCommands.TryExecute(app, args)) return;
 if (await CatalogCommands.TryExecute(app, args)) return;
 if (await SeedAdminCommand.TryExecute(app, args)) return;
 

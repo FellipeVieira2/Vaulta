@@ -57,6 +57,11 @@ COPY ["src/Modules/Reviews/Vaulta.Reviews.Application/Vaulta.Reviews.Application
 COPY ["src/Modules/Reviews/Vaulta.Reviews.Domain/Vaulta.Reviews.Domain.csproj", "src/Modules/Reviews/Vaulta.Reviews.Domain/"]
 COPY ["src/Modules/Reviews/Vaulta.Reviews.Contracts/Vaulta.Reviews.Contracts.csproj", "src/Modules/Reviews/Vaulta.Reviews.Contracts/"]
 COPY ["src/Modules/Wallets/Vaulta.Wallets.Infrastructure/Vaulta.Wallets.Infrastructure.csproj", "src/Modules/Wallets/Vaulta.Wallets.Infrastructure/"]
+COPY ["src/Modules/Vision/Vaulta.Vision.Contracts/Vaulta.Vision.Contracts.csproj", "src/Modules/Vision/Vaulta.Vision.Contracts/"]
+COPY ["src/Modules/Vision/Vaulta.Vision.Domain/Vaulta.Vision.Domain.csproj", "src/Modules/Vision/Vaulta.Vision.Domain/"]
+COPY ["src/Modules/Vision/Vaulta.Vision.Application/Vaulta.Vision.Application.csproj", "src/Modules/Vision/Vaulta.Vision.Application/"]
+COPY ["src/Modules/Vision/Vaulta.Vision.Infrastructure/Vaulta.Vision.Infrastructure.csproj", "src/Modules/Vision/Vaulta.Vision.Infrastructure/"]
+COPY ["src/Vaulta.Vision.Encoding/Vaulta.Vision.Encoding.csproj", "src/Vaulta.Vision.Encoding/"]
 RUN dotnet restore "./src/Vaulta.Web.Api/Vaulta.Web.Api.csproj"
 COPY . .
 WORKDIR "/src/src/Vaulta.Web.Api"

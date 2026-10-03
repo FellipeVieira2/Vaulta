@@ -9,6 +9,7 @@ using Vaulta.Payments.Infrastructure;
 using Vaulta.Reviews.Infrastructure;
 using Vaulta.Shipping.Infrastructure;
 using Vaulta.Wallets.Infrastructure;
+using Vaulta.Vision.Infrastructure;
 
 namespace Vaulta.Web.Api;
 
@@ -22,6 +23,7 @@ public static class DatabaseMigrations
             scope.ServiceProvider.GetRequiredService<IdentityDbContext>(),
             scope.ServiceProvider.GetRequiredService<CatalogDbContext>(),
             scope.ServiceProvider.GetRequiredService<AssetsDbContext>(),
+            scope.ServiceProvider.GetRequiredService<VisionDbContext>(),
             scope.ServiceProvider.GetRequiredService<CollectionDbContext>(),
             scope.ServiceProvider.GetRequiredService<MarketplaceDbContext>(),
             scope.ServiceProvider.GetRequiredService<OrdersDbContext>(),

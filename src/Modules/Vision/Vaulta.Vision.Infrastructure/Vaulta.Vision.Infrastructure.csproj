@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Vaulta.Vision.Application/Vaulta.Vision.Application.csproj" />
+    <ProjectReference Include="../../../Vaulta.Vision.Encoding/Vaulta.Vision.Encoding.csproj" />
+    <ProjectReference Include="../../Catalog/Vaulta.Catalog.Infrastructure/Vaulta.Catalog.Infrastructure.csproj" />
+    <ProjectReference Include="../../Assets/Vaulta.Assets.Application/Vaulta.Assets.Application.csproj" />
+    <ProjectReference Include="../../../Vaulta.SharedKernel/Vaulta.SharedKernel.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.6"><PrivateAssets>all</PrivateAssets></PackageReference>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.23.2" />
+  </ItemGroup>
+</Project>
