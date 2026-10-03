@@ -61,6 +61,14 @@ public sealed class Printing
     public string? Rarity { get; set; }
     public string? RawRarity { get; set; }
     public string? ExternalArtworkUrl { get; set; }
+    public Guid? ArtworkAssetId { get; set; }
+    public Guid? ThumbnailAssetId { get; set; }
+    public string? ArtworkSha256 { get; set; }
+    public string? ArtworkETag { get; set; }
+    public DateTimeOffset? ArtworkLastModified { get; set; }
+    public string? ArtworkImportStatus { get; set; }
+    public string? ArtworkImportError { get; set; }
+    public DateTimeOffset? ArtworkCheckedAt { get; set; }
     public string? ArtworkProvider { get; set; }
     public string? MetadataJson { get; set; }
     public string? SourcePricingJson { get; set; }

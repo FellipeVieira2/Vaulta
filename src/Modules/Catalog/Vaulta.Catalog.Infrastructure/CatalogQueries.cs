@@ -20,7 +20,7 @@ internal sealed class CatalogQueries(CatalogDbContext db) : ICatalogSearch, ICat
             .ThenBy(x => x.Id).Take(50)
             .Select(x => new
             {
-                Card = new CatalogSearchResult(x.Id, x.Card.Game.Code, x.SetId, x.Set.Name, x.Card.Name, x.CollectorNumber, x.Language, x.Rarity, x.ExternalArtworkUrl),
+                Card = new CatalogSearchResult(x.Id, x.Card.Game.Code, x.SetId, x.Set.Name, x.Card.Name, x.CollectorNumber, x.Language, x.Rarity, x.ArtworkAssetId == null ? null : "/api/v1/catalog/printings/" + x.Id + "/artwork"),
                 ProviderSetId = db.ExternalIds.Where(e => e.Provider == "tcgdex" && e.EntityType == "set" && e.EntityId == x.SetId).Select(e => e.ExternalId).SingleOrDefault(),
                 Variants = x.Variants.Where(v => v.IsActive).OrderBy(v => v.Code).Select(v => v.Code).ToArray()
             }).ToArrayAsync(cancellationToken);
@@ -42,25 +42,25 @@ internal sealed class CatalogQueries(CatalogDbContext db) : ICatalogSearch, ICat
         var items = await results.OrderByDescending(x => x.Card.NormalizedName == normalized)
             .ThenBy(x => x.Card.NormalizedName).ThenBy(x => x.Set.Name).ThenBy(x => x.NormalizedCollectorNumber).ThenBy(x => x.Id)
             .Skip((page - 1) * pageSize).Take(pageSize)
-            .Select(x => new CatalogSearchResult(x.Id, x.Card.Game.Code, x.SetId, x.Set.Name, x.Card.Name, x.CollectorNumber, x.Language, x.Rarity, x.ExternalArtworkUrl))
+            .Select(x => new CatalogSearchResult(x.Id, x.Card.Game.Code, x.SetId, x.Set.Name, x.Card.Name, x.CollectorNumber, x.Language, x.Rarity, x.ArtworkAssetId == null ? null : "/api/v1/catalog/printings/" + x.Id + "/artwork"))
             .ToArrayAsync(cancellationToken);
         return new(items, page, pageSize, total);
     }
 
     public Task<CatalogPrintingDetails?> GetPrinting(Guid id, CancellationToken cancellationToken) => db.Printings.AsNoTracking()
         .Where(x => x.Id == id && x.IsActive)
-        .Select(x => new CatalogPrintingDetails(x.Id, x.CardId, x.SetId, x.Card.Game.Code, x.Set.Name, x.Card.Name, x.CollectorNumber, x.Language, x.Rarity, x.ExternalArtworkUrl,
+        .Select(x => new CatalogPrintingDetails(x.Id, x.CardId, x.SetId, x.Card.Game.Code, x.Set.Name, x.Card.Name, x.CollectorNumber, x.Language, x.Rarity, x.ArtworkAssetId == null ? null : "/api/v1/catalog/printings/" + x.Id + "/artwork",
             x.Variants.Where(v => v.IsActive).OrderBy(v => v.Code).Select(v => new CatalogVariantDto(v.Id, v.Code, v.Name)).ToArray()))
         .SingleOrDefaultAsync(cancellationToken);
 
     Task<CollectionPrintingDetails?> ICatalogCollectionReader.GetPrinting(Guid printingId, CancellationToken cancellationToken) => db.Printings.AsNoTracking()
         .Where(x => x.Id == printingId)
-        .Select(x => new CollectionPrintingDetails(x.Id, x.CardId, x.SetId, x.Card.Game.Code, x.Set.Name, x.Card.Name, x.CollectorNumber, x.Language, x.Rarity, x.ExternalArtworkUrl, x.IsActive))
+        .Select(x => new CollectionPrintingDetails(x.Id, x.CardId, x.SetId, x.Card.Game.Code, x.Set.Name, x.Card.Name, x.CollectorNumber, x.Language, x.Rarity, x.ArtworkAssetId == null ? null : "/api/v1/catalog/printings/" + x.Id + "/artwork", x.IsActive))
         .SingleOrDefaultAsync(cancellationToken);
 
     async Task<IReadOnlyList<CollectionPrintingDetails>> ICatalogCollectionReader.GetPrintings(IReadOnlyCollection<Guid> printingIds, CancellationToken cancellationToken) =>
         await db.Printings.AsNoTracking().Where(x => printingIds.Contains(x.Id))
-            .Select(x => new CollectionPrintingDetails(x.Id, x.CardId, x.SetId, x.Card.Game.Code, x.Set.Name, x.Card.Name, x.CollectorNumber, x.Language, x.Rarity, x.ExternalArtworkUrl, x.IsActive))
+            .Select(x => new CollectionPrintingDetails(x.Id, x.CardId, x.SetId, x.Card.Game.Code, x.Set.Name, x.Card.Name, x.CollectorNumber, x.Language, x.Rarity, x.ArtworkAssetId == null ? null : "/api/v1/catalog/printings/" + x.Id + "/artwork", x.IsActive))
             .ToArrayAsync(cancellationToken);
 
     async Task<IReadOnlyList<CollectionVariantDetails>> ICatalogCollectionReader.GetVariants(IReadOnlyCollection<Guid> variantIds, CancellationToken cancellationToken) =>

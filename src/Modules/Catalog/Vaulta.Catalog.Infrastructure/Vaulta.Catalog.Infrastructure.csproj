@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../../Assets/Vaulta.Assets.Application/Vaulta.Assets.Application.csproj" />
     <InternalsVisibleTo Include="Vaulta.Identity.UnitTests" />
     <InternalsVisibleTo Include="Vaulta.Identity.IntegrationTests" />
     <PackageReference Include="AWSSDK.BedrockRuntime" Version="4.0.101.7" />

@@ -9,6 +9,9 @@ public sealed class Asset
     public string ContentType { get; set; } = null!;
     public long ContentLength { get; set; }
     public string? Sha256 { get; set; }
+    public int? Width { get; set; }
+    public int? Height { get; set; }
+    public string? SourceUrl { get; set; }
     public Guid? OwnerId { get; set; }
     public string Status { get; set; } = null!;
     public DateTimeOffset CreatedAt { get; set; }

@@ -18,3 +18,17 @@ public interface IAssetService
     Task<CollectionAssetAccess?> GetCollectionAssetAccess(Guid ownerId, Guid assetId, CancellationToken cancellationToken);
     Task<CollectionAssetUrl?> CreatePrivateReadUrl(Guid ownerId, Guid assetId, CancellationToken cancellationToken);
 }
+
+// Internal server-only port. It is not exposed by the user upload endpoint.
+public interface IAssetContentStore
+{
+    Task PutAsync(string key,Stream content,string contentType,CancellationToken ct);
+    Task<byte[]?> ReadAsync(string key,int maxBytes,CancellationToken ct);
+    Task DeleteAsync(string key,CancellationToken ct);
+}
+public interface ISystemAssetService
+{
+    Task<Guid> StoreArtworkAsync(byte[] bytes,int width,int height,string sourceUrl,bool thumbnail,CancellationToken ct);
+    Task<string?> GetArtworkReadUrlAsync(Guid assetId,CancellationToken ct);
+    Task<byte[]?> ReadArtworkAsync(Guid assetId,CancellationToken ct);
+}

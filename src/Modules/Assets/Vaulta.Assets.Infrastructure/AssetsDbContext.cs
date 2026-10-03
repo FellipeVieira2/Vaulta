@@ -19,6 +19,7 @@ public sealed class AssetsDbContext(DbContextOptions<AssetsDbContext> options) :
             b.Property(x => x.Purpose).HasMaxLength(40).IsRequired();
             b.Property(x => x.Visibility).HasMaxLength(20).IsRequired();
             b.Property(x => x.ContentType).HasMaxLength(120).IsRequired();
+            b.Property(x => x.SourceUrl).HasMaxLength(2048);
             b.Property(x => x.Sha256).HasMaxLength(64);
             b.Property(x => x.Status).HasMaxLength(20).IsRequired();
             b.HasIndex(x => x.ObjectKey).IsUnique();

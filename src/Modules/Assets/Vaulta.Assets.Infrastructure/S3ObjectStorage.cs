@@ -41,7 +41,7 @@ internal sealed class S3PresigningClient : IDisposable
     public void Dispose() { if (_ownsClient) Client.Dispose(); }
 }
 
-internal sealed class S3ObjectStorage(IAmazonS3 client, S3PresigningClient signing, IOptions<S3StorageOptions> options) : IObjectStorage
+internal sealed class S3ObjectStorage(IAmazonS3 client, S3PresigningClient signing, IOptions<S3StorageOptions> options) : IObjectStorage, IAssetContentStore
 {
     private readonly string _bucket = options.Value.Bucket;
 
@@ -86,4 +86,23 @@ internal sealed class S3ObjectStorage(IAmazonS3 client, S3PresigningClient signi
             Expires = DateTime.UtcNow.Add(lifetime)
         }));
     }
+    public async Task PutAsync(string key, Stream content, string contentType, CancellationToken ct)
+    {
+        await client.PutObjectAsync(new PutObjectRequest { BucketName=_bucket,Key=key,InputStream=content,ContentType=contentType,AutoCloseStream=false },ct);
+    }
+    public async Task<byte[]?> ReadAsync(string key,int maxBytes,CancellationToken ct)
+    {
+        try
+        {
+            using var response=await client.GetObjectAsync(new GetObjectRequest { BucketName=_bucket,Key=key },ct);
+            if(response.Headers.ContentLength>maxBytes) throw new InvalidDataException("Stored asset exceeds the byte limit.");
+            using var output=new MemoryStream(); var buffer=new byte[16384]; int read;
+            while((read=await response.ResponseStream.ReadAsync(buffer,ct))>0)
+            { if(output.Length+read>maxBytes) throw new InvalidDataException("Stored asset exceeds the byte limit."); await output.WriteAsync(buffer.AsMemory(0,read),ct); }
+            return output.ToArray();
+        }
+        catch(AmazonS3Exception error) when(error.StatusCode==System.Net.HttpStatusCode.NotFound) { return null; }
+    }
+    public async Task DeleteAsync(string key,CancellationToken ct) => await client.DeleteObjectAsync(_bucket,key,ct);
+
 }

@@ -21,7 +21,10 @@ public static class DependencyInjection
             S3ClientFactory.Create(provider.GetRequiredService<IOptions<S3StorageOptions>>().Value));
         services.AddSingleton<S3PresigningClient>();
         services.AddDbContext<AssetsDbContext>(options => options.UseNpgsql(configuration.GetConnectionString("Vaulta")));
-        services.AddScoped<IObjectStorage, S3ObjectStorage>();
+        services.AddScoped<S3ObjectStorage>();
+        services.AddScoped<IObjectStorage>(p=>p.GetRequiredService<S3ObjectStorage>());
+        services.AddScoped<IAssetContentStore>(p=>p.GetRequiredService<S3ObjectStorage>());
+        services.AddScoped<ISystemAssetService, SystemAssetService>();
         services.AddScoped<IAssetService, AssetService>();
         return services;
     }

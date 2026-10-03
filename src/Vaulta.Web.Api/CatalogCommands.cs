@@ -14,6 +14,7 @@ internal static class CatalogCommands
         for (var index = 0; index < args.Length; index++)
         {
             if (args[index] == "--catalog-sync") index += 2;
+            else if (args[index] == "--catalog-assets-import") index++;
             else if (args[index] == "--catalog-sync-run") index++;
             else if (args[index] != "--catalog-sync-runs") result.Add(args[index]);
         }
@@ -22,7 +23,7 @@ internal static class CatalogCommands
 
     public static async Task<bool> TryExecute(WebApplication app, string[] args)
     {
-        var command = args.FirstOrDefault(x => x is "--catalog-sync" or "--catalog-sync-runs" or "--catalog-sync-run");
+        var command = args.FirstOrDefault(x => x is "--catalog-sync" or "--catalog-sync-runs" or "--catalog-sync-run" or "--catalog-assets-import");
         if (command is null) return false;
         await using var scope = app.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
@@ -33,7 +34,14 @@ internal static class CatalogCommands
         try
         {
             object result;
-            if (command == "--catalog-sync")
+            if (command == "--catalog-assets-import")
+            {
+                if(args.Length<=index+1 || args[index+1]!="all" && !Guid.TryParse(args[index+1],out _)) throw new ArgumentException("Usage: --catalog-assets-import <all|canonicalSetId>");
+                Guid? setId=args[index+1]=="all" ? null : Guid.Parse(args[index+1]);
+                var report=await scope.ServiceProvider.GetRequiredService<ICatalogArtifactImporter>().ImportAsync(setId,cancellation.Token);
+                result=report; if(report.Failed>0) Environment.ExitCode=1;
+            }
+            else if (command == "--catalog-sync")
             {
                 if (args.Length <= index + 2) throw new ArgumentException("Usage: --catalog-sync <provider> <all|setId|resume:runId>");
                 var id = await scope.ServiceProvider.GetRequiredService<ICatalogSync>().Synchronize(args[index + 1], args[index + 2], cancellation.Token);

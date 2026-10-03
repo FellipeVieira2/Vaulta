@@ -51,7 +51,7 @@ public sealed class DailyMarketPriceRefreshJob(IServiceScopeFactory scopes, IClo
                 try
                 {
                     await using var scope = scopes.CreateAsyncScope();
-                    var result = await scope.ServiceProvider.GetRequiredService<IScannerCardDetailsReader>().GetAsync(id, ct);
+                    var result = await scope.ServiceProvider.GetRequiredService<TcgDexScannerDetailsReader>().GetAsync(id, ct);
                     if (result?.FetchedAt is not null && result.NextRefreshAt > clock.UtcNow) Interlocked.Increment(ref refreshed);
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }

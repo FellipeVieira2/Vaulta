@@ -314,6 +314,8 @@ public sealed class CatalogSyncService(CatalogDbContext db, IEnumerable<ICatalog
                 printing.NormalizedCollectorNumber = CatalogNormalizer.NormalizeCollectorNumber(input.CollectorNumber);
                 printing.Language = CatalogNormalizer.NormalizeLanguage(input.Language);
                 printing.Rarity = CatalogNormalizer.NormalizeCode(input.Rarity); printing.RawRarity = input.Rarity;
+                if(printing.ExternalArtworkUrl != input.ImageUrl)
+                { printing.ArtworkAssetId=null; printing.ThumbnailAssetId=null; printing.ArtworkSha256=null; printing.ArtworkETag=null; printing.ArtworkLastModified=null; printing.ArtworkImportStatus="pending"; }
                 printing.ExternalArtworkUrl = input.ImageUrl; printing.ArtworkProvider = input.ImageUrl is null ? null : providerCode;
                 printing.IsActive = true;
                 printing.MetadataJson = input.MetadataJson ?? printing.MetadataJson;

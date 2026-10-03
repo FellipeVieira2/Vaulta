@@ -54,6 +54,10 @@ internal sealed class PrintingConfiguration : IEntityTypeConfiguration<Printing>
         b.ToTable("printings"); b.HasKey(x => x.Id); b.Property(x => x.Id).ValueGeneratedNever(); b.Property(x => x.CollectorNumber).HasMaxLength(64).IsRequired(); b.Property(x => x.NormalizedCollectorNumber).HasMaxLength(64).IsRequired();
         b.Property(x => x.Language).HasMaxLength(35).IsRequired(); b.Property(x => x.Rarity).HasMaxLength(80); b.Property(x => x.RawRarity).HasMaxLength(120);
         b.Property(x => x.ExternalArtworkUrl).HasMaxLength(2048);
+        b.Property(x => x.ArtworkSha256).HasMaxLength(64);
+        b.Property(x => x.ArtworkETag).HasMaxLength(512);
+        b.Property(x => x.ArtworkImportStatus).HasMaxLength(32);
+        b.Property(x => x.ArtworkImportError).HasMaxLength(80);
         b.Property(x => x.ArtworkProvider).HasMaxLength(40);
         b.Property(x => x.MetadataJson).HasColumnType("jsonb");
         b.Property(x => x.SourcePricingJson).HasColumnType("jsonb");

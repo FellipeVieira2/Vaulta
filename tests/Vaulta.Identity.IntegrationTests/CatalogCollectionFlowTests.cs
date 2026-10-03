@@ -50,10 +50,10 @@ public sealed class CatalogCollectionFlowTests(ApiFixture fixture)
         var found = Assert.Single(page!.Items);
         Assert.Equal(1, page.TotalCount); Assert.Equal(1, page.PageSize);
         Assert.Equal(printingId, found.PrintingId); Assert.Equal(setId, found.SetId);
-        Assert.Equal(provider.Artwork, found.ArtworkUrl);
+        Assert.Null(found.ArtworkUrl); // External metadata must not leak into the owned-artwork read path.
         var details = (await client.GetFromJsonAsync<CatalogPrintingDetails>($"/api/v1/catalog/printings/{found.PrintingId}"))!;
         Assert.Equal(cardId, details.CardId); Assert.Equal(setId, details.SetId);
-        Assert.Equal(provider.Artwork, details.ArtworkUrl);
+        Assert.Null(details.ArtworkUrl);
         Assert.Equal("007 / 100", details.CollectorNumber); Assert.Equal("en", details.Language); Assert.Equal("rare", details.Rarity);
         Assert.Equal(variantId, details.Variants.Single(x => x.Code == "normal").Id);
         await Authenticate(client);
@@ -68,7 +68,7 @@ public sealed class CatalogCollectionFlowTests(ApiFixture fixture)
             Assert.Equal(2, await collection.Items.CountAsync(x => x.CollectionEntryId == added.CollectionEntryId));
             var catalog = scope.ServiceProvider.GetRequiredService<ICatalogCollectionReader>();
             Assert.Empty(await catalog.SearchPrintingIds(null, null, null, default));
-            Assert.Equal(provider.Artwork, Assert.Single(await catalog.GetPrintings([printingId], default)).ArtworkUrl);
+            Assert.Null(Assert.Single(await catalog.GetPrintings([printingId], default)).ArtworkUrl);
             Assert.Equal(variantId, Assert.Single(await catalog.GetVariants([variantId], default)).VariantId);
         }
         // Unfiltered Collection no longer materializes every catalog ID, but must still return this entry.
@@ -90,7 +90,7 @@ public sealed class CatalogCollectionFlowTests(ApiFixture fixture)
             Assert.NotNull(await scope.ServiceProvider.GetRequiredService<ICatalogCollectionReader>().GetVariant(variantId, default));
         }
         details = (await client.GetFromJsonAsync<CatalogPrintingDetails>($"/api/v1/catalog/printings/{printingId}"))!;
-        Assert.Equal("holo", Assert.Single(details.Variants).Code); Assert.Equal(provider.Artwork, details.ArtworkUrl);
+        Assert.Equal("holo", Assert.Single(details.Variants).Code); Assert.Null(details.ArtworkUrl);
         var historical = await client.GetAsync($"/api/v1/me/collection/entries/{added.CollectionEntryId}");
         historical.EnsureSuccessStatusCode();
         // Reappearance reactivates the exact original GUID.

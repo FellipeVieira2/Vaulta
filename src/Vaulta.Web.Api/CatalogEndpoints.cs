@@ -9,6 +9,13 @@ public static class CatalogEndpoints
     public static void MapCatalogEndpoints(this WebApplication app)
     {
         var catalog = app.MapGroup("/api/v1/catalog").WithTags("Catalog");
+        catalog.MapGet("/printings/{id:guid}/artwork", async (Guid id, bool? thumbnail, Vaulta.Catalog.Infrastructure.CatalogDbContext db, Vaulta.Assets.Application.ISystemAssetService assets, CancellationToken ct) =>
+        {
+            var asset=await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SingleOrDefaultAsync(
+                db.Printings.Where(x=>x.Id==id && x.IsActive).Select(x=>thumbnail==true ? x.ThumbnailAssetId : x.ArtworkAssetId),ct);
+            var url=asset is null ? null : await assets.GetArtworkReadUrlAsync(asset.Value,ct);
+            return url is null ? Results.NotFound() : Results.Redirect(url);
+        });
         catalog.MapGet("/search", async (string q, string? game, int? page, int? pageSize, ICatalogSearch search, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(q) || q.Length > 200 || CatalogNormalizer.NormalizeName(q).Length == 0)

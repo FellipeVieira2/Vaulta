@@ -137,12 +137,16 @@ public static class DependencyInjection
             provider.GetRequiredService<Vaulta.SharedKernel.IClock>()));
         services.AddSingleton<IScannerWebMarketResearchProvider, MarketResearch.CompositeScannerWebMarketResearchProvider>();
         services.AddScoped<IScannerMarketResearch, MarketResearch.ScannerMarketResearch>();
-        services.AddHttpClient<IScannerCardDetailsReader, TcgDexScannerDetailsReader>((provider, client) =>
+        services.AddHttpClient<TcgDexScannerDetailsReader>((provider, client) =>
         {
             var options = provider.GetRequiredService<IOptions<TcgDexOptions>>().Value;
             client.BaseAddress = new Uri(options.BaseAddress.TrimEnd('/') + "/");
             client.Timeout = TimeSpan.FromSeconds(options.Timeout);
         });
+        services.AddScoped<IScannerCardDetailsReader, LocalScannerDetailsReader>();
+        services.AddHttpClient<Artwork.CatalogArtworkDownloader>(client => client.Timeout=TimeSpan.FromSeconds(30))
+            .ConfigurePrimaryHttpMessageHandler(()=>new SocketsHttpHandler { AllowAutoRedirect=false });
+        services.AddScoped<ICatalogArtifactImporter, Artwork.CatalogArtifactImporter>();
         services.AddOptions<MarketPriceRefreshOptions>().Bind(configuration.GetSection("Catalog:MarketPrices:Refresh"))
             .Validate(o => o.IsValid(), "Invalid daily market refresh limits.").ValidateOnStart();
         services.AddSingleton<DailyMarketPriceRefreshJob>();

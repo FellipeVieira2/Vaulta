@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Vaulta.Assets.Infrastructure;
@@ -11,9 +12,11 @@ using Vaulta.Assets.Infrastructure;
 namespace Vaulta.Assets.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AssetsDbContext))]
-    partial class AssetsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261003064600_SystemArtworkMetadata")]
+    partial class SystemArtworkMetadata
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
