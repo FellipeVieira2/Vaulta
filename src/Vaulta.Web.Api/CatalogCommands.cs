@@ -35,9 +35,10 @@ internal static class CatalogCommands
             object result;
             if (command == "--catalog-sync")
             {
-                if (args.Length <= index + 2) throw new ArgumentException("Usage: --catalog-sync <provider> <all|setId>");
+                if (args.Length <= index + 2) throw new ArgumentException("Usage: --catalog-sync <provider> <all|setId|resume:runId>");
                 var id = await scope.ServiceProvider.GetRequiredService<ICatalogSync>().Synchronize(args[index + 1], args[index + 2], cancellation.Token);
                 result = await db.SyncRuns.AsNoTracking().SingleAsync(x => x.Id == id, cancellation.Token);
+                if (((Vaulta.Catalog.Domain.CatalogSyncRun)result).Status is "partial" or "failed") Environment.ExitCode = 1;
             }
             else if (command == "--catalog-sync-run")
             {

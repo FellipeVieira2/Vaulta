@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
 using Vaulta.Catalog.Application;
@@ -80,15 +81,33 @@ internal sealed partial class TcgDexProvider(HttpClient httpClient, IOptions<Tcg
             var number = CollectorNumber(card.LocalId);
             if (card.Set?.CardCount?.Official is > 0 and <= 9999)
                 number += "/" + card.Set.CardCount.Official.Value.ToString(CultureInfo.InvariantCulture);
-            var variants = card.Variants.Where(x => x.Value)
+            var variants = card.VariantsDetailed is { Length: > 0 } detailed
+                ? detailed.Select(DetailedVariant).DistinctBy(x => x.Code).OrderBy(x => x.Code, StringComparer.Ordinal).ToArray()
+                : card.Variants.Where(x => x.Value)
                 .Select(x => new ProviderVariant(VariantCode(x.Key), VariantName(x.Key), x.Key))
                 .OrderBy(x => x.Code, StringComparer.Ordinal).ToArray();
             if (variants.Select(x => x.Code).Distinct(StringComparer.Ordinal).Count() != variants.Length)
                 throw ContractError("TCGdex treatments normalize to duplicate codes.");
             printings[index] = new ProviderPrinting(card.Id, card.Name, number, CultureInfo.GetCultureInfo(NormalizeLanguage(_options.Language)).Name,
-                card.Rarity, ArtworkUrl(card.Image), variants);
+                card.Rarity, ArtworkUrl(card.Image), variants,
+                JsonSerializer.Serialize(new { hp = card.Hp, illustrator = card.Illustrator, category = card.Category, types = card.Types, stage = card.Stage, attacks = card.Attacks, abilities = card.Abilities }),
+                card.Pricing is { ValueKind: JsonValueKind.Object } pricing ? pricing.GetRawText() : null);
         });
-        return new(new ProviderSet(set.Id, set.Name, null, releaseDate), printings);
+        return new(new ProviderSet(set.Id, set.Name, null, releaseDate, set.Serie is { } series ? new ProviderSeries(series.Id, series.Name) : null), printings);
+    }
+
+    private static ProviderVariant DetailedVariant(JsonElement detail)
+    {
+        if (detail.ValueKind != JsonValueKind.Object || !detail.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String)
+            throw ContractError("Detailed variant type is missing.");
+        var parts = new List<string> { type.GetString()! };
+        if (detail.TryGetProperty("subtype", out var subtype) && subtype.ValueKind == JsonValueKind.String) parts.Add(subtype.GetString()!);
+        if (detail.TryGetProperty("stamp", out var stamps) && stamps.ValueKind == JsonValueKind.Array)
+            parts.AddRange(stamps.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString() == "1st-edition" ? "first-edition" : x.GetString()!).Order(StringComparer.Ordinal));
+        if (detail.TryGetProperty("foil", out var foil) && foil.ValueKind == JsonValueKind.String) parts.Add(foil.GetString()!);
+        if (detail.TryGetProperty("size", out var size) && size.ValueKind == JsonValueKind.String && size.GetString() != "standard") parts.Add(size.GetString()!);
+        var code = VariantCode(string.Join("-", parts));
+        return new ProviderVariant(code, string.Join(" / ", parts), detail.GetRawText());
     }
 
     private async Task<T> Get<T>(string path, CancellationToken cancellationToken)
@@ -177,9 +196,13 @@ internal sealed partial class TcgDexProvider(HttpClient httpClient, IOptions<Tcg
 
     private sealed record TcgDexSetDto(string Id, string Name, TcgDexCardCountDto? CardCount);
     private sealed record TcgDexCardCountDto(int? Official);
-    private sealed record TcgDexSetDetailsDto(string Id, string Name, string? ReleaseDate, TcgDexCardBriefDto[]? Cards);
+    private sealed record TcgDexSetDetailsDto(string Id, string Name, string? ReleaseDate, TcgDexCardBriefDto[]? Cards, TcgDexSeriesDto? Serie);
+    private sealed record TcgDexSeriesDto(string Id, string Name);
     private sealed record TcgDexCardBriefDto(string Id, string Name, JsonElement LocalId, string? Image);
     // Dictionary models the real boolean object and accepts future treatment keys without leaking them to the app.
     private sealed record TcgDexCardDetailsDto(string Id, string Name, JsonElement LocalId, string? Rarity, string? Image,
-        Dictionary<string, bool>? Variants, TcgDexSetDto? Set);
+        Dictionary<string, bool>? Variants, TcgDexSetDto? Set,
+        [property: JsonPropertyName("variants_detailed")] JsonElement[]? VariantsDetailed,
+        int? Hp, string? Illustrator, string? Category, string[]? Types, string? Stage,
+        JsonElement? Attacks, JsonElement? Abilities, JsonElement? Pricing);
 }

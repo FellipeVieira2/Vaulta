@@ -62,6 +62,8 @@ public sealed class Printing
     public string? RawRarity { get; set; }
     public string? ExternalArtworkUrl { get; set; }
     public string? ArtworkProvider { get; set; }
+    public string? MetadataJson { get; set; }
+    public string? SourcePricingJson { get; set; }
     public bool IsActive { get; set; } = true;
     public Card Card { get; set; } = null!;
     public Set Set { get; set; } = null!;
@@ -104,4 +106,5 @@ public sealed class CatalogSyncRun
     public int RecordsUpdated { get; set; }
     public int RecordsUnresolved { get; set; }
     public string? ErrorCategory { get; set; }
+    public string? ProgressJson { get; set; }
 }

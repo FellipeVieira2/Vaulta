@@ -55,6 +55,8 @@ internal sealed class PrintingConfiguration : IEntityTypeConfiguration<Printing>
         b.Property(x => x.Language).HasMaxLength(35).IsRequired(); b.Property(x => x.Rarity).HasMaxLength(80); b.Property(x => x.RawRarity).HasMaxLength(120);
         b.Property(x => x.ExternalArtworkUrl).HasMaxLength(2048);
         b.Property(x => x.ArtworkProvider).HasMaxLength(40);
+        b.Property(x => x.MetadataJson).HasColumnType("jsonb");
+        b.Property(x => x.SourcePricingJson).HasColumnType("jsonb");
         b.Property(x => x.IsActive).HasDefaultValue(true);
         b.HasOne(x => x.Card).WithMany(x => x.Printings).HasForeignKey(x => x.CardId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Set).WithMany(x => x.Printings).HasForeignKey(x => x.SetId).OnDelete(DeleteBehavior.Restrict);
@@ -68,7 +70,7 @@ internal sealed class VariantConfiguration : IEntityTypeConfiguration<Variant>
 {
     public void Configure(EntityTypeBuilder<Variant> b)
     {
-        b.ToTable("variants"); b.HasKey(x => x.Id); b.Property(x => x.Id).ValueGeneratedNever(); b.Property(x => x.Code).HasMaxLength(80).IsRequired(); b.Property(x => x.Name).HasMaxLength(120).IsRequired(); b.Property(x => x.RawValue).HasMaxLength(120);
+        b.ToTable("variants"); b.HasKey(x => x.Id); b.Property(x => x.Id).ValueGeneratedNever(); b.Property(x => x.Code).HasMaxLength(80).IsRequired(); b.Property(x => x.Name).HasMaxLength(120).IsRequired(); b.Property(x => x.RawValue).HasColumnType("text");
         b.Property(x => x.IsActive).HasDefaultValue(true);
         b.HasOne(x => x.Printing).WithMany(x => x.Variants).HasForeignKey(x => x.PrintingId).OnDelete(DeleteBehavior.Cascade);
         b.HasIndex(x => new { x.PrintingId, x.Code }).IsUnique().HasDatabaseName("ux_catalog_variants_printing_code");
@@ -92,6 +94,7 @@ internal sealed class CatalogSyncRunConfiguration : IEntityTypeConfiguration<Cat
     {
         b.ToTable("sync_runs"); b.HasKey(x => x.Id); b.Property(x => x.Id).ValueGeneratedNever(); b.Property(x => x.Provider).HasMaxLength(40).IsRequired(); b.Property(x => x.Scope).HasMaxLength(200).IsRequired();
         b.Property(x => x.Status).HasMaxLength(24).IsRequired(); b.Property(x => x.ErrorCategory).HasMaxLength(80);
+        b.Property(x => x.ProgressJson).HasColumnType("jsonb");
         b.HasIndex(x => new { x.Provider, x.StartedAt }).HasDatabaseName("ix_catalog_sync_runs_provider_started");
     }
 }
