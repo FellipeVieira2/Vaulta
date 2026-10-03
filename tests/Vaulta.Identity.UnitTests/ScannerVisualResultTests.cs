@@ -7,6 +7,15 @@ namespace Vaulta.Identity.UnitTests;
 
 public sealed class ScannerVisualResultTests
 {
+    [Fact]
+    public async Task UnreadableCollectorNumberDoesNotTurnGuessedDigitsIntoIdentity()
+    {
+        var evidence = (await new Extractor().ExtractAsync([1], default))! with { CollectorNumber = new("062/066", .4) };
+        var provider = new EvidenceCardRecognitionProvider(new GivenExtractor(evidence), new(new EmptyCatalog()), null, "openai", null);
+        var result = await new ScannerService([provider], new LocalSearch(), new Resolver()).IdentifyAsync(new(Convert.ToBase64String([1]), null), default);
+        Assert.Equal("Golisopod", result.VisualIdentification!.Name);
+        Assert.Null(result.VisualIdentification.CollectorNumber);
+    }
     [Theory]
     [InlineData(.799, null)]
     [InlineData(.8, "reverse")]

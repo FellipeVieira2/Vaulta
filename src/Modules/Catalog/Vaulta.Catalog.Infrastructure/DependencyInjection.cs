@@ -42,6 +42,7 @@ public static class DependencyInjection
             .PostConfigure(o => o.ApiKey ??= configuration["OPENAI_API_KEY"])
             .Validate(o => o.IsValid(), "Invalid OpenAI scanner configuration or request limits.").ValidateOnStart();
         services.AddScoped<Recognition.CardEvidenceCatalogMatcher>();
+        services.AddScoped<IScannerIdentityResolver, Recognition.ScannerIdentityResolver>();
         if (primary == "openai" || fallback == "openai")
         {
             services.AddHttpClient("Vaulta.Scanner.OpenAI", client =>
@@ -111,6 +112,31 @@ public static class DependencyInjection
             client.BaseAddress = new Uri("https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/");
             client.Timeout = TimeSpan.FromSeconds(15);
         });
+        services.AddOptions<MarketResearch.ScannerMarketResearchOptions>().Bind(configuration.GetSection("Scanner:MarketResearch"))
+            .Validate(o => o.IsValid(), "Invalid scanner market research limits.").ValidateOnStart();
+        services.AddOptions<MarketResearch.JustTcgScannerOptions>().Bind(configuration.GetSection("Scanner:JustTCG"))
+            .PostConfigure(o => o.ApiKey ??= configuration["JUSTTCG_API_KEY"])
+            .Validate(o => o.TimeoutSeconds is >= 1 and <= 15, "Invalid JustTCG request timeout.").ValidateOnStart();
+        services.AddHttpClient("Vaulta.Scanner.Market.OpenAI", client =>
+        {
+            client.BaseAddress = new Uri("https://api.openai.com/v1/"); client.Timeout = Timeout.InfiniteTimeSpan;
+        }).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, PooledConnectionLifetime = TimeSpan.FromMinutes(5) })
+            .SetHandlerLifetime(Timeout.InfiniteTimeSpan).RemoveAllLoggers();
+        services.AddHttpClient("Vaulta.Scanner.Market.JustTCG", client =>
+        {
+            client.BaseAddress = new Uri("https://api.justtcg.com/v1/"); client.Timeout = Timeout.InfiniteTimeSpan;
+        }).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, PooledConnectionLifetime = TimeSpan.FromMinutes(5) })
+            .SetHandlerLifetime(Timeout.InfiniteTimeSpan).RemoveAllLoggers();
+        services.AddSingleton<MarketResearch.OpenAiScannerWebMarketResearchProvider>(provider => new(
+            provider.GetRequiredService<IHttpClientFactory>().CreateClient("Vaulta.Scanner.Market.OpenAI"),
+            provider.GetRequiredService<IOptions<Recognition.OpenAiScannerOptions>>(), provider.GetRequiredService<IBrlExchangeRateProvider>(),
+            provider.GetRequiredService<Vaulta.SharedKernel.IClock>(), provider.GetRequiredService<IOptions<MarketResearch.ScannerMarketResearchOptions>>()));
+        services.AddSingleton<MarketResearch.JustTcgScannerMarketResearchProvider>(provider => new(
+            provider.GetRequiredService<IHttpClientFactory>().CreateClient("Vaulta.Scanner.Market.JustTCG"),
+            provider.GetRequiredService<IOptions<MarketResearch.JustTcgScannerOptions>>(), provider.GetRequiredService<IBrlExchangeRateProvider>(),
+            provider.GetRequiredService<Vaulta.SharedKernel.IClock>()));
+        services.AddSingleton<IScannerWebMarketResearchProvider, MarketResearch.CompositeScannerWebMarketResearchProvider>();
+        services.AddScoped<IScannerMarketResearch, MarketResearch.ScannerMarketResearch>();
         services.AddHttpClient<IScannerCardDetailsReader, TcgDexScannerDetailsReader>((provider, client) =>
         {
             var options = provider.GetRequiredService<IOptions<TcgDexOptions>>().Value;

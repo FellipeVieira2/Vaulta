@@ -4,6 +4,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Vaulta.Catalog.Application;
 using Vaulta.SharedKernel;
+using System.Text.Json;
+using Vaulta.Catalog.Contracts;
 
 namespace Vaulta.Catalog.Infrastructure;
 
@@ -18,7 +20,7 @@ public sealed class MarketPriceRefreshOptions
         && MaxConcurrency is >= 1 and <= 2 && MaxRunMinutes is >= 1 and <= 240;
 }
 
-// Refresh only canonical printings previously consulted, using the shared daily
+// Refresh only canonical printings and researched identities previously consulted, using the shared daily
 // cache/lock. It never invokes vision or reconstructs identity from photographs.
 public sealed class DailyMarketPriceRefreshJob(IServiceScopeFactory scopes, IClock clock,
     IOptions<MarketPriceRefreshOptions> options, ILogger<DailyMarketPriceRefreshJob> logger)
@@ -51,7 +53,30 @@ public sealed class DailyMarketPriceRefreshJob(IServiceScopeFactory scopes, IClo
                 catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                 catch (Exception ex) { logger.LogWarning("Daily market refresh failed for {PrintingId}: {ErrorType}", id, ex.GetType().Name); }
             });
-        logger.LogInformation("Daily market refresh completed: {Refreshed} of {Requested} printings", refreshed, ids.Length);
+        string[] researched;
+        await using (var scope = scopes.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+            var now = clock.UtcNow;
+            researched = await db.ScannerResearchSnapshots.AsNoTracking().Where(x => x.RefreshAfter <= now && x.MarketDay < day.Date
+                    && (x.Outcome == "quoted" || x.Outcome == "identity_only"))
+                .OrderBy(x => x.RefreshAfter).ThenBy(x => x.CacheKey).Select(x => x.Payload).Take(limits.MaxPrintingsPerRun).ToArrayAsync(deadline.Token);
+        }
+        await Parallel.ForEachAsync(researched, new ParallelOptions { MaxDegreeOfParallelism = limits.MaxConcurrency, CancellationToken = deadline.Token },
+            async (payload, ct) =>
+            {
+                try
+                {
+                    var identity = JsonSerializer.Deserialize<ScannerMarketResearchResultDto>(payload)?.Identification;
+                    if (identity is null) return;
+                    await using var scope = scopes.CreateAsyncScope();
+                    var result = await scope.ServiceProvider.GetRequiredService<IScannerMarketResearch>().ResearchAsync(identity, null, ct);
+                    if (result?.Estimate is not null) Interlocked.Increment(ref refreshed);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                catch (Exception ex) { logger.LogWarning("Daily researched market refresh failed: {ErrorType}", ex.GetType().Name); }
+            });
+        logger.LogInformation("Daily market refresh completed: {Refreshed} of {Requested} identities", refreshed, ids.Length + researched.Length);
         return refreshed;
     }
 }

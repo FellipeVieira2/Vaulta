@@ -32,6 +32,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_HTTP_PORTS: "8080"
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      JUSTTCG_API_KEY: ${JUSTTCG_API_KEY:-}
       Scanner__Recognition__Provider: ${SCANNER_RECOGNITION_PROVIDER:-openai}
       Scanner__Recognition__FallbackProvider: ocr
       ConnectionStrings__Vaulta: Host=postgres;Port=5432;Database=${POSTGRES_DB:-vaulta};Username=${POSTGRES_USER:-vaulta};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD};Maximum Pool Size=15;Minimum Pool Size=0;Timeout=15

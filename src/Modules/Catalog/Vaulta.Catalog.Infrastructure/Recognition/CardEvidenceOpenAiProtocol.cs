@@ -4,7 +4,7 @@ namespace Vaulta.Catalog.Infrastructure.Recognition;
 
 internal static class CardEvidenceOpenAiProtocol
 {
-    public const string PromptVersion = "card-evidence-openai-v5";
+    public const string PromptVersion = "card-evidence-openai-v6";
     public const string Prompt = """
         You are the visual extraction engine for the Vaulta card scanner. Read only visible information from the photographed TCG card.
         Your responsibility ends at visual evidence; the Vaulta catalog resolves canonical identity afterwards.
@@ -15,6 +15,7 @@ internal static class CardEvidenceOpenAiProtocol
         Each confidence is your probability that the extracted field correctly describes this physical card, based on visible evidence; it is not certainty of a canonical catalog printing. Use the whole image, including different card regions, together.
         Vaulta automatically accepts fields at confidence >= 0.80, including exactly 0.80. Read and classify the card yourself; do not defer a supportable finish classification to the user. Below 0.80, express the real uncertainty so confirmation can be requested only for difficult readings. Never inflate confidence to avoid confirmation.
         Preserve the full collector number: leading zeros, letters, prefixes, suffixes, slash and denominator, e.g. 026/086 or TG01/TG30.
+        Small footer digits are easy to confuse: never guess a digit or denominator to complete the number. If any part is unreadable, return collectorNumber null with confidence 0. An unreadable number does not mean an unreadable card: combine the visible name, HP, type, stage, attacks, set symbols, year and artwork to preserve the supported visual fields. Artwork may support the visual reading but never justifies invented numbers or expansion names. Downstream photo-supported market research can resolve the printing using these signals.
         hp is the printed life/HP/PS number as a decimal string, e.g. "140". Read it from the card; never infer it from the name or memory.
         setCode and setName must be visibly printed, never guessed provider identifiers. language comes only from the card text, not user location.
         language must use a code from the schema, e.g. "pt-BR" for Brazilian Portuguese, "en" for English, "ja" for Japanese; never return language names such as "Portuguese".

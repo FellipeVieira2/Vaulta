@@ -12,6 +12,12 @@ public interface IScannerMarketResearch
         Vaulta.Catalog.Contracts.CardVisualIdentificationDto identification, byte[]? image, CancellationToken cancellationToken);
 }
 
+public interface IScannerIdentityResolver
+{
+    Task<IReadOnlyList<CardRecognitionCandidate>> ResolveAsync(
+        Vaulta.Catalog.Contracts.CardVisualIdentificationDto identification, CancellationToken cancellationToken);
+}
+
 public interface IScannerCardDetailsReader
 {
     Task<Vaulta.Catalog.Contracts.ScannerCardDetailsDto?> GetAsync(Guid printingId, CancellationToken cancellationToken);
