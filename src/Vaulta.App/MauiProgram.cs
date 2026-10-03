@@ -86,6 +86,8 @@ public static class MauiProgram
                 client.BaseAddress = ResolveBaseAddress(serviceProvider))
             .AddHttpMessageHandler<AuthorizingHttpMessageHandler>();
 
+        builder.Services.AddHttpClient<Vaulta.App.Core.Vision.IVisionClient,Vaulta.App.Core.Vision.VisionClient>((serviceProvider,client)=>client.BaseAddress=ResolveBaseAddress(serviceProvider))
+            .AddHttpMessageHandler<AuthorizingHttpMessageHandler>();
         // Catalog/Collection/Assets API calls attach a Bearer token and retry once on 401.
         builder.Services.AddHttpClient<ICatalogClient, CatalogClient>((serviceProvider, client) =>
                 client.BaseAddress = ResolveBaseAddress(serviceProvider))

@@ -20,6 +20,9 @@ foreach(var file in files)
     if(encoded.Vector.Length!=encoder.Identity.Dimension || Math.Abs(encoded.Vector.Sum(x=>(double)x*x)-1)>0.00001) throw new InvalidOperationException("Invalid real model vector.");
     vectors.Add(encoded.Vector); timings.Add(watch.Elapsed.TotalMilliseconds);
 }
+var prototypes=OrientationPrototypes.Load(File.ReadAllText(Path.Combine(Path.GetDirectoryName(args[0])!,"orientation-prototypes.json")),encoder.Identity);
+var labels=vectors.Select(vector=>prototypes.Classify(new(encoder.Identity,vector))).ToArray();
+Console.WriteLine(JsonSerializer.Serialize(new{orientation=labels.GroupBy(x=>x).ToDictionary(x=>x.Key,x=>x.Count()),kind="official-artwork-only-not-camera-or-back-accuracy"}));
 var top1=0;
 for(var i=0;i<files.Length;i++)
 {

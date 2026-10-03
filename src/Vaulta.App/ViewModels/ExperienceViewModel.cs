@@ -616,7 +616,7 @@ public partial class ExperienceViewModel : ObservableObject
             OnPropertyChanged(nameof(Screen));
             const string gameCode = "pokemon";
             var result = await _scannerClient.ScanCardAsync(imageData, gameCode, cancellationToken);
-            ScanResult = result;
+            ScanResult = Vaulta.App.Core.Catalog.VisionAcceptance.ManualCandidates(result);
 
             if (result.Candidates.Count == 0)
             {

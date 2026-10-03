@@ -62,10 +62,10 @@ COPY ["src/Modules/Vision/Vaulta.Vision.Domain/Vaulta.Vision.Domain.csproj", "sr
 COPY ["src/Modules/Vision/Vaulta.Vision.Application/Vaulta.Vision.Application.csproj", "src/Modules/Vision/Vaulta.Vision.Application/"]
 COPY ["src/Modules/Vision/Vaulta.Vision.Infrastructure/Vaulta.Vision.Infrastructure.csproj", "src/Modules/Vision/Vaulta.Vision.Infrastructure/"]
 COPY ["src/Vaulta.Vision.Encoding/Vaulta.Vision.Encoding.csproj", "src/Vaulta.Vision.Encoding/"]
-RUN dotnet restore "./src/Vaulta.Web.Api/Vaulta.Web.Api.csproj"
+RUN dotnet restore "./src/Vaulta.Web.Api/Vaulta.Web.Api.csproj" -r linux-x64
 COPY . .
 WORKDIR "/src/src/Vaulta.Web.Api"
-RUN dotnet build "./Vaulta.Web.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build
+RUN dotnet build "./Vaulta.Web.Api.csproj" -c $BUILD_CONFIGURATION -r linux-x64 --no-restore -o /app/build
 
 FROM build AS scanner-tests
 WORKDIR /src
@@ -75,7 +75,7 @@ RUN dotnet test tests/Vaulta.Identity.UnitTests/Vaulta.Identity.UnitTests.csproj
 # Esta fase é usada para publicar o projeto de serviço a ser copiado para a fase final
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./Vaulta.Web.Api.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "./Vaulta.Web.Api.csproj" -c $BUILD_CONFIGURATION -r linux-x64 --no-restore --self-contained false -o /app/publish /p:UseAppHost=false
 
 # Esta fase é usada na produção ou quando executada no VS no modo normal (padrão quando não está usando a configuração de Depuração)
 FROM base AS final

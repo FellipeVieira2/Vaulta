@@ -34,10 +34,10 @@ public sealed partial class ScannerSessionPage : ContentPage
     private CancellationTokenSource _lifetime = new();
 
     public ScannerSessionPage(SessionState account, IScannerSessionStore store, IScannerClient scanner, ScannerSessionImporter importer,
-        SessionVideoStore videoStore, ISessionVideoExporter videoExporter)
+        SessionVideoStore videoStore, ISessionVideoExporter videoExporter,Vaulta.App.Core.Vision.IVisionClient vision)
     {
         _account = account; _store = store; _scanner = scanner; _importer = importer;
-        _videoStore = videoStore; _videoExporter = videoExporter;
+        _videoStore = videoStore; _videoExporter = videoExporter; _vision=vision; _captureArchive=new(vision);
         BackgroundColor = Color.FromArgb("#080911"); Shell.SetNavBarIsVisible(this, false); Shell.SetTabBarIsVisible(this, false);
         Content = new Grid { Children = { Text("Abrindo sua sessão…", 18, Colors.White) } };
     }
@@ -135,43 +135,35 @@ public sealed partial class ScannerSessionPage : ContentPage
 
     private Task CaptureCard() => CaptureCard(false, null);
 
-    private async Task CaptureCard(bool continuous, byte[]? signature)
+    private async Task CaptureCard(bool continuous, byte[]? savedFrame)
     {
         var operation = BeginScannerOperation();
         if (!_cameraReady || _camera is null) throw new InvalidOperationException("Aguarde a câmera ou use a busca pelo nome.");
         if (_session?.Phase != ScannerSessionPhase.Scanning) return;
-        if (continuous && !HasCurrentCard(signature))
-        { _status.Text = "Enquadre a carta inteira e mantenha por um instante."; return; }
-        if (!continuous && Vaulta.App.Services.Camera.CameraSceneSampler.Read(_camera) is { } currentScene) _sceneGate.Consume(currentScene);
+        if (!continuous && Vaulta.App.Services.Camera.CameraSceneSampler.Read(_camera) is { } currentScene) _frameLoop.Consume(currentScene);
         SetIdentificationLoading(true);
-        _status.Text = "Tirando a foto… mantenha a carta só até capturar.";
         try
         {
-            using var stream = await operation.Camera!.CaptureImage(operation.Context.Token);
-            RequireScannerOperation(operation);
-            SetIdentificationLoading(true, captured: true);
-            _status.Text = "Foto capturada — pode retirar a carta. Identificando…";
-            using var data = new MemoryStream();
-            var buffer = new byte[81920]; int read;
-            while ((read = await stream.ReadAsync(buffer, operation.Context.Token)) > 0)
+            byte[] photo;
+            if(savedFrame is not null) photo=savedFrame;
+            else
             {
-                RequireScannerOperation(operation);
-                if (data.Length + read > ScannerClient.MaxImageBytes) throw new InvalidOperationException("A foto ficou muito grande. Tente novamente ou busque pelo nome.");
-                await data.WriteAsync(buffer.AsMemory(0, read), operation.Context.Token);
-                RequireScannerOperation(operation);
+                _status.Text="Tirando a foto…";
+                using var stream=await operation.Camera!.CaptureImage(operation.Context.Token);
+                using var data=new MemoryStream(); var buffer=new byte[81920]; int read;
+                while((read=await stream.ReadAsync(buffer,operation.Context.Token))>0)
+                { if(data.Length+read>ScannerClient.MaxImageBytes) throw new InvalidOperationException("A foto ficou muito grande. Tente novamente."); await data.WriteAsync(buffer.AsMemory(0,read),operation.Context.Token); }
+                photo=data.ToArray();
             }
-            RequireScannerOperation(operation);
-            var result = await _scanner.ScanCardAsync(data.ToArray(), null, operation.Context.Token); RequireScannerOperation(operation);
-            await HandleContinuousResult(result, operation);
+            RequireScannerOperation(operation); SetIdentificationLoading(true,captured:true);
+            _status.Text="Foto capturada · pode retirar a carta. Identificando…";
+            var attempt=await ReserveHistory(operation.Context.Token);RequireScannerOperation(operation);
+            var result=await _scanner.ScanCardAsync(photo,null,attempt?.AttemptId,attempt is null?null:Guid.NewGuid().ToString("N"),operation.Context.Token);RequireScannerOperation(operation);
+            if(attempt is not null && result.History?.PersistenceStatus=="saved" && (_archiveTask is null || _archiveTask.IsCompleted))
+                _archiveTask=_captureArchive.ArchiveAsync(photo,attempt.AttemptId,operation.Context.Token);
+            await HandleContinuousResult(result,operation);
         }
         finally { SetIdentificationLoading(false); }
-    }
-
-    private bool HasCurrentCard(byte[]? signature)
-    {
-        var observation = _camera is null ? null : Vaulta.App.Services.Camera.CameraSceneSampler.ReadObservation(_camera);
-        return signature is not null && observation is { CardPresent: true }
-            && ScannerSceneGate.IsSameScene(signature, observation.Signature);
     }
 
     private async Task Search()
@@ -305,6 +297,7 @@ public sealed partial class ScannerSessionPage : ContentPage
             var row = new VerticalStackLayout { Spacing = 4, Children = { Text(card.Name, 17, Colors.White, true), Text($"{card.SetName} · {card.CollectorNumber} · {card.VariantName}", 12, Color.FromArgb("#B4B5C8")),
                 Text(card.MarketValue is { } quote ? $"{Money(quote.AmountBrl)} · {quote.Source} · {quote.QuotedAt.ToLocalTime():dd/MM HH:mm}" : "Sem cotação", 14, Colors.White) } };
             AddVisualDetails(card.VisualIdentification, row);
+            AddHistoryActions(row,card);
             if (card.PrintingId == Guid.Empty)
                 row.Children.Add(Text("Edição pendente no catálogo · estoque e venda indisponíveis", 12, Color.FromArgb("#FFDA77")));
             if (card.MarketValue is { IsEstimate: true } researched)

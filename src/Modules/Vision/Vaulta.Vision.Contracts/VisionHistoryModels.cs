@@ -1,0 +1,14 @@
+namespace Vaulta.Vision.Contracts;
+public sealed record VisionPoliciesDto(bool Enabled,string? OperationalPolicyVersion,string? ImprovementPolicyVersion,int RetentionDays);
+public sealed record CreateScanAttemptRequest(string OperationalPolicyVersion,string? ImprovementPolicyVersion=null,Guid? SessionCorrelationId=null);
+public sealed record CreateScanAttemptResponse(Guid AttemptId,DateTimeOffset RetentionUntil);
+public sealed record CreateVisionCaptureRequest(string ContentType,long ContentLength,string Sha256,int Sequence,string Role);
+public sealed record VisionCaptureUploadResponse(Guid CaptureId,Guid AssetId,string UploadUrl,DateTimeOffset ExpiresAt);
+public sealed record VisionCaptureDto(Guid Id,Guid AssetId,int Sequence,string Role,string Sha256,string Status);
+public sealed record VisionRunDto(Guid Id,string Status,string InputSha256,VisionScanResultDto? Prediction,bool HasEmbedding);
+public sealed record VisionFeedbackRequest(Guid RunId,string Source,Guid? ConfirmedPrintingId=null,Guid? ConfirmedVariantId=null,string? Orientation=null,string? Presence=null,string? Notes=null);
+public sealed record VisionFeedbackDto(Guid Id,VisionFeedbackRequest Feedback,DateTimeOffset CreatedAt);
+public sealed record VisionAttemptDetailsDto(Guid Id,DateTimeOffset RetentionUntil,string Status,IReadOnlyList<VisionCaptureDto> Captures,IReadOnlyList<VisionRunDto> Runs,IReadOnlyList<VisionFeedbackDto> Feedback);
+public sealed record VisionHistoryTraceDto(Guid AttemptId,Guid? RunId,string PersistenceStatus);
+public sealed record VisionBenchmarkSampleDto(Guid SampleId,Guid CaptureId,string Sha256,string SplitGroup,Guid? PrintingId,Guid? VariantId,string? Orientation,string? Presence,Guid FeedbackRevision);
+public sealed record VisionBenchmarkManifestDto(string DatasetVersion,DateTimeOffset CreatedAt,IReadOnlyList<VisionBenchmarkSampleDto> Samples);

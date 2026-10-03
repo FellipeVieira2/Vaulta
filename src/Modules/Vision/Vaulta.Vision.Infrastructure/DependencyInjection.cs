@@ -18,6 +18,7 @@ public static class DependencyInjection
         var options=configuration.GetSection("Vision").Get<VisionOptions>() ?? new();
         if(options.EncoderConcurrency is <1 or >4 || options.MaxIndexReferences is <1 or >100000) throw new InvalidOperationException("Invalid Vision resource limits.");
         services.AddSingleton(options);
+        var history=configuration.GetSection("Vision:History").Get<VisionHistoryOptions>() ?? new();history.Validate();services.AddSingleton(history);services.AddScoped<VisionHistoryService>();
         services.AddSingleton<IImageEncoder>(_=>new OnnxImageEncoder(options.ModelManifestPath ?? throw new InvalidOperationException("Vision encoder is not configured."),options.EncoderConcurrency));
         services.AddSingleton<CosineReferenceIndex>(p=>new(p.GetRequiredService<IImageEncoder>().Identity,options.MaxIndexReferences));
         services.AddSingleton<IVisualReferenceIndex>(p=>p.GetRequiredService<CosineReferenceIndex>());
@@ -28,6 +29,6 @@ public static class DependencyInjection
         services.AddSingleton<VisionPrintingResolver>();
         services.AddSingleton<VisionScanCapacity>();
         services.AddScoped<VisionScannerService>();
-        services.AddHostedService<VisualIndexRefreshWorker>(); return services;
+        services.AddHostedService<VisualIndexRefreshWorker>(); services.AddHostedService<VisionRetentionWorker>(); return services;
     }
 }

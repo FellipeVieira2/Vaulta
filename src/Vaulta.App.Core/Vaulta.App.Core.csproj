@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../Modules/Vision/Vaulta.Vision.Contracts/Vaulta.Vision.Contracts.csproj" />
     <ProjectReference Include="../Modules/Catalog/Vaulta.Catalog.Contracts/Vaulta.Catalog.Contracts.csproj" />
     <ProjectReference Include="../Modules/Collection/Vaulta.Collection.Contracts/Vaulta.Collection.Contracts.csproj" />
     <ProjectReference Include="../Modules/Assets/Vaulta.Assets.Contracts/Vaulta.Assets.Contracts.csproj" />

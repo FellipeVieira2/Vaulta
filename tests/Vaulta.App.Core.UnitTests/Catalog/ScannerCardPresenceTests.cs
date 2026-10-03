@@ -74,31 +74,6 @@ public sealed class ScannerCardPresenceTests
         Assert.False(ScannerCardPresence.IsPresent(new byte[8], int.MaxValue, int.MaxValue));
     }
 
-    [Fact]
-    public void StableEmptySceneCannotCaptureAndCardMustSettleAfterArrival()
-    {
-        var gate = new ScannerSceneGate(); var signature = new byte[288];
-        for (var time = 0; time < 60000; time += 600) Assert.False(gate.Observe(signature, time, cardPresent: false));
-        Assert.False(gate.Observe(signature, 60000, cardPresent: true));
-        Assert.False(gate.Observe(signature, 60600, cardPresent: true));
-        Assert.True(gate.Observe(signature, 61200, cardPresent: true));
-        gate.Consume(signature);
-        Assert.False(gate.Observe(signature, 63000, cardPresent: true));
-    }
-
-    [Fact]
-    public void LostContourResetsStabilityAndVisibleRemovalAllowsIdenticalNextCopy()
-    {
-        var gate = new ScannerSceneGate(); var card = Enumerable.Repeat((byte)100, 288).ToArray(); var empty = new byte[288];
-        Assert.False(gate.Observe(card, 0, true));
-        Assert.False(gate.Observe(card, 600, false));
-        Assert.False(gate.Observe(card, 1200, true));
-        Assert.True(gate.Observe(card, 2400, true)); gate.Consume(card);
-        Assert.False(gate.Observe(empty, 3000, false));
-        Assert.False(gate.Observe(card, 3600, true));
-        Assert.True(gate.Observe(card, 4800, true));
-    }
-
     private static byte[] Rectangle(int left, int top, int right, int bottom, byte background, byte face, bool printed = true)
     {
         var image = Enumerable.Repeat(background, Width * Height).ToArray();

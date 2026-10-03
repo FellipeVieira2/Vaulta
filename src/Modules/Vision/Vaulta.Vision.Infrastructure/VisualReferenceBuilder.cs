@@ -82,7 +82,7 @@ public sealed class VisualReferenceBuilder(VisionDbContext db,CatalogDbContext c
         var model=ModelVersion(encoder.Identity); var references=new List<VisualIndexEntry>(); var versions=new List<string>(); Guid? after=null;
         while(true)
         {
-            var page=await db.VisualReferences.FromSql($"SELECT r.* FROM vision.visual_references r JOIN catalog.printings p ON p.id=r.printing_id WHERE p.is_active AND r.status='ready' AND r.origin='official' AND r.source_asset_id=p.artwork_asset_id AND r.model_version={model}")
+            var page=await db.VisualReferences.FromSql($"SELECT r.* FROM vision.visual_references r JOIN catalog.printings p ON p.id=r.printing_id WHERE p.is_active AND r.status='ready' AND ((r.origin='official' AND r.source_asset_id=p.artwork_asset_id) OR (r.origin='verified_capture' AND EXISTS (SELECT 1 FROM vision.scan_captures c JOIN vision.scan_attempts a ON a.id=c.attempt_id JOIN vision.reviewed_samples s ON s.capture_id=c.id JOIN vision.feedback f ON f.id=s.feedback_id WHERE c.asset_id=r.source_asset_id AND c.status='ready' AND a.deletion_requested_at IS NULL AND a.retention_until>now() AND a.improvement_policy_version IS NOT NULL AND f.printing_id=r.printing_id AND f.orientation='front' AND f.presence='card-present'))) AND r.model_version={model}")
                 .AsNoTracking().Where(x=>after==null || x.Id.CompareTo(after.Value)>0).OrderBy(x=>x.Id).Take(1000).ToArrayAsync(ct);
             if(page.Length==0) break;
             if(references.Count+page.Length>index.MaxReferences) throw new InvalidOperationException("Visual index exceeds configured capacity.");

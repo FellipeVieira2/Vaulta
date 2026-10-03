@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<IAssetContentStore>(p=>p.GetRequiredService<S3ObjectStorage>());
         services.AddScoped<ISystemAssetService, SystemAssetService>();
         services.AddScoped<IAssetService, AssetService>();
+        services.AddScoped<IPrivateAssetService,PrivateAssetService>();
         return services;
     }
 

@@ -16,6 +16,9 @@ internal static class CatalogCommands
         for (var index = 0; index < args.Length; index++)
         {
             if (args[index] is "--vision-index-build" or "--vision-index-probe" or "--vision-model-install") index++;
+            else if(args[index]=="--vision-rerun-benchmark") index+=3;
+            else if(args[index] is "--vision-review" or "--vision-export-manifest") index+=2;
+            else if(args[index]=="--vision-purge-expired") { }
             else if (args[index] == "--vision-index-status") { }
             else if (args[index] == "--catalog-sync") index += 2;
             else if (args[index] == "--catalog-assets-import") index++;

@@ -3,7 +3,7 @@ using Vaulta.Catalog.Application;
 using Vaulta.Catalog.Contracts;
 using Vaulta.Vision.Contracts;
 namespace Vaulta.Vision.Application;
-public sealed class VisionBusyException() : Exception("O scanner est· ocupado. Tente novamente em instantes.");
+public sealed class VisionBusyException() : Exception("O scanner est√° ocupado. Tente novamente em instantes.");
 public sealed class VisionScanCapacity
 {
     internal static VisionScanCapacity Shared { get; }=new();
@@ -12,10 +12,11 @@ public sealed class VisionScanCapacity
 public sealed class VisionScannerService(IImageEncoder encoder,IVisualReferenceIndex index,IVisionCatalog catalog,IVisionEvidenceReader evidence,
     IScannerCardDetailsReader quotes,VisionPrintingResolver resolver,VisionScanCapacity? capacity=null)
 {
-    public async Task<VisionScanResultDto> IdentifyAsync(VisionScanInput input,CancellationToken ct)
+    public async Task<VisionScanResultDto> IdentifyAsync(VisionScanInput input,CancellationToken ct)=>(await ExecuteAsync(input,ct)).Result;
+    public async Task<VisionScanExecution> ExecuteAsync(VisionScanInput input,CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(input);
-        if(input.Captures.Count!=1 || input.Captures[0].Image.Length is 0 or >15*1024*1024) throw new ArgumentException("Envie uma captura de atÈ 15 MB.");
+        if(input.Captures.Count!=1 || input.Captures[0].Image.Length is 0 or >15*1024*1024) throw new ArgumentException("Envie uma captura de at√© 15 MB.");
         var slots=(capacity??VisionScanCapacity.Shared).Slots;
         if(!await slots.WaitAsync(0,ct)) throw new VisionBusyException();
         try
@@ -46,10 +47,13 @@ public sealed class VisionScannerService(IImageEncoder encoder,IVisualReferenceI
             var scores=retrieval.Matches.GroupBy(x=>x.PrintingId).ToDictionary(x=>x.Key,x=>x.Max(x=>x.Similarity));
             var displayed=candidates.OrderByDescending(x=>x.Printing.PrintingId==resolution.PrintingId).ThenByDescending(x=>scores.GetValueOrDefault(x.Printing.PrintingId,-1)).Take(5)
                 .Select(x=>new VisionScanCandidateDto(x.Printing,scores.TryGetValue(x.Printing.PrintingId,out var score)?score:null)).ToArray();
-            return new(Guid.NewGuid(),resolution.Status,resolution.PrintingId,resolution.VariantId,resolution.PrintingConfidence,resolution.VariantConfidence,displayed,quote,
+            var result=new VisionScanResultDto(Guid.NewGuid(),resolution.Status,resolution.PrintingId,resolution.VariantId,resolution.PrintingConfidence,resolution.VariantConfidence,displayed,quote,
                 quote is not null?"available":graded?"graded_unavailable":resolution.PrintingId is null?"unresolved":resolution.VariantId is null?"variant_pending":"unavailable",resolution.ReviewReason,fields,
                 new(encoded.Identity,retrieval.Index.Version,VisionPrintingResolver.Version,observed?.ModelVersion,observed?.PromptVersion,timer.ElapsedMilliseconds),reading.Issue);
+            return new(result,encoded);
         }
         finally { slots.Release(); }
     }
 }
+
+public sealed record VisionScanExecution(VisionScanResultDto Result,ImageEmbedding Embedding);

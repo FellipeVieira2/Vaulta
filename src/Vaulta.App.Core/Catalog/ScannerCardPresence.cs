@@ -7,9 +7,11 @@ namespace Vaulta.App.Core.Catalog;
 /// </summary>
 public static class ScannerCardPresence
 {
-    public static bool IsPresent(ReadOnlySpan<byte> gray, int width, int height)
+    public sealed record Region(int Left,int Top,int Width,int Height);
+    public static bool IsPresent(ReadOnlySpan<byte> gray,int width,int height)=>Locate(gray,width,height) is not null;
+    public static Region? Locate(ReadOnlySpan<byte> gray, int width, int height)
     {
-        if (width is < 24 or > 256 || height is < 24 or > 256 || gray.Length != width * height) return false;
+        if (width is < 24 or > 256 || height is < 24 or > 256 || gray.Length != width * height) return null;
         var vertical = new double[width]; var horizontal = new double[height];
         for (var y = 3; y < height - 3; y++)
             for (var x = 3; x < width - 3; x++)
@@ -33,10 +35,10 @@ public static class ScannerCardPresence
                             || Math.Abs((top + bottom) / 2d - height / 2d) > height * .15) continue;
                         if (Edge(gray, width, left, top, bottom, true) && Edge(gray, width, right, top, bottom, true)
                             && Edge(gray, width, top, left, right, false) && Edge(gray, width, bottom, left, right, false)
-                            && HasDetail(gray, width, left + 4, top + 4, right - 4, bottom - 4)) return true;
+                            && HasDetail(gray, width, left + 4, top + 4, right - 4, bottom - 4)) return new(left,top,right-left,bottom-top);
                     }
             }
-        return false;
+        return null;
     }
 
     private static int[] Peaks(double[] strengths)

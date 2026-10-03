@@ -23,7 +23,7 @@ public sealed partial class ScannerSessionPage
     private void ShowLive()
     {
         StopReveal(); StopCamera(); DetachSharedViews(); ClearResults();
-        _status.Text = "Enquadre a carta inteira por 1 segundo para tirar a foto.";
+        _status.Text = "Mostre uma carta · captura automática.";
         _camera = new CameraView { ImageCaptureResolution = new Size(1920, 1080) };
         var camera = _camera;
         camera.Loaded += async (_, _) =>
@@ -40,6 +40,12 @@ public sealed partial class ScannerSessionPage
                 await camera.StartCameraPreview(_lifetime.Token);
                 await Vaulta.App.Services.Camera.CameraPreviewReady.Wait(camera, _lifetime.Token);
                 if (!_visible || camera != _camera) return;
+                _status.Text="Preparando o reconhecimento local…";
+                try { await Vaulta.App.Services.Camera.LocalCardVision.WarmupAsync(_lifetime.Token); _localVisionAvailable=true; }
+                catch(OperationCanceledException) { throw; }
+                catch(Exception) { _localVisionAvailable=false; }
+                if (!_visible || camera != _camera) return;
+                _status.Text="Mostre uma carta · captura automática.";
                 _cameraReady = true;
                 StartContinuous();
             }
@@ -102,11 +108,12 @@ public sealed partial class ScannerSessionPage
         var options = Action("Opções da sessão", async () =>
         {
             var choice = await DisplayActionSheetAsync("Sessão", "Voltar", null,
-                _soundEnabled ? "Desligar som" : "Ligar som", "Pacotes e custo", "Capturar novamente", "Nova sessão");
+                _soundEnabled ? "Desligar som" : "Ligar som", "Pacotes e custo", "Capturar novamente", "Histórico e melhoria", "Nova sessão");
             if (choice is "Desligar som" or "Ligar som")
             { _soundEnabled = !_soundEnabled; Preferences.Default.Set("scanner-session-sound", _soundEnabled); }
             else if (choice == "Pacotes e custo")
             { RequireOwner(); await StopRecording(); RequireOwner(); ShowSetup(); }
+            else if (choice == "Histórico e melhoria") await ConfigureHistory();
             else if (choice == "Capturar novamente") await CaptureCard();
             else if (choice == "Nova sessão") { await StopRecording(); RequireOwner(); _session = null; ShowSetup(); }
         });

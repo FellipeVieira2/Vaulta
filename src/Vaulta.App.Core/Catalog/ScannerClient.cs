@@ -1,13 +1,15 @@
 using System.Net.Http.Headers;
 using Vaulta.App.Core.Http;
 using Vaulta.Catalog.Contracts;
+using Vaulta.Vision.Contracts;
 using System.Diagnostics;
 
 namespace Vaulta.App.Core.Catalog;
 
 public interface IScannerClient
 {
-    Task<CardScanResultDto> ScanCardAsync(byte[] imageData, string? gameCode, CancellationToken cancellationToken = default);
+    Task<VisionScanResultDto> ScanCardAsync(byte[] imageData, string? gameCode, CancellationToken cancellationToken = default);
+    Task<VisionScanResultDto> ScanCardAsync(byte[] imageData,string? gameCode,Guid? attemptId,string? executionKey,CancellationToken cancellationToken=default);
     Task<CardScanResultDto> SearchCardsAsync(string query, string? gameCode, CancellationToken cancellationToken = default);
     Task<ScannerCardDetailsDto> GetCardDetailsAsync(Guid printingId, CancellationToken cancellationToken = default);
 }
@@ -24,20 +26,26 @@ public sealed class ScannerClient(HttpClient httpClient) : IScannerClient
 
     public const int MaxImageBytes = 15 * 1024 * 1024;
 
-    public async Task<CardScanResultDto> ScanCardAsync(byte[] imageData, string? gameCode, CancellationToken cancellationToken = default)
+    public Task<VisionScanResultDto> ScanCardAsync(byte[] imageData,string? gameCode,CancellationToken cancellationToken=default)=>ScanCardAsync(imageData,gameCode,null,null,cancellationToken);
+    public async Task<VisionScanResultDto> ScanCardAsync(byte[] imageData,string? gameCode,Guid? attemptId,string? executionKey,CancellationToken cancellationToken=default)
     {
         using var activity = Activities.StartActivity("scanner.client.identify");
         ArgumentNullException.ThrowIfNull(imageData);
         if (imageData.Length == 0 || imageData.Length > MaxImageBytes)
-            throw new ArgumentException("Envie uma foto de até 15 MB.", nameof(imageData));
+            throw new ArgumentException("Envie uma foto de atÃ© 15 MB.", nameof(imageData));
 
         var (mimeType, extension) = DetectFormat(imageData);
         using var content = new MultipartFormDataContent();
         var image = new ByteArrayContent(imageData);
         image.Headers.ContentType = new MediaTypeHeaderValue(mimeType);
         content.Add(image, "image", $"card.{extension}");
-        using var response = await httpClient.PostAsync(WithGame("api/v1/scanner/identify", gameCode), content, cancellationToken);
-        return await response.ReadApiJsonAsync<CardScanResultDto>(cancellationToken);
+        if((attemptId is null)!=(executionKey is null)) throw new ArgumentException("Attempt and execution key must be supplied together.");
+        var path=WithGame("api/v1/scanner/identify",gameCode);
+        if(attemptId is not null) path+=(path.Contains('?')?'&':'?')+"attemptId="+attemptId;
+        using var request=new HttpRequestMessage(HttpMethod.Post,path){Content=content};
+        if(executionKey is not null) request.Headers.Add("X-Scan-Execution-ID",executionKey);
+        using var response=await httpClient.SendAsync(request,cancellationToken);
+        return await response.ReadApiJsonAsync<VisionScanResultDto>(cancellationToken);
     }
 
     public async Task<CardScanResultDto> SearchCardsAsync(string query, string? gameCode, CancellationToken cancellationToken = default)

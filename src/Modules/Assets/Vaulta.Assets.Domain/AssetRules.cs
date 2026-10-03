@@ -5,7 +5,7 @@ namespace Vaulta.Assets.Domain;
 public static class AssetRules
 {
     private static readonly HashSet<string> AllowedContentTypes = ["image/jpeg", "image/png", "image/webp"];
-    private static readonly HashSet<string> AllowedPurposes = ["collection-item", "profile-avatar"];
+    private static readonly HashSet<string> AllowedPurposes = ["collection-item", "profile-avatar", "vision-scan"];
 
     public static void ValidateUpload(string purpose, string contentType, long contentLength, string? sha256)
     {

@@ -95,4 +95,4 @@ O ambiente de teste pode usar API na rede local ou AWS. Preparar build e configu
 
 ## Estado
 
-Esta é uma especificação; não há novo motor implementado ainda. Ela incorpora os esclarecimentos: a entrega é o scanner funcionando com nosso catálogo, e o fluxo antigo pode ser substituído porque não há usuários ativos.
+Implementação integrada e validada localmente em 03/10/2026; deploy e validação física são rastreados no plano e relatório observado. Ela incorpora os esclarecimentos: a entrega é o scanner funcionando com nosso catálogo, e o fluxo antigo pode ser substituído porque não há usuários ativos.

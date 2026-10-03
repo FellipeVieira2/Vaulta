@@ -1,81 +1,21 @@
 using Vaulta.App.Core.Catalog;
 using Xunit;
-
 namespace Vaulta.App.Core.UnitTests.Catalog;
-
 public sealed class ScannerSceneGateTests
 {
-    [Fact]
-    public void ConfirmedRemovalRearmsAnIdenticalCopyEvenWhenPreviewSignatureIsUnchanged()
-    {
-        var gate = new ScannerSceneGate(); var frame = Enumerable.Repeat((byte)80, 288).ToArray();
-        gate.Observe(frame, 0); gate.Consume(frame);
-        Assert.False(gate.Observe(frame, 1500, cardPresent: false));
-        Assert.False(gate.Observe(frame, 1750, cardPresent: false));
-        Assert.False(gate.Observe(frame, 2000));
-        Assert.False(gate.Observe(frame, 2999));
-        Assert.True(gate.Observe(frame, 3000));
-        gate.Consume(frame);
-        Assert.False(gate.Observe(frame, 5000));
-    }
-
-    [Fact]
-    public void OneMissedPresenceSampleDoesNotCountTheSameCardTwice()
-    {
-        var gate = new ScannerSceneGate(); var frame = Enumerable.Repeat((byte)80, 288).ToArray();
-        gate.Observe(frame, 0); gate.Consume(frame);
-        Assert.False(gate.Observe(frame, 1500, cardPresent: false));
-        Assert.False(gate.Observe(frame, 1750));
-        Assert.False(gate.Observe(frame, 5000));
-    }
-
-    [Fact]
-    public void SmallHandAndExposureChangesStillCaptureWithinOneSecond()
-    {
-        var gate = new ScannerSceneGate();
-        byte[] Frame(byte brightness) => Enumerable.Repeat(brightness, 288).ToArray();
-        Assert.False(gate.Observe(Frame(80), 0));
-        Assert.False(gate.Observe(Frame(89), 250));
-        Assert.False(gate.Observe(Frame(80), 500));
-        Assert.False(gate.Observe(Frame(89), 750));
-        Assert.True(gate.Observe(Frame(80), 1000));
-        gate.Consume(Frame(85));
-        Assert.False(gate.Observe(Frame(89), 2000));
-    }
-
-    [Fact]
-    public void CaptureRequiresOneFullSecondAndConsumedPhotoDoesNotRequestAnother()
-    {
-        var gate = new ScannerSceneGate(); var card = Enumerable.Repeat((byte)80, 288).ToArray();
-        Assert.False(gate.Observe(card, 0, cardPresent: true));
-        Assert.False(gate.Observe(card, 999, cardPresent: true));
-        Assert.True(gate.Observe(card, 1000, cardPresent: true));
-        gate.Consume(card);
-        Assert.False(gate.Observe(card, 5000, cardPresent: true));
-        Assert.False(gate.Observe(new byte[288], 6000, cardPresent: false));
-    }
-
-    [Fact]
-    public void StationaryCardAndSmallExposureChangesDoNotRepeatARequest()
-    {
-        var gate = new ScannerSceneGate(); var card = Enumerable.Repeat((byte)80, 288).ToArray();
-        Assert.False(gate.Observe(card, 0)); Assert.True(gate.Observe(card, 1200)); gate.Consume(card);
-        Assert.False(gate.Observe(card, 2400));
-        Assert.False(gate.Observe(Enumerable.Repeat((byte)86, 288).ToArray(), 6000));
-        Assert.False(gate.Observe(card, 10000));
-    }
-
-    [Fact]
-    public void NextCardMustSettleAndAnotherIdenticalCopyRequiresVisibleRemoval()
-    {
-        var gate = new ScannerSceneGate(); var first = new byte[288]; var next = Enumerable.Repeat((byte)100, 288).ToArray();
-        gate.Observe(first, 0); gate.Consume(first);
-        Assert.False(gate.Observe(next, 2000)); Assert.False(gate.Observe(next, 2600));
-        Assert.True(gate.Observe(next, 3200)); gate.Consume(next);
-        Assert.False(gate.Observe(next, 7000));
-        Assert.False(gate.Observe(first, 7500)); // hand/removal passes over the stack
-        Assert.False(gate.Observe(next, 8100));
-        Assert.True(gate.Observe(next, 9300));
-        Assert.False(ScannerSceneGate.IsSameScene(first, next));
-    }
+    private static byte[] Frame(byte value) => Enumerable.Repeat(value, 288).ToArray();
+    [Fact] public void UsefulFirstFrameCapturesWithoutOneSecondDwell()
+    { Assert.True(new ScannerSceneGate().Observe(Frame(80), 0)); }
+    [Fact] public void ConsumedCardAndExposureChangesDoNotRepeat()
+    { var g=new ScannerSceneGate(); g.Consume(Frame(80)); Assert.False(g.Observe(Frame(86), 100)); Assert.False(g.Observe(Frame(80), 5000)); }
+    [Fact] public void TwoRemovalSamplesRearmIdenticalCopyImmediately()
+    { var g=new ScannerSceneGate(); g.Consume(Frame(80)); Assert.False(g.Observe(Frame(0),100,false)); Assert.False(g.Observe(Frame(0),350,false)); Assert.True(g.Observe(Frame(80),400)); }
+    [Fact] public void OneMissedContourDoesNotRearmSameCard()
+    { var g=new ScannerSceneGate(); g.Consume(Frame(80)); Assert.False(g.Observe(Frame(0),100,false)); Assert.False(g.Observe(Frame(80),200)); Assert.False(g.Observe(Frame(80),5000)); }
+    [Fact] public void ReplacementNeedsTwoConsistentFramesRatherThanLongDwell()
+    { var g=new ScannerSceneGate(); g.Consume(Frame(80)); Assert.False(g.Observe(Frame(150),100)); Assert.True(g.Observe(Frame(150),250)); }
+    [Fact] public void PassingHandDoesNotRearmStationaryCard()
+    { var g=new ScannerSceneGate(); g.Consume(Frame(80)); Assert.False(g.Observe(Frame(150),100)); Assert.False(g.Observe(Frame(80),250)); Assert.False(g.Observe(Frame(80),500)); }
+    [Fact] public void EmptyAndAbsentFramesNeverCapture()
+    { var g=new ScannerSceneGate(); Assert.False(g.Observe([],0)); Assert.False(g.Observe(Frame(0),100,false)); }
 }

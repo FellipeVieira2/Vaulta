@@ -10,7 +10,7 @@ public sealed record ScannerSessionCard(Guid ScanId, Guid PrintingId, Guid? Vari
     string CollectorNumber, string VariantName, string Condition, string? ArtworkUrl, SessionMarketValue? MarketValue,
     DateTimeOffset ScannedAt, Guid? ImportedItemId = null, bool ImportStarted = false,
     Guid? ListingDraftId = null, Guid? PublicationVersion = null, Guid? PublishedListingId = null,
-    Vaulta.Catalog.Contracts.CardVisualIdentificationDto? VisualIdentification = null);
+    Vaulta.Catalog.Contracts.CardVisualIdentificationDto? VisualIdentification = null, Vaulta.Vision.Contracts.VisionHistoryTraceDto? History = null);
 
 /// <summary>A scan occurrence identifies a physical copy; printing IDs can repeat.</summary>
 public sealed record ScannerSession(Guid Id, Guid OwnerId, DateTimeOffset StartedAt, ScannerSessionPhase Phase,
@@ -47,6 +47,9 @@ public sealed record ScannerSession(Guid Id, Guid OwnerId, DateTimeOffset Starte
         return this with { PackCount = packCount, CostMode = mode, EnteredCostBrl = enteredCostBrl };
     }
 
+    public bool RequiresDuplicateConfirmation(ScannerSessionCard card)=>card.PrintingId!=Guid.Empty
+        && Cards.Any(x=>x.ScanId!=card.ScanId && x.PrintingId==card.PrintingId);
+
     public ScannerSession Add(ScannerSessionCard card)
     {
         RequireScanning();
@@ -63,6 +66,15 @@ public sealed record ScannerSession(Guid Id, Guid OwnerId, DateTimeOffset Starte
             return this;
         }
         return this with { Cards = Cards.Append(card).ToArray() };
+    }
+
+    public ScannerSession Correct(ScannerSessionCard corrected)
+    {
+        if(Phase is not (ScannerSessionPhase.Scanning or ScannerSessionPhase.Completed)) throw new InvalidOperationException("Corrija a unidade na coleção após iniciar a importação.");
+        var original=Cards.SingleOrDefault(x=>x.ScanId==corrected.ScanId)??throw new ArgumentException("Carta fora da sessão.");
+        if(original.ImportStarted || original.ImportedItemId.HasValue || original.ListingDraftId.HasValue) throw new InvalidOperationException("Esta unidade já possui estoque ou anúncio.");
+        var validated=(this with {Phase=ScannerSessionPhase.Scanning,Cards=Cards.Where(x=>x.ScanId!=corrected.ScanId).ToArray()}).Add(corrected);
+        return validated with {Phase=Phase,Cards=Cards.Select(x=>x.ScanId==corrected.ScanId?corrected:x).ToArray()};
     }
 
     public ScannerSession Remove(Guid scanId)

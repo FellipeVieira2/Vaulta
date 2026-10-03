@@ -75,6 +75,7 @@ builder.Services.AddOpenTelemetry().ConfigureResource(r => r.AddService("Vaulta.
     .WithTracing(t => t.AddAspNetCoreInstrumentation().AddSource("Vaulta.Scanner"))
     .WithMetrics(m => m.AddAspNetCoreInstrumentation().AddMeter("Microsoft.AspNetCore.Hosting", "Vaulta.Scanner"));
 
+builder.Services.AddScoped<ScannerVisionCoordinator>();
 var app = builder.Build();
 if (app.Environment.IsProduction()) ProductionConfiguration.Validate(app.Configuration);
 // CLI commands exit before host StartAsync; validate JWT options before any migration or sync too.
@@ -84,6 +85,7 @@ if (args.Contains("--migrate") || builder.Configuration.GetValue<bool>("Database
     await DatabaseMigrations.ApplyAsync(app.Services);
     if (args.Contains("--migrate")) return;
 }
+if (await VisionDatasetCommands.TryExecute(app,args)) return;
 if (await VisionCommands.TryExecute(app, args)) return;
 if (await CatalogCommands.TryExecute(app, args)) return;
 if (await SeedAdminCommand.TryExecute(app, args)) return;
@@ -122,6 +124,7 @@ app.MapWalletEndpoints();
 app.MapShippingEndpoints();
 app.MapReviewEndpoints();
 app.MapScannerEndpoints();
+app.MapVisionEndpoints();
 app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = c => c.Tags.Contains("ready") });
 app.Run();

@@ -44,6 +44,7 @@
 		<MauiImage Include="Resources/Images/*.svg" />
 		<MauiFont Include="Resources/Fonts/*.ttf" />
 		<MauiAsset Include="Resources/Fonts/Inter-OFL.txt" LogicalName="licenses/Inter-OFL.txt" />
+		<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.23.2" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.60" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
 		<PackageReference Include="CommunityToolkit.Maui.Camera" Version="6.1.0" />
@@ -72,6 +73,7 @@
 		<ProjectReference Include="../Modules/Orders/Vaulta.Orders.Contracts/Vaulta.Orders.Contracts.csproj" />
 		<ProjectReference Include="../Modules/Payments/Vaulta.Payments.Contracts/Vaulta.Payments.Contracts.csproj" />
 		<ProjectReference Include="../Modules/Wallets/Vaulta.Wallets.Contracts/Vaulta.Wallets.Contracts.csproj" />
+		<ProjectReference Include="../Vaulta.Vision.Encoding/Vaulta.Vision.Encoding.csproj" />
 		<ProjectReference Include="../Vaulta.App.Core/Vaulta.App.Core.csproj" />
 	</ItemGroup>
 
@@ -83,4 +85,11 @@
         <AssemblyMetadata Include="VaultaDevelopmentApiBaseUrl" Value="$(VaultaDevelopmentApiBaseUrl)" />
     </ItemGroup>
 
+    <PropertyGroup><VaultaVisionModelPath Condition="'$(VaultaVisionModelPath)' == ''">$(MSBuildProjectDirectory)/../../artifacts/vision/clip-base/model.onnx</VaultaVisionModelPath></PropertyGroup>
+    <ItemGroup>
+        <MauiAsset Include="$(VaultaVisionModelPath)" LogicalName="vision/model.onnx" Condition="Exists('$(VaultaVisionModelPath)')" />
+        <MauiAsset Include="../Vaulta.Vision.Encoding/Models/clip-base.json" LogicalName="vision/manifest.json" />
+        <MauiAsset Include="Resources/Raw/vision/orientation-prototypes.json" LogicalName="vision/orientation-prototypes.json" />
+    </ItemGroup>
+    <Target Name="RequireVisionWeights" BeforeTargets="PrepareForBuild"><Error Condition="!Exists('$(VaultaVisionModelPath)')" Text="Install the pinned encoder with --vision-model-install before building the scanner, or set VaultaVisionModelPath." /></Target>
 </Project>

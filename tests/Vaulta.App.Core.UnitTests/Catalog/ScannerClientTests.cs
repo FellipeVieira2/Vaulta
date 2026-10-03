@@ -21,13 +21,16 @@ public sealed class ScannerClientTests
             bodies.Add(await request.Content.ReadAsByteArrayAsync());
             return new HttpResponseMessage(request.Headers.Authorization?.Parameter == "token-v2" ? HttpStatusCode.OK : HttpStatusCode.Unauthorized)
             {
-                Content = new StringContent("{\"candidates\":[]}", Encoding.UTF8, "application/json")
+                Content = new StringContent("{\"scanId\":\"286a2261-9d3b-4c19-a203-bbba733de1b5\",\"status\":\"identified\",\"printingConfidence\":0.8,\"priceStatus\":\"unavailable\",\"candidates\":[],\"evidence\":{}}", Encoding.UTF8, "application/json")
             };
         });
         using var http = new HttpClient(new AuthorizingHttpMessageHandler(provider) { InnerHandler = inner })
         { BaseAddress = new Uri("https://api.test/") };
         var result = await new ScannerClient(http).ScanCardAsync([0xff, 0xd8, 0xff, 0x45], "POKEMON");
         Assert.Empty(result.Candidates);
+        var wire = System.Text.Json.JsonSerializer.SerializeToElement(result, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        Assert.Equal("identified", wire.GetProperty("status").GetString());
+        Assert.Equal("286a2261-9d3b-4c19-a203-bbba733de1b5", wire.GetProperty("scanId").GetString());
         Assert.Equal(1, provider.RefreshCalls);
         Assert.Equal(2, bodies.Count);
         Assert.Equal(bodies[0], bodies[1]);

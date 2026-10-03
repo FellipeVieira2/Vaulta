@@ -56,15 +56,25 @@ services:
       Cors__Origins__1: ${CORS_ORIGIN_1:-}
       RateLimit__AuthPermitLimit: ${AUTH_PERMIT_LIMIT:-20}
       Outbox__Enabled: "true"
+      Vision__ModelManifestPath: ${VISION_MODEL_MANIFEST_PATH:-}
+      Vision__EncoderConcurrency: "1"
+      Vision__History__Enabled: ${VISION_HISTORY_ENABLED:-false}
+      Vision__History__OperationalPolicyVersion: ${VISION_HISTORY_OPERATIONAL_POLICY:-ops-v1}
+      Vision__History__ImprovementPolicyVersion: ${VISION_HISTORY_IMPROVEMENT_POLICY:-improve-v1}
+      Vision__History__RetentionDays: "7"
+      Scanner__OpenAI__MaxConcurrency: "1"
+      Scanner__MarketResearch__Enabled: "false"
       DOTNET_gcServer: "0"
+    volumes:
+      - ${VISION_MODEL_DIR:-./store/vision/clip-base}:/models/clip-base:ro
     ports:
       - "127.0.0.1:8080:8080"
     networks: [backend]
     depends_on:
       postgres:
         condition: service_healthy
-    mem_limit: 384m
-    memswap_limit: 768m
+    mem_limit: 512m
+    memswap_limit: 1024m
     stop_grace_period: 30s
     restart: unless-stopped
     logging: *logs

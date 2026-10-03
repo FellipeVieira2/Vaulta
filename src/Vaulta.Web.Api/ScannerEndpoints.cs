@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using Vaulta.Catalog.Application;
 using Vaulta.Catalog.Contracts;
 using Vaulta.Vision.Application;
@@ -18,7 +19,7 @@ public static class ScannerEndpoints
             return result is null ? Results.NotFound() : Results.Ok(result);
         }).WithName("GetScannerCardDetails").Produces<ScannerCardDetailsDto>().ProducesProblem(401).Produces(404);
 
-        scanner.MapPost("/identify", async (IFormFile image, [FromQuery] string? gameCode, VisionScannerService service, CancellationToken ct) =>
+        scanner.MapPost("/identify", async (IFormFile image, [FromQuery] string? gameCode, [FromQuery] Guid? attemptId, HttpRequest http, ClaimsPrincipal principal, ScannerVisionCoordinator service, CancellationToken ct) =>
         {
             if (image is null || image.Length == 0)
                 return Results.Problem(statusCode: 400, title: "Envie uma imagem da carta.");
@@ -32,10 +33,11 @@ public static class ScannerEndpoints
             await stream.CopyToAsync(memoryStream, ct);
             var imageData = memoryStream.ToArray();
 
-            var request = new VisionScanInput([new(imageData)], gameCode);
-            try { return Results.Ok(await service.IdentifyAsync(request, ct)); }
+            var owner=Guid.Parse(principal.FindFirstValue("sub")!);
+            var key=http.Headers["X-Scan-Execution-ID"].FirstOrDefault();
+            try { return Results.Ok(await service.IdentifyAsync(owner,imageData,gameCode,attemptId,key,ct)); }
             catch(Exception error) when(error is InvalidDataException or SixLabors.ImageSharp.UnknownImageFormatException or SixLabors.ImageSharp.InvalidImageContentException)
-            { return Results.Problem(statusCode:400,title:"N„o foi possÌvel processar essa imagem. Envie uma foto v·lida da carta."); }
+            { return Results.Problem(statusCode:400,title:"N√£o foi poss√≠vel processar essa imagem. Envie uma foto v√°lida da carta."); }
         }).WithName("IdentifyCard").DisableAntiforgery().Produces<VisionScanResultDto>().ProducesProblem(400).ProducesProblem(401).ProducesProblem(429);
 
         scanner.MapGet("/search", async (string query, string? gameCode, ICatalogSearch catalog, CancellationToken ct) =>

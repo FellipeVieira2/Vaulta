@@ -1,4 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
   </ItemGroup>
-</Project>
+<ItemGroup><ProjectReference Include="../../../Vaulta.SharedKernel/Vaulta.SharedKernel.csproj" /></ItemGroup></Project>
