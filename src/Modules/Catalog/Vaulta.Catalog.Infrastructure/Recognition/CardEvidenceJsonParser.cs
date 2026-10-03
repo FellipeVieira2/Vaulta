@@ -16,9 +16,10 @@ public static class CardEvidenceJsonParser
             using var document = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 4 });
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("schemaVersion", out var version)
-                || !version.TryGetInt32(out var schema) || schema is not (1 or 2 or 3 or 4)) return null;
+                || !version.TryGetInt32(out var schema) || schema is not (1 or 2 or 3 or 4 or 5)) return null;
             var expected = schema switch
             {
+                5 => [.. RootFields, "hp", "finish", "condition", "isGraded", "gradingCompany", "grade", "certificationNumber", "rarity", "year", "cardType", "stage", "cardSide", "isCard", "edition"],
                 4 => [.. RootFields, "hp", "finish", "condition", "isGraded", "gradingCompany", "grade", "certificationNumber", "rarity", "year", "cardType", "stage"],
                 3 => [.. RootFields, "hp", "finish", "condition"],
                 2 => [.. RootFields, "hp"],
@@ -40,6 +41,9 @@ public static class CardEvidenceJsonParser
             var grade = Extra("grade", 24); var certificate = Extra("certificationNumber", 64);
             var rarity = Extra("rarity", 80); var year = Extra("year", 4);
             var cardType = Extra("cardType", 80); var stage = Extra("stage", 80);
+            var side=schema>=5?ReadField(root,"cardSide",5,optional:true):new CardEvidenceField(null,0);
+            var isCard=schema>=5?ReadField(root,"isCard",5,optional:true):new CardEvidenceField(null,0);
+            var edition=schema>=5?ReadField(root,"edition",120,optional:true):new CardEvidenceField(null,0);
             if (game?.Value is { } g && !Regex.IsMatch(g, @"^[a-z][a-z0-9-]{0,31}$", RegexOptions.CultureInvariant)
                 || number?.Value is { } n && !ValidCollectorNumber(n, game?.Value, schema)
                 || setCode?.Value is { } s && !Regex.IsMatch(s, @"^[a-zA-Z0-9][a-zA-Z0-9-]{0,39}$", RegexOptions.CultureInvariant)
@@ -48,12 +52,13 @@ public static class CardEvidenceJsonParser
                 || finish?.Value is not (null or "normal" or "holo" or "reverse" or "textured" or "full-art")
                 || condition?.Value is not (null or "MINT" or "NEAR_MINT" or "LIGHTLY_PLAYED" or "MODERATELY_PLAYED" or "HEAVILY_PLAYED" or "DAMAGED")
                 || isGraded?.Value is not (null or "true" or "false")
+                || side?.Value is not (null or "front" or "back") || isCard?.Value is not (null or "true" or "false")
                 || year?.Value is { } y && (!int.TryParse(y, out var printedYear) || printedYear is < 1900 or > 2200)
                 || hp?.Value is { } h && (!int.TryParse(h, out var points) || points is < 1 or > 9999)) return null;
             if (game is null || name is null || number is null || setCode is null || setName is null || language is null || variant is null || hp is null || finish is null || condition is null
-                || isGraded is null || company is null || grade is null || certificate is null || rarity is null || year is null || cardType is null || stage is null) return null;
+                || isGraded is null || company is null || grade is null || certificate is null || rarity is null || year is null || cardType is null || stage is null || side is null || isCard is null || edition is null) return null;
             return new(game, name, number, setCode, setName, language, variant, promptVersion, modelVersion, hp, finish, condition,
-                isGraded, company, grade, certificate, rarity, year, cardType, stage);
+                isGraded, company, grade, certificate, rarity, year, cardType, stage,side,isCard,edition);
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
         {

@@ -43,7 +43,7 @@ public static class DependencyInjection
             .Validate(o => o.IsValid(), "Invalid OpenAI scanner configuration or request limits.").ValidateOnStart();
         services.AddScoped<Recognition.CardEvidenceCatalogMatcher>();
         services.AddScoped<IScannerIdentityResolver, Recognition.ScannerIdentityResolver>();
-        if (primary == "openai" || fallback == "openai")
+        // Shared evidence extractor is also used by the local-first Vision scanner.
         {
             services.AddHttpClient("Vaulta.Scanner.OpenAI", client =>
             {

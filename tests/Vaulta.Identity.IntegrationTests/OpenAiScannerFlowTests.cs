@@ -17,6 +17,8 @@ using Vaulta.Catalog.Infrastructure.Recognition;
 using Vaulta.Identity.Contracts;
 using Vaulta.SharedKernel;
 using Xunit;
+using Vaulta.Vision.Application;
+using Vaulta.Vision.Contracts;
 
 namespace Vaulta.Identity.IntegrationTests;
 
@@ -26,23 +28,20 @@ public sealed class OpenAiScannerFlowTests(ApiFixture fixture)
     [Fact]
     public async Task ImageToCanonicalPrintingAndCachedDetailsUsesOnlyFakeOpenAiBoundary()
     {
-        using var boundary = new Boundary(); var ocr = new Ocr();
+        using var boundary = new Boundary(); var ocr = new Ocr(); var visual=new ArtificialVisualBoundary();
         await using var factory = fixture.Factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
-            services.RemoveAll<ICardRecognitionProvider>();
+            services.RemoveAll<IImageEncoder>(); services.AddSingleton<IImageEncoder>(visual);
+            services.RemoveAll<IVisualReferenceIndex>(); services.AddSingleton<IVisualReferenceIndex>(visual);
             services.RemoveAll<IOcrService>(); services.AddSingleton<IOcrService>(ocr);
-            services.AddSingleton<ICardEvidenceExtractor>(_ => new OpenAiCardEvidenceExtractor(
-                new HttpClient(boundary, false) { BaseAddress = new("https://api.openai.com/v1/") },
-                Options.Create(new OpenAiScannerOptions { Enabled = true, ApiKey = "fake-test-key", RetryCount = 0 }),
-                NullLogger<OpenAiCardEvidenceExtractor>.Instance));
-            services.AddScoped<ICardRecognitionProvider>(sp => new EvidenceCardRecognitionProvider(sp.GetRequiredService<ICardEvidenceExtractor>(),
-                sp.GetRequiredService<CardEvidenceCatalogMatcher>(), sp.GetRequiredService<PokemonTcgRecognitionProvider>(), "openai", "ocr"));
-            services.RemoveAll<IScannerCardDetailsReader>();
-            services.AddScoped<IScannerCardDetailsReader>(sp => new TcgDexScannerDetailsReader(new HttpClient(new NoNetwork()) { BaseAddress = new("https://cards.example.test/") },
-                sp.GetRequiredService<CatalogDbContext>(), sp.GetRequiredService<ICatalogSearch>(), new NoRates(), sp.GetRequiredService<IClock>(), NullLogger<TcgDexScannerDetailsReader>.Instance));
+            services.RemoveAll<OpenAiCardEvidenceExtractor>();
+            services.AddSingleton(_=>new OpenAiCardEvidenceExtractor(new HttpClient(boundary,false) { BaseAddress=new("https://api.openai.com/v1/") },
+                Options.Create(new OpenAiScannerOptions { Enabled=true,ApiKey="fake-test-key",RetryCount=0 }),NullLogger<OpenAiCardEvidenceExtractor>.Instance));
+            services.RemoveAll<IScannerCardDetailsReader>(); services.AddScoped<IScannerCardDetailsReader,LocalScannerDetailsReader>();
+            services.AddHttpClient<ICatalogProvider,TcgDexProvider>().ConfigurePrimaryHttpMessageHandler(()=>new NoNetwork());
         }));
         using var client = factory.CreateClient();
-        var provider = new Provider(); Guid printingId;
+        var provider = new Provider(); boundary.CardName=provider.CardName; boundary.SetName=provider.SetName; ocr.Name=provider.CardName; Guid printingId;
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
@@ -54,6 +53,7 @@ public sealed class OpenAiScannerFlowTests(ApiFixture fixture)
             db.DailyMarketSnapshots.Add(new() { PrintingId = printingId, MarketDay = day.Date, FetchedAt = now, RefreshAfter = day.RefreshAfter, Payload = JsonSerializer.Serialize(details) });
             await db.SaveChangesAsync();
         }
+        visual.PrintingId=printingId;
         var register = new RegisterRequest($"{Guid.NewGuid():N}@example.test", "Secure-Test-Password1!", "s" + Guid.NewGuid().ToString("N")[..20], "Collector");
         (await client.PostAsJsonAsync("/api/v1/auth/register", register)).EnsureSuccessStatusCode();
         using var login = await client.PostAsJsonAsync("/api/v1/auth/login", new LoginRequest(register.Email, register.Password));
@@ -67,20 +67,12 @@ public sealed class OpenAiScannerFlowTests(ApiFixture fixture)
             var content = new ByteArrayContent(bytes.ToArray()); content.Headers.ContentType = new("image/png"); multipart.Add(content, "image", "card.png");
             using var response = await client.PostAsync("/api/v1/scanner/identify?gameCode=pokemon", multipart);
             response.EnsureSuccessStatusCode();
-            var result = (await response.Content.ReadFromJsonAsync<CardScanResultDto>())!;
-            var candidate = Assert.Single(result.Candidates, x => x.PrintingId == printingId);
-            Assert.Null(candidate.EstimatedMarketValueBrl); Assert.True(candidate.HasCollectorNumberMatch);
-            Assert.Equal(["holo", "normal"], candidate.VariantCodes);
-            Assert.InRange(candidate.ConfidenceScore, .8, .9);
-            Assert.Equal("normal", result.VisualIdentification!.Finish);
-            if (i == 1)
-            {
-                Assert.Equal("PSA", result.VisualIdentification!.Certification!.Company);
-                Assert.Equal("01234567", result.VisualIdentification.Certification.Number);
-                Assert.False(result.VisualIdentification.Certification.Verified);
-            }
+            var result=(await response.Content.ReadFromJsonAsync<VisionScanResultDto>())!;
+            Assert.Equal("identified",result.Status); Assert.Equal(printingId,result.PrintingId); Assert.Null(result.Price);
+            Assert.Equal(.8,result.PrintingConfidence); Assert.Equal("normal",result.Evidence["variant"].Value);
+            if(i==1) { Assert.Equal("PSA",result.Evidence["gradingCompany"].Value); Assert.Equal("01234567",result.Evidence["certificationNumber"].Value); Assert.Equal("graded_unavailable",result.PriceStatus); }
         }
-        Assert.Equal(2, boundary.Calls); Assert.Equal(0, ocr.Calls);
+        Assert.Equal(2, boundary.Calls); Assert.Equal(2, ocr.Calls);
         var detailsResponses = await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => client.GetAsync($"/api/v1/scanner/printings/{printingId}")));
         foreach (var response in detailsResponses)
         {
@@ -93,22 +85,36 @@ public sealed class OpenAiScannerFlowTests(ApiFixture fixture)
         fallbackContent.Headers.ContentType = new("image/png"); fallbackForm.Add(fallbackContent, "image", "card.png");
         using var fallbackResponse = await client.PostAsync("/api/v1/scanner/identify?gameCode=pokemon", fallbackForm);
         fallbackResponse.EnsureSuccessStatusCode();
-        Assert.Contains((await fallbackResponse.Content.ReadFromJsonAsync<CardScanResultDto>())!.Candidates, x => x.PrintingId == printingId);
-        Assert.Equal(1, ocr.Calls);
+        var fallback=(await fallbackResponse.Content.ReadFromJsonAsync<VisionScanResultDto>())!;
+        Assert.Contains(fallback.Candidates,x=>x.Printing.PrintingId==printingId); Assert.Equal("partial",fallback.Status); Assert.Null(fallback.Price);
+        Assert.Equal(3,ocr.Calls);
     }
 
+    // Artificial image boundary isolates HTTP orchestration; the separate real encoder harness proves inference.
+    private sealed class ArtificialVisualBoundary : IImageEncoder,IVisualReferenceIndex
+    {
+        public Guid PrintingId; public EncoderIdentity Identity { get; }=new("fixture","fixture","fixture","fixture",3,"test","input","output");
+        public VisualIndexStatus Status=>new("fixture",1,Identity);
+        public Task<ImageEmbedding> EncodeAsync(Stream image,CancellationToken ct)=>Task.FromResult(new ImageEmbedding(Identity,[1f,0f,0f]));
+        public Task<IReadOnlyList<VisualMatch>> SearchAsync(ImageEmbedding embedding,int topK,CancellationToken ct)=>Task.FromResult<IReadOnlyList<VisualMatch>>([new(Guid.NewGuid(),PrintingId,.99,"fixture")]);
+    }
     private sealed class Boundary : HttpMessageHandler
     {
         public int Calls { get; private set; }
         public bool Invalid { get; set; }
         public bool Certified { get; set; }
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        public string CardName { get; set; }=null!; public string SetName { get; set; }=null!;
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
         {
+            using var requestBody=JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct));
+            Assert.False(requestBody.RootElement.TryGetProperty("tools",out _));
+            var context=requestBody.RootElement.GetProperty("input")[0].GetProperty("content")[1].GetProperty("text").GetString()!;
+            Assert.Contains("Untrusted local retrieval candidates",context); Assert.DoesNotContain("PrintingId",context); Assert.DoesNotContain("MarketValue",context);
             Calls++;
             const string evidence = """
                 {"schemaVersion":1,"gameCode":{"value":"pokemon","confidence":0.8},"name":{"value":"OpenAi Scanner Test Card","confidence":0.8},"collectorNumber":{"value":"058/102","confidence":0.8},"setCode":{"value":null,"confidence":0},"setName":{"value":null,"confidence":0},"language":{"value":"en","confidence":0.8},"variant":{"value":"normal","confidence":0.8}}
                 """;
-            var reading = JsonNode.Parse(evidence)!;
+            var reading = JsonNode.Parse(evidence)!; reading["name"]!["value"]=CardName; reading["setName"]=new JsonObject { ["value"]=SetName,["confidence"]=.8 };
             if (Certified)
             {
                 reading["schemaVersion"] = 4;
@@ -119,14 +125,14 @@ public sealed class OpenAiScannerFlowTests(ApiFixture fixture)
                 reading["grade"] = new JsonObject { ["value"] = "10", ["confidence"] = .99 };
                 reading["certificationNumber"] = new JsonObject { ["value"] = "01234567", ["confidence"] = .99 };
             }
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(new
-            { status = "completed", output = new[] { new { type = "message", role = "assistant", status = "completed", content = new[] { new { type = "output_text", text = Invalid ? "{}" : reading.ToJsonString() } } } } })) });
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(new
+            { status = "completed", output = new[] { new { type = "message", role = "assistant", status = "completed", content = new[] { new { type = "output_text", text = Invalid ? "{}" : reading.ToJsonString() } } } } })) };
         }
     }
     private sealed class Ocr : IOcrService
     {
-        public int Calls { get; private set; }
-        public Task<OcrResult> ExtractTextAsync(byte[] bytes, CancellationToken ct) { Calls++; return Task.FromResult(new OcrResult("OpenAi Scanner Test Card\n058/102", [])); }
+        public int Calls { get; private set; } public string Name { get; set; }=null!;
+        public Task<OcrResult> ExtractTextAsync(byte[] bytes, CancellationToken ct) { Calls++; return Task.FromResult(new OcrResult(Name+"\n058/102", [])); }
     }
     private sealed class NoNetwork : HttpMessageHandler
     { protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) => throw new InvalidOperationException("Snapshot must prevent external pricing/details HTTP"); }
@@ -135,9 +141,10 @@ public sealed class OpenAiScannerFlowTests(ApiFixture fixture)
     private sealed class Provider : ICatalogProvider
     {
         public string Code => "tcgdex"; public string SetId { get; } = "openai-" + Guid.NewGuid().ToString("N"); public string CardId => SetId + "-58";
-        private ProviderSet Set => new(SetId, "OpenAI test set", null, null);
+        public string CardName=>"OpenAi Scanner Test Card "+SetId; public string SetName=>"OpenAI test set "+SetId;
+        private ProviderSet Set => new(SetId,SetName,null,null);
         public Task<IReadOnlyList<ProviderSet>> GetSets(CancellationToken ct) => Task.FromResult<IReadOnlyList<ProviderSet>>([Set]);
         public Task<ProviderSetDetails> GetSetDetails(string id, CancellationToken ct) => Task.FromResult(new ProviderSetDetails(Set,
-            [new(CardId, "OpenAi Scanner Test Card", "58/102", "en", "Common", null, [new("normal", "Normal", "normal"), new("holo", "Holo", "holo")])]));
+            [new(CardId,CardName, "58/102", "en", "Common", null, [new("normal", "Normal", "normal"), new("holo", "Holo", "holo")])]));
     }
 }

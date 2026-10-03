@@ -1,4 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
   </ItemGroup>
+  <ItemGroup><ProjectReference Include="../../Catalog/Vaulta.Catalog.Contracts/Vaulta.Catalog.Contracts.csproj" /></ItemGroup>
 </Project>

@@ -20,6 +20,7 @@ using Vaulta.Wallets.Domain;
 using Vaulta.Wallets.Infrastructure;
 using Vaulta.Web.Api;
 using Xunit;
+using Vaulta.Vision.Infrastructure;
 
 namespace Vaulta.Identity.IntegrationTests;
 
@@ -104,7 +105,8 @@ public sealed class DatabaseMigrationTests
             services.GetRequiredService<PaymentsDbContext>(),
             wallets,
             services.GetRequiredService<ShippingDbContext>(),
-            services.GetRequiredService<ReviewsDbContext>()
+            services.GetRequiredService<ReviewsDbContext>(),
+            services.GetRequiredService<VisionDbContext>()
         ];
         var expectedMigrations = contexts.SelectMany(db => db.Database.GetMigrations()).Order().ToArray();
         Assert.Equal(expectedMigrations, historyBeforeRepeat.Order().ToArray());

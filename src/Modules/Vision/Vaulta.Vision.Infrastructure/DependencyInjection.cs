@@ -23,6 +23,11 @@ public static class DependencyInjection
         services.AddSingleton<IVisualReferenceIndex>(p=>p.GetRequiredService<CosineReferenceIndex>());
         services.AddScoped<IVisualReferenceBuilder,VisualReferenceBuilder>();
         services.AddScoped<CatalogVisionPreparation>();
+        services.AddScoped<IVisionCatalog,VisionCatalog>();
+        services.AddScoped<IVisionEvidenceReader,VisionEvidenceReader>();
+        services.AddSingleton<VisionPrintingResolver>();
+        services.AddSingleton<VisionScanCapacity>();
+        services.AddScoped<VisionScannerService>();
         services.AddHostedService<VisualIndexRefreshWorker>(); return services;
     }
 }

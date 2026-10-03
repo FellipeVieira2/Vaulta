@@ -178,10 +178,12 @@ public sealed class DailyMarketPriceFlowTests(ApiFixture fixture)
         fixture.Factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IScannerCardDetailsReader>();
-            services.AddScoped<IScannerCardDetailsReader>(sp => new TcgDexScannerDetailsReader(
+            services.RemoveAll<TcgDexScannerDetailsReader>();
+            services.AddScoped<TcgDexScannerDetailsReader>(sp => new TcgDexScannerDetailsReader(
                 new HttpClient(handler, disposeHandler: false) { BaseAddress = new Uri("https://cards.example.test/") },
                 sp.GetRequiredService<CatalogDbContext>(), sp.GetRequiredService<ICatalogSearch>(), rates, clock,
                 NullLogger<TcgDexScannerDetailsReader>.Instance));
+            services.AddScoped<IScannerCardDetailsReader>(sp=>sp.GetRequiredService<TcgDexScannerDetailsReader>());
         }));
 
     private static async Task<Guid> Seed(IServiceProvider services, Provider provider)

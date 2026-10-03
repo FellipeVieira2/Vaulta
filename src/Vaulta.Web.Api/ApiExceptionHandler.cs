@@ -19,6 +19,7 @@ public sealed class ApiExceptionHandler(IProblemDetailsService problems, ILogger
             NotFoundException => 404, ConflictException => 409,
             DbUpdateConcurrencyException => 409,
             DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } } => 409,
+            Vision.Application.VisionBusyException => 429,
             Catalog.Infrastructure.Recognition.OcrUnavailableException => 503, _ => 500
         };
         if (status == 500) logger.LogError("Request {TraceId} failed with {ErrorType}", context.TraceIdentifier, exception.GetType().Name);

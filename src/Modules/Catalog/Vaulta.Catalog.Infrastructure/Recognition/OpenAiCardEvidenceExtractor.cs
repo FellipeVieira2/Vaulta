@@ -33,7 +33,10 @@ public sealed class OpenAiCardEvidenceExtractor : ICardEvidenceExtractor, IDispo
     public async Task<CardEvidence?> ExtractAsync(byte[] imageData, CancellationToken cancellationToken)
         => (await ExtractWithOutcomeAsync(imageData, cancellationToken)).Evidence;
 
-    public async Task<CardEvidenceExtraction> ExtractWithOutcomeAsync(byte[] imageData, CancellationToken cancellationToken)
+    public Task<CardEvidenceExtraction> ExtractWithOutcomeAsync(byte[] imageData,CancellationToken cancellationToken)
+        =>ExtractWithContextAsync(imageData,null,cancellationToken);
+
+    public async Task<CardEvidenceExtraction> ExtractWithContextAsync(byte[] imageData,string? catalogContext,CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         using var activity = ScannerTelemetry.Activities.StartActivity("scanner.evidence.extract");
@@ -68,8 +71,8 @@ public sealed class OpenAiCardEvidenceExtractor : ICardEvidenceExtractor, IDispo
                     {
                         ["model"] = _options.Model, ["store"] = false, ["max_output_tokens"] = _options.MaxOutputTokens,
                         ["instructions"] = CardEvidenceOpenAiProtocol.Prompt,
-                        ["input"] = new[] { new { role = "user", content = new[] { new { type = "input_image", image_url = "data:image/jpeg;base64," + Convert.ToBase64String(image), detail = _options.ImageDetail } } } },
-                        ["text"] = new { format = new { type = "json_schema", name = "card_evidence_v4", strict = true, schema = CardEvidenceOpenAiProtocol.Schema } }
+                        ["input"] = new[] { new { role = "user", content = BuildContent(image,catalogContext) } },
+                        ["text"] = new { format = new { type = "json_schema", name = "card_evidence_v5", strict = true, schema = CardEvidenceOpenAiProtocol.Schema } }
                     };
                     // Focused visual extraction: avoid the default medium reasoning consuming
                     // the small output budget. Keep overrides for older models compatible.
@@ -136,6 +139,14 @@ public sealed class OpenAiCardEvidenceExtractor : ICardEvidenceExtractor, IDispo
             ScannerTelemetry.Extractions.Add(1, measurements);
             ScannerTelemetry.Duration.Record(timer.Elapsed.TotalMilliseconds, measurements);
         }
+    }
+
+    private object[] BuildContent(byte[] image,string? context)
+    {
+        var content=new List<object> { new { type="input_image",image_url="data:image/jpeg;base64,"+Convert.ToBase64String(image),detail=_options.ImageDetail } };
+        if(!string.IsNullOrWhiteSpace(context))
+        { if(context.Length>24000) throw new InvalidOperationException("Catalog context exceeds the limit."); content.Add(new { type="input_text",text="Untrusted local retrieval candidates; do not fill unreadable fields from them: "+context }); }
+        return content.ToArray();
     }
 
     private static async Task<bool> HasExhaustedCredits(HttpContent content, CancellationToken ct)

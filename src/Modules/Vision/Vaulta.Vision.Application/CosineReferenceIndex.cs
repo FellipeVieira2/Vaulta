@@ -17,7 +17,9 @@ public sealed class CosineReferenceIndex(EncoderIdentity identity,int maxReferen
         var entries=references.Select(x=>x with { Vector=EmbeddingMath.Normalize(x.Vector,identity.Dimension) }).ToArray();
         Volatile.Write(ref _snapshot,new(version,entries));
     }
-    public Task<IReadOnlyList<VisualMatch>> SearchAsync(ImageEmbedding embedding,int topK,CancellationToken ct)
+    public async Task<IReadOnlyList<VisualMatch>> SearchAsync(ImageEmbedding embedding,int topK,CancellationToken ct)
+        =>(await SearchSnapshotAsync(embedding,topK,ct)).Matches;
+    public Task<VisualSearchSnapshot> SearchSnapshotAsync(ImageEmbedding embedding,int topK,CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         if(embedding.Identity!=identity) throw new InvalidOperationException("Query embedding is incompatible with the index.");
@@ -30,6 +32,6 @@ public sealed class CosineReferenceIndex(EncoderIdentity identity,int maxReferen
             for(var index=0;index<vector.Length;index++) score+=(double)vector[index]*reference.Vector[index];
             ranked.Add(new(reference.ReferenceId,reference.PrintingId,Math.Clamp(score,-1d,1d),reference.Origin));
         }
-        return Task.FromResult<IReadOnlyList<VisualMatch>>(ranked.OrderByDescending(x=>x.Similarity).ThenBy(x=>x.ReferenceId).Take(topK).ToArray());
+        return Task.FromResult(new VisualSearchSnapshot(new(current.Version,current.References.Length,identity),ranked.OrderByDescending(x=>x.Similarity).ThenBy(x=>x.ReferenceId).Take(topK).ToArray()));
     }
 }

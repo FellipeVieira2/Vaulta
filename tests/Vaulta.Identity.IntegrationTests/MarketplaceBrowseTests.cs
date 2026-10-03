@@ -35,7 +35,7 @@ public sealed class MarketplaceBrowseTests(ApiFixture fixture)
         Assert.Equal("223/197", printing.GetProperty("collectorNumber").GetString());
         Assert.Equal("en", printing.GetProperty("language").GetString());
         Assert.Equal(seed.Game, printing.GetProperty("gameCode").GetString());
-        Assert.Equal("https://images.example.test/card.png", printing.GetProperty("artworkUrl").GetString());
+        Assert.Null(printing.GetProperty("artworkUrl").GetString()); // Not yet owned/imported: provider image URL is never exposed.
         Assert.Equal("holo", printing.GetProperty("variantCode").GetString());
     }
 

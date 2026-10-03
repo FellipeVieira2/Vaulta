@@ -46,8 +46,8 @@ public sealed class OpenAiScannerTests
             Assert.True(format.GetProperty("strict").GetBoolean());
             var schema = format.GetProperty("schema");
             Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
-            Assert.Equal(19, schema.GetProperty("required").GetArrayLength());
-            Assert.Equal(4, schema.GetProperty("properties").GetProperty("schemaVersion").GetProperty("enum")[0].GetInt32());
+            Assert.Equal(22, schema.GetProperty("required").GetArrayLength());
+            Assert.Equal(5, schema.GetProperty("properties").GetProperty("schemaVersion").GetProperty("enum")[0].GetInt32());
             Assert.True(schema.GetProperty("properties").TryGetProperty("certificationNumber", out _));
             Assert.True(schema.GetProperty("properties").GetProperty("variant").GetProperty("properties").GetProperty("value").TryGetProperty("enum", out _));
             var languages = schema.GetProperty("properties").GetProperty("language").GetProperty("properties").GetProperty("value").GetProperty("enum")
@@ -68,7 +68,7 @@ public sealed class OpenAiScannerTests
         Assert.Equal("058/102", evidence.CollectorNumber.Value);
         Assert.Equal("en", evidence.Language.Value);
         Assert.Null(evidence.Variant.Value);
-        Assert.Equal("card-evidence-openai-v6", evidence.PromptVersion);
+        Assert.Equal("card-evidence-openai-v7", evidence.PromptVersion);
         Assert.Equal("gpt-6-luna", evidence.ModelVersion);
         Assert.Equal(1, handler.Calls);
     }

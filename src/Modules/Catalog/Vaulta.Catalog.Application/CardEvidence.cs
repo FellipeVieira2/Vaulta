@@ -23,7 +23,10 @@ public sealed record CardEvidence(
     CardEvidenceField? Rarity = null,
     CardEvidenceField? Year = null,
     CardEvidenceField? CardType = null,
-    CardEvidenceField? Stage = null);
+    CardEvidenceField? Stage = null,
+    CardEvidenceField? CardSide = null,
+    CardEvidenceField? IsCard = null,
+    CardEvidenceField? Edition = null);
 
 public interface ICardEvidenceExtractor
 {

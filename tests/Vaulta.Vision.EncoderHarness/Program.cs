@@ -29,3 +29,5 @@ for(var i=0;i<files.Length;i++)
 }
 if(top1!=files.Length) throw new InvalidOperationException("Official-reference smoke retrieval failed.");
 Console.WriteLine(JsonSerializer.Serialize(new { encoder=encoder.Identity,references=files.Length,top1,timingsMs=timings,kind="official-artwork-smoke-not-phone-benchmark" }));
+
+if(args.Contains("--scan-local")) Console.WriteLine(JsonSerializer.Serialize(await LocalScanHarness.RunAsync(encoder,args[1])));

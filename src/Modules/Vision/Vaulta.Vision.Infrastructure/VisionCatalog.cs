@@ -1,0 +1,58 @@
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Vaulta.Catalog.Application;
+using Vaulta.Catalog.Contracts;
+using Vaulta.Catalog.Domain;
+using Vaulta.Catalog.Infrastructure;
+using Vaulta.Vision.Application;
+namespace Vaulta.Vision.Infrastructure;
+// Canonical identity and candidate metadata come only from the local Vaulta database.
+public sealed class VisionCatalog(CatalogDbContext db) : IVisionCatalog
+{
+    public async Task<IReadOnlyList<VisionCatalogPrinting>> GetPrintingsAsync(IReadOnlyList<Guid> ids,CancellationToken ct)
+    {
+        if(ids.Count>100) throw new ArgumentException("Candidate ID limit exceeded.");
+        return await ReadAsync(Query().Where(x=>ids.Contains(x.Id)),ct);
+    }
+    public async Task<IReadOnlyList<VisionCatalogPrinting>> FindEvidenceCandidatesAsync(CardEvidence evidence,CancellationToken ct)
+    {
+        if(!VisionPrintingResolver.Usable(evidence.Name,.6)) return [];
+        var normalized=CatalogNormalizer.NormalizeName(evidence.Name.Value!);
+        var query=Query().Where(x=>x.Card.NormalizedName==normalized);
+        if(VisionPrintingResolver.Usable(evidence.GameCode)) query=query.Where(x=>x.Card.Game.Code==evidence.GameCode.Value);
+        return await ReadAsync(query,ct);
+    }
+    private IQueryable<Printing> Query()=>db.Printings.AsNoTracking().Where(x=>x.IsActive)
+        .Include(x=>x.Card).ThenInclude(x=>x.Game).Include(x=>x.Set).Include(x=>x.Variants.Where(v=>v.IsActive));
+    private static async Task<IReadOnlyList<VisionCatalogPrinting>> ReadAsync(IQueryable<Printing> query,CancellationToken ct)
+    {
+        var rows=await query.OrderBy(x=>x.Id).Take(100).ToArrayAsync(ct); var result=new List<VisionCatalogPrinting>();
+        foreach(var row in rows)
+        {
+            using var metadata=JsonDocument.Parse(row.MetadataJson??"{}"); var root=metadata.RootElement;
+            string? Text(string key)=>root.TryGetProperty(key,out var v) && v.ValueKind==JsonValueKind.String?v.GetString():null;
+            int? hp=root.TryGetProperty("hp",out var life) && life.ValueKind==JsonValueKind.Number && life.TryGetInt32(out var points)?points:null;
+            var variants=row.Variants.OrderBy(x=>x.Id).Select(MapVariant).ToArray();
+            var printing=new CatalogPrintingDetails(row.Id,row.CardId,row.SetId,row.Card.Game.Code,row.Set.Name,row.Card.Name,row.CollectorNumber,row.Language,row.Rarity,
+                row.ArtworkAssetId is null?null:$"/api/v1/catalog/printings/{row.Id}/artwork",row.Variants.OrderBy(x=>x.Id).Select(x=>new CatalogVariantDto(x.Id,x.Code,x.Name)).ToArray());
+            result.Add(new(printing,hp,Text("stage"),Text("category"),variants));
+        }
+        return result;
+    }
+    private static VisionCatalogVariant MapVariant(Variant row)
+    {
+        string? type=null; string? subtype=null; string[] stamps=[];
+        if(row.RawValue?.StartsWith('{')==true)
+        {
+            using var raw=JsonDocument.Parse(row.RawValue); var root=raw.RootElement;
+            if(root.TryGetProperty("type",out var t) && t.ValueKind==JsonValueKind.String) type=t.GetString();
+            if(root.TryGetProperty("subtype",out var s) && s.ValueKind==JsonValueKind.String) subtype=s.GetString();
+            if(root.TryGetProperty("stamp",out var stamp) && stamp.ValueKind==JsonValueKind.Array) stamps=stamp.EnumerateArray().Where(x=>x.ValueKind==JsonValueKind.String).Select(x=>x.GetString()!).ToArray();
+        }
+        type??=row.Code.Split('-')[0];
+        var surface=type switch { "normal" or "nonHolo" or "non-holo"=>"normal","holo" or "foil"=>"holo","reverse" or "reverseHolo"=>"reverse",_=>null };
+        var edition=new List<string>(); if(subtype is not null && subtype!="normal") edition.Add(subtype);
+        edition.AddRange(stamps.Select(x=>x=="1st-edition"?"first-edition":x));
+        return new(row.Id,row.Code,row.Name,surface,edition.Count==0?null:string.Join('-',edition));
+    }
+}
