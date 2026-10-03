@@ -35,6 +35,10 @@ public sealed class DailyMarketPriceRefreshJob(IServiceScopeFactory scopes, IClo
         await using (var scope = scopes.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+            var now = clock.UtcNow;
+            // Receipts are short-lived request artifacts; they never enter physical-price refresh.
+            await db.ScannerResearchSnapshots.Where(x => x.Outcome == MarketResearch.ScannerMarketResearch.CaptureReceiptOutcome && x.RefreshAfter <= now)
+                .ExecuteDeleteAsync(deadline.Token);
             ids = await db.Printings.AsNoTracking().Where(p => p.IsActive
                     && db.DailyMarketSnapshots.Any(x => x.PrintingId == p.Id && x.MarketDay < day.Date)
                     && !db.DailyMarketSnapshots.Any(x => x.PrintingId == p.Id && x.MarketDay == day.Date))

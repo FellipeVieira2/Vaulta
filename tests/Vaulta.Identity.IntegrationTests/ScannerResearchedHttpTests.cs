@@ -50,11 +50,11 @@ public sealed class ScannerResearchedHttpTests(ApiFixture fixture)
         using var login = await client.PostAsJsonAsync("/api/v1/auth/login", new LoginRequest(register.Email, register.Password));
         login.EnsureSuccessStatusCode();
         client.DefaultRequestHeaders.Authorization = new("Bearer", (await login.Content.ReadFromJsonAsync<AuthResponse>())!.AccessToken);
+        using var photo = new Image<Rgba32>(200, 300); using var bytes = new MemoryStream(); photo.SaveAsPng(bytes);
         for (var i = 0; i < 2; i++)
         {
-            // The first footer is unreadable. A later corrected capture uses the corrected cache key.
-            boundary.NumberReadable = i == 1;
-            using var photo = new Image<Rgba32>(200, 300); using var bytes = new MemoryStream(); photo.SaveAsPng(bytes);
+            // An identical-photo retry remains unreadable and must use only its exact capture receipt.
+            boundary.NumberReadable = false;
             using var form = new MultipartFormDataContent(); var content = new ByteArrayContent(bytes.ToArray());
             content.Headers.ContentType = new("image/png"); form.Add(content, "image", "card.png");
             using var response = await client.PostAsync("/api/v1/scanner/identify?gameCode=pokemon", form);

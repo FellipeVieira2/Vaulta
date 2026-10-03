@@ -14,25 +14,31 @@ namespace Vaulta.Catalog.Infrastructure.MarketResearch;
 public sealed class ScannerMarketResearch(CatalogDbContext db, IScannerWebMarketResearchProvider provider, IClock clock,
     IOptions<ScannerMarketResearchOptions> options) : IScannerMarketResearch
 {
+    internal const string CaptureReceiptOutcome = "capture_receipt";
+    private const int MaxCaptureReceipts = 1000;
+    private static readonly long ReceiptCapacityLock = BinaryPrimitives.ReadInt64BigEndian(SHA256.HashData(Encoding.UTF8.GetBytes("Vaulta:scanner:capture-receipts:capacity:v1")));
+
     public async Task<ScannerMarketResearchResultDto?> ResearchAsync(CardVisualIdentificationDto identification, byte[]? image, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!options.Value.Enabled) return null;
         var clean = MarketResearchValidation.WithoutSerial(identification);
         var key = Key(clean);
+        var receiptKey = image is { Length: > 0 and <= 15 * 1024 * 1024 }
+            ? Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"Vaulta:scanner:capture:v1:{key}:{Convert.ToHexString(SHA256.HashData(image))}"))) : null;
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         // Includes advisory-lock waiting and both external providers. The HTTP scanner additionally bounds the whole identify operation.
         deadline.CancelAfter(TimeSpan.FromSeconds(options.Value.TimeoutSeconds + 15));
         var ct = deadline.Token;
         try
         {
-            var cached = await Read(key, ct);
+            var cached = await Read(key, receiptKey, ct);
             if (cached is not null) return Restore(cached, identification, cacheHit: true);
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
             var day = MarketPriceDay.At(clock.UtcNow);
             var lockKey = BinaryPrimitives.ReadInt64BigEndian(SHA256.HashData(Encoding.UTF8.GetBytes($"Vaulta:scanner:research:{key}:{day.Date:yyyy-MM-dd}")));
             await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({lockKey})", ct);
-            cached = await Read(key, ct);
+            cached = await Read(key, receiptKey, ct);
             if (cached is not null) return Restore(cached, identification, cacheHit: true);
             ScannerMarketResearchResultDto? result;
             try { result = await provider.ResearchAsync(clean, image, ct); }
@@ -44,21 +50,34 @@ public sealed class ScannerMarketResearch(CatalogDbContext db, IScannerWebMarket
             var estimate = result.Estimate;
             // Never create a broad positive entry for incomplete physical identity.
             if (!Complete(corrected)) { estimate = null; outcome = "unresolved"; }
-            var refresh = estimate is not null ? MarketPriceDay.At(clock.UtcNow).RefreshAfter
-                : clock.UtcNow.AddMinutes(outcome == "transient_miss" ? 2 : 10);
+            var fetchedAt = clock.UtcNow;
+            var observedDay = MarketPriceDay.At(fetchedAt);
+            var refresh = estimate is not null ? observedDay.RefreshAfter
+                : fetchedAt.AddMinutes(outcome == "transient_miss" ? 2 : 10);
             result = result with { Identification = corrected, Estimate = estimate is null ? null : estimate with { Identification = corrected, NextRefreshAt = refresh } };
             var correctedKey = Key(corrected);
             var payload = JsonSerializer.Serialize(result);
-            var fetchedAt = clock.UtcNow;
             // Corrections are written exclusively under the corrected key. A misread number never aliases another printing.
             // Atomic upsert permits different uncertain captures to converge without unique-key races.
-            await db.Database.ExecuteSqlInterpolatedAsync($"""
-                INSERT INTO catalog.scanner_research_snapshots (cache_key, market_day, fetched_at, refresh_after, outcome, payload)
-                VALUES ({correctedKey}, {day.Date}, {fetchedAt}, {refresh}, {outcome}, CAST({payload} AS jsonb))
-                ON CONFLICT (cache_key) DO UPDATE SET market_day = EXCLUDED.market_day, fetched_at = EXCLUDED.fetched_at,
-                    refresh_after = EXCLUDED.refresh_after, outcome = EXCLUDED.outcome, payload = EXCLUDED.payload
-                WHERE scanner_research_snapshots.refresh_after <= {fetchedAt}
-                """, ct);
+            await Write(correctedKey, observedDay.Date, fetchedAt, refresh, outcome, payload, ct);
+            if (receiptKey is not null && correctedKey != key)
+            {
+                // This receipt applies only to retries of the exact input identity and exact image bytes.
+                // It is never a physical-printing alias and carries no image or certification serial.
+                await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({ReceiptCapacityLock})", ct);
+                await db.ScannerResearchSnapshots.Where(x => x.Outcome == CaptureReceiptOutcome && x.RefreshAfter <= fetchedAt).ExecuteDeleteAsync(ct);
+                // Serialize bounded capacity/eviction across processes, protecting all physical snapshots.
+                await db.Database.ExecuteSqlInterpolatedAsync($"""
+                    DELETE FROM catalog.scanner_research_snapshots WHERE cache_key IN (
+                        SELECT cache_key FROM catalog.scanner_research_snapshots WHERE outcome = {CaptureReceiptOutcome}
+                        ORDER BY fetched_at, cache_key
+                        LIMIT GREATEST((SELECT COUNT(*) FROM catalog.scanner_research_snapshots WHERE outcome = {CaptureReceiptOutcome}) - {MaxCaptureReceipts - 1}, 0)
+                    )
+                    """, ct);
+                var receiptExpires = fetchedAt.AddMinutes(2);
+                if (estimate is not null && refresh < receiptExpires) receiptExpires = refresh;
+                await Write(receiptKey, observedDay.Date, fetchedAt, receiptExpires, CaptureReceiptOutcome, payload, ct);
+            }
             await transaction.CommitAsync(ct);
             return Restore(result, identification);
         }
@@ -66,10 +85,21 @@ public sealed class ScannerMarketResearch(CatalogDbContext db, IScannerWebMarket
         { return new(identification, null, "research_timeout"); }
     }
 
-    private async Task<ScannerMarketResearchResultDto?> Read(string key, CancellationToken ct)
+    private Task Write(string key, DateOnly day, DateTimeOffset fetchedAt, DateTimeOffset refresh, string outcome, string payload, CancellationToken ct)
+        => db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO catalog.scanner_research_snapshots (cache_key, market_day, fetched_at, refresh_after, outcome, payload)
+            VALUES ({key}, {day}, {fetchedAt}, {refresh}, {outcome}, CAST({payload} AS jsonb))
+            ON CONFLICT (cache_key) DO UPDATE SET market_day = EXCLUDED.market_day, fetched_at = EXCLUDED.fetched_at,
+                refresh_after = EXCLUDED.refresh_after, outcome = EXCLUDED.outcome, payload = EXCLUDED.payload
+            WHERE scanner_research_snapshots.refresh_after <= {fetchedAt}
+            """, ct);
+
+    private async Task<ScannerMarketResearchResultDto?> Read(string key, string? receiptKey, CancellationToken ct)
     {
         var now = clock.UtcNow;
-        var snapshot = await db.ScannerResearchSnapshots.AsNoTracking().SingleOrDefaultAsync(x => x.CacheKey == key && x.RefreshAfter > now, ct);
+        var snapshot = await db.ScannerResearchSnapshots.AsNoTracking().Where(x => x.RefreshAfter > now
+                && (x.CacheKey == key && x.Outcome != CaptureReceiptOutcome || x.CacheKey == receiptKey && x.Outcome == CaptureReceiptOutcome))
+            .OrderBy(x => x.Outcome == CaptureReceiptOutcome).FirstOrDefaultAsync(ct);
         return snapshot is null ? null : JsonSerializer.Deserialize<ScannerMarketResearchResultDto>(snapshot.Payload);
     }
 
