@@ -29,7 +29,7 @@
 
 Files: `Catalog.Contracts/ScannerModels.cs`, `Catalog.Application/ScannerPorts.cs`, infraestrutura `MarketResearch/`, `tests/Vaulta.Identity.UnitTests/ScannerWebMarketResearchTests.cs`.
 
-- [ ] Fixar os contratos comuns.
+- [ ] Fixar os contratos comuns, incluindo ScannerMarketResearchResultDto para manter identificação corrigida mesmo sem cotação.
 - [ ] Escrever testes RED de resposta com/sem web e fontes, confiança, moeda, foto e conflitos.
 - [ ] Implementar cliente Responses com `web_search`, fontes, schema estrito e média/câmbio no backend; permitir número ausente e reler número pela imagem, sem aceitar preço de impressão conflitante.
 - [ ] Implementar consulta real ao JustTCG com chave somente server-side, correspondência de idioma/impressão/variante e fallback web em ausência/erro. Usar documentação oficial atual em `https://justtcg.com/docs/swagger.json`; não usar o antigo adaptador simulado.

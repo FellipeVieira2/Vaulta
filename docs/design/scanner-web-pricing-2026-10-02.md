@@ -26,7 +26,9 @@ O usuário confirmou que a carta da captura é número 067, e não 062. Não exi
 
 `CardScanResultDto.MarketEstimate` traz `ScannerMarketEstimateDto`: AmountBrl, Source, CheckedAt, Confidence, Identification, Sources, IsEstimate e NextRefreshAt. Sources usam `ScannerPriceSourceDto`: Url, Title, Amount, Currency, Basis, PriceUpdatedAt.
 
-`IScannerWebMarketResearchProvider.ResearchAsync(CardVisualIdentificationDto, byte[]? image, CancellationToken)` faz somente pesquisa e validação das fontes. `IScannerMarketResearch.ResearchAsync(...)` acrescenta cache durável e controle entre processos. ScannerService coordena o retorno e tenta resolver novamente uma leitura corrigida, preservando pendência quando necessário.
+`ScannerMarketResearchResultDto` separa Identification, Estimate opcional e Issue. Uma pesquisa pode corrigir a identificação com fontes e a foto sem encontrar preço; essa correção ainda pode resolver a impressão e obter uma cotação existente no TCGdex. Nunca fabricar cotação de zero para representar ausência.
+
+`IScannerWebMarketResearchProvider.ResearchAsync(CardVisualIdentificationDto, byte[]? image, CancellationToken)` retorna esse resultado e faz somente pesquisa e validação das fontes. `IScannerMarketResearch.ResearchAsync(...)` acrescenta cache durável e controle entre processos. ScannerService coordena o retorno e tenta resolver novamente uma leitura corrigida, preservando pendência quando necessário.
 
 ## Verificação
 
