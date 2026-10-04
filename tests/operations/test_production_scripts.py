@@ -112,7 +112,7 @@ if 'run' in args:
     assert '--service-ports' not in args
     from pathlib import Path
     override=Path(args[[i for i,x in enumerate(args) if x=='-f'][-1]+1]).read_text()
-    assert 'cpus: 0.25' in override and 'mem_limit: 512m' in override and 'memswap_limit: 1024m' in override
+    assert 'cpus: 1.0' in override and 'mem_limit: 1024m' in override and 'memswap_limit: 1536m' in override
     print('worker')
 if args[0]=='wait':print('0')
 ''')

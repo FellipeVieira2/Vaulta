@@ -11,15 +11,15 @@ trap 'docker stop -t 30 vaulta-vision-follow >/dev/null 2>&1 || true; exit 0' TE
 cat > "$override" <<'YAML'
 services:
   vaulta-api:
-    cpus: 0.25
-    mem_limit: 512m
-    memswap_limit: 1024m
+    cpus: 1.0
+    mem_limit: 1024m
+    memswap_limit: 1536m
 YAML
 if docker inspect "$name" >/dev/null 2>&1; then
     if [[ $(docker inspect -f '{{.State.Running}}' "$name") != true ]]; then
         docker rm "$name" >/dev/null
     else
-        expected="$ECR_REPOSITORY:$IMAGE_TAG|[\"--vision-index-follow\",\"/models/clip-base/manifest.json\",\"100\"]|250000000|536870912|1073741824"
+        expected="$ECR_REPOSITORY:$IMAGE_TAG|[\"--vision-index-follow\",\"/models/clip-base/manifest.json\",\"100\"]|1000000000|1073741824|1610612736"
         actual=$(docker inspect -f '{{.Config.Image}}|{{json .Config.Cmd}}|{{.HostConfig.NanoCpus}}|{{.HostConfig.Memory}}|{{.HostConfig.MemorySwap}}' "$name")
         [[ "$actual" == "$expected" ]] || fail 'Existing Vision worker configuration differs. Stop its service before updating; active worker was preserved.'
     fi
