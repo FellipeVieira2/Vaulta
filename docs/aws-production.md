@@ -15,12 +15,14 @@ O monólito modular .NET 10 mantém Identity, Catalog, Collection, Assets e Outb
 | Recurso informado | Valor |
 |---|---|
 | Região | `us-east-1` |
-| EC2 | `i-0e57271cbb9d8a6b2`, `t3a.micro`, Amazon Linux |
+| EC2 | `i-0e57271cbb9d8a6b2`, `c7i.large` desde 2026-10-04, Amazon Linux |
 | Endereço público informado | `34.197.51.51` |
-| Disco / memória | 20 GB gp3 / ~1 GB RAM + 2 GB swap |
+| Disco / memória | 20 GB gp3 / 4 GB RAM + 2 GB swap |
 | ECR | `142767402064.dkr.ecr.us-east-1.amazonaws.com/vaulta-api` |
 | S3 | `vaulta-assets-142767402064-us-east-1` |
 | Budget informado | US$ 25/mês; alerta de orçamento não limita gastos automaticamente |
+
+Upgrade autorizado em 2026-10-04 para acelerar a carga inicial: `c7i.large`, 2 vCPUs/4 GiB, US$ 0,08925/h On-Demand Linux em us-east-1 (somente EC2). O worker incremental usa 1 CPU/1 GiB de RAM/1,5 GiB de RAM+swap. O orçamento informado acima não é um teto de consumo nem foi alterado. Evidências da troca e da retomada: `docs/vision/2026-10-04-c7i-resize-validation.md`.
 
 ## Configuração e secrets
 

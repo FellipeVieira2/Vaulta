@@ -1,5 +1,7 @@
 # Carga incremental de imagens e embeddings — 2026-10-04
 
+Este documento registra a ativação inicial do worker. A máquina e os limites foram aumentados depois, com autorização do usuário; estado atual e medição estão em `2026-10-04-c7i-resize-validation.md`.
+
 A geração de embeddings deixou de esperar o término de toda a carga de imagens. Um worker separado procura imagens oficiais já prontas, gera referências em lotes de 100 e persiste cada resultado. Ele continua consultando o banco quando não encontra trabalho; novas imagens entram nos próximos lotes.
 
 ## Implementação e validação
