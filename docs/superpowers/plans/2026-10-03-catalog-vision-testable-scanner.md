@@ -119,10 +119,11 @@
 
 **Files:** Create `docs/vision-scanner-test.md`, relatório observado e `artifacts/Vaulta-vision-scanner-arm64.apk`; atualizar este plano/spec com estado real.
 
-- [ ] Rodar sync/index reais, informar cobertura/contagens/tempo, apontar API de teste acessível ao celular e confirmar health/versão/index ativos.
-- [ ] Compilar Release API/Android, aplicar migrations duas vezes, executar unitários/integrações relevantes e revisão independente autorizada pelo método escolhido.
-- [ ] Gerar APK assinado e documentar endpoint/modelo/índice correspondentes, sem segredos dentro do app. Deploy AWS somente com credenciais disponíveis; alternativa de teste em rede local é documentada concretamente.
-- [ ] Executar smoke scan end-to-end pelo catálogo com providers de catálogo/preço indisponíveis. Mostrar valor conhecido somado; para sem cotação, mostrar estado correto e próxima carta.
+- [x] Rodar sync/index reais, informar cobertura/contagens/tempo, apontar API de teste acessível ao celular e confirmar health/versão/index ativos. Carga multilíngue completa permanece em andamento.
+- [x] Compilar API Release e Android ARM64 Debug, aplicar migrations duas vezes e executar unitários/integrações relevantes. Revisão independente anterior corrigida; ajustes desta entrega validados por regressões.
+- [x] Gerar APK assinado e documentar endpoint/modelo/índice correspondentes, sem segredos dentro do app. API publicada e saudável na AWS.
+- [x] Executar smoke API público com GPT real, catálogo e cotação locais; regressões de soma/sem cotação e providers bloqueados aprovadas.
+- [ ] Observar exibição, soma e próxima carta no aparelho físico.
 - [ ] Testar negativos/verso/troca e registrar lacunas físicas do benchmark. Não encerrar apenas com scaffold, contratos, migrations ou embeddings sem integração ao aplicativo.
 
 ## Self-review e estado
@@ -130,3 +131,5 @@
 O plano anterior exclusivamente estrutural continua útil como subplano de dataset, mas não rege o critério final de entrega. Este plano cobre a identificação real via catálogo, índice e app solicitada pelo usuário, sem obrigar manutenção do fluxo antigo.
 
 Estado em 03/10: implementação das tarefas 1–7 integrada, 737 testes aprovados e APK ARM64 compilado/assinado. A execução física de orientação/câmera continua pendente; protótipos conservadores retornaram unknown nos 16 artworks oficiais. Tarefa 8 em andamento: o usuário autorizou deploy AWS, chamada real e importação remota. Evidências detalhadas em docs/design/vision-scanner-validation-2026-10-03.md; não declarar precisão física nem cobertura integral por inferência.
+
+Atualização da entrega master: ver docs/design/vision-scanner-deployment-2026-10-03.md. API b443dd5 publicada; 782 testes .NET e 16 de operação aprovados. Smoke GPT real resolve Printing e retorna cotação local. Fila dos 18 códigos de idioma ativa; câmera física, acabamento e cobertura integral continuam pendentes.
