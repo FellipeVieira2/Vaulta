@@ -45,15 +45,15 @@ internal static class CatalogCommands
             {
                 if(args.Length<=index+1 || args[index+1]!="all" && !Guid.TryParse(args[index+1],out _)) throw new ArgumentException("Usage: --catalog-assets-import <all|canonicalSetId>");
                 Guid? setId=args[index+1]=="all" ? null : Guid.Parse(args[index+1]);
-                if(app.Services.GetRequiredService<VisionOptions>().ModelManifestPath is not null)
+                var artworkReport=await scope.ServiceProvider.GetRequiredService<ICatalogArtifactImporter>().ImportAsync(setId,cancellation.Token);
+                if(!string.IsNullOrWhiteSpace(app.Services.GetRequiredService<VisionOptions>().ModelManifestPath))
                 {
-                    var report=await scope.ServiceProvider.GetRequiredService<CatalogVisionPreparation>().PrepareAsync(setId,cancellation.Token);
-                    result=report; if(!report.Complete) Environment.ExitCode=1;
+                    var visionReport=await scope.ServiceProvider.GetRequiredService<CatalogVisionPreparation>().PrepareAsync(setId,cancellation.Token);
+                    result=new { artwork=artworkReport, vision=visionReport }; if(artworkReport.Failed>0 || !visionReport.Complete) Environment.ExitCode=1;
                 }
                 else
                 {
-                    var report=await scope.ServiceProvider.GetRequiredService<ICatalogArtifactImporter>().ImportAsync(setId,cancellation.Token);
-                    result=report; if(report.Failed>0) Environment.ExitCode=1;
+                    result=artworkReport; if(artworkReport.Failed>0) Environment.ExitCode=1;
                 }
             }
             else if (command == "--catalog-sync")
@@ -63,11 +63,8 @@ internal static class CatalogCommands
                 result = await db.SyncRuns.AsNoTracking().SingleAsync(x => x.Id == id, cancellation.Token);
                 var sync=(Vaulta.Catalog.Domain.CatalogSyncRun)result;
                 if (sync.Status is "partial" or "failed") Environment.ExitCode = 1;
-                if(app.Services.GetRequiredService<VisionOptions>().ModelManifestPath is not null)
-                {
-                    var preparation=await scope.ServiceProvider.GetRequiredService<CatalogVisionPreparation>().PrepareAsync(null,cancellation.Token);
-                    result=new { sync,preparation }; if(!preparation.Complete) Environment.ExitCode=1;
-                }
+                // Vision preparation is now a separate phase (--vision-index-build).
+                // Metadata sync no longer triggers artwork or vision implicitly.
             }
             else if (command == "--catalog-sync-run")
             {

@@ -64,6 +64,9 @@ services:
       Vision__History__RetentionDays: "7"
       Scanner__OpenAI__MaxConcurrency: "1"
       Scanner__MarketResearch__Enabled: "false"
+      Catalog__Artwork__WorkerCount: "${CATALOG_ARTWORK_WORKER_COUNT:-3}"
+      Catalog__Artwork__PageSize: "${CATALOG_ARTWORK_PAGE_SIZE:-200}"
+      Catalog__Artwork__RevalidateAfterHours: "${CATALOG_ARTWORK_REVALIDATE_HOURS:-24}"
       DOTNET_gcServer: "0"
     volumes:
       - ${VISION_MODEL_DIR:-./store/vision/clip-base}:/models/clip-base:ro

@@ -147,6 +147,11 @@ public static class DependencyInjection
         services.AddHttpClient<Artwork.CatalogArtworkDownloader>(client => client.Timeout=TimeSpan.FromSeconds(30))
             .ConfigurePrimaryHttpMessageHandler(()=>new SocketsHttpHandler { AllowAutoRedirect=false });
         services.AddScoped<ICatalogArtifactImporter, Artwork.CatalogArtifactImporter>();
+        services.AddOptions<Artwork.ArtworkImportOptions>().Bind(configuration.GetSection("Catalog:Artwork"))
+            .Validate(o => o.WorkerCount is >= 1 and <= 16, "Artwork WorkerCount must be between 1 and 16.")
+            .Validate(o => o.PageSize is >= 1 and <= 1000, "Artwork PageSize must be between 1 and 1000.")
+            .Validate(o => o.RevalidateAfterHours is >= 1 and <= 168, "Artwork RevalidateAfterHours must be between 1 and 168.")
+            .ValidateOnStart();
         services.AddOptions<MarketPriceRefreshOptions>().Bind(configuration.GetSection("Catalog:MarketPrices:Refresh"))
             .Validate(o => o.IsValid(), "Invalid daily market refresh limits.").ValidateOnStart();
         services.AddSingleton<DailyMarketPriceRefreshJob>();

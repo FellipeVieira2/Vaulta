@@ -11,20 +11,34 @@ internal sealed class SystemAssetService(AssetsDbContext db,IAssetContentStore c
         if(bytes.Length is 0 or > 15728640 || width<1 || height<1) throw new ArgumentException("Invalid system artwork.");
         var hash=Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
         var key=$"catalog-artwork/{(thumbnail ? "thumbnail" : "image")}/{hash}.webp";
-        var asset=await db.Assets.SingleOrDefaultAsync(x=>x.ObjectKey==key,ct);
-        if(asset?.Status=="ready") { db.Entry(asset).State=EntityState.Detached; return asset.Id; }
-        if(asset is null)
+        // Retry short race: two concurrent workers may produce the same hash simultaneously.
+        // Unique constraint protects correctness; retry resolves the timing window.
+        for(var attempt=0;attempt<3;attempt++)
         {
-            asset=new Asset { Id=Guid.NewGuid(),ObjectKey=key,Purpose="catalog-artwork",Visibility="private",ContentType="image/webp",ContentLength=bytes.Length,Sha256=hash,Width=width,Height=height,SourceUrl=sourceUrl,Status="pending",CreatedAt=clock.UtcNow };
-            db.Assets.Add(asset); await db.SaveChangesAsync(ct);
+            try
+            {
+                var asset=await db.Assets.SingleOrDefaultAsync(x=>x.ObjectKey==key,ct);
+                if(asset?.Status=="ready") { db.Entry(asset).State=EntityState.Detached; return asset.Id; }
+                if(asset is null)
+                {
+                    asset=new Asset { Id=Guid.NewGuid(),ObjectKey=key,Purpose="catalog-artwork",Visibility="private",ContentType="image/webp",ContentLength=bytes.Length,Sha256=hash,Width=width,Height=height,SourceUrl=sourceUrl,Status="pending",CreatedAt=clock.UtcNow };
+                    db.Assets.Add(asset); await db.SaveChangesAsync(ct);
+                }
+                // Stable hash/key and pending row make an interrupted PUT safely resumable.
+                try
+                {
+                    using var stream=new MemoryStream(bytes,false); await content.PutAsync(key,stream,"image/webp",ct);
+                    asset.Status="ready"; asset.ConfirmedAt=clock.UtcNow; await db.SaveChangesAsync(ct); return asset.Id;
+                }
+                finally { db.Entry(asset).State=EntityState.Detached; }
+            }
+            catch(DbUpdateException ex) when(attempt<2 && IsUniqueViolation(ex))
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(100*(attempt+1)),ct);
+                db.ChangeTracker.Clear();
+            }
         }
-        // Stable hash/key and pending row make an interrupted PUT safely resumable.
-        try
-        {
-            using var stream=new MemoryStream(bytes,false); await content.PutAsync(key,stream,"image/webp",ct);
-            asset.Status="ready"; asset.ConfirmedAt=clock.UtcNow; await db.SaveChangesAsync(ct); return asset.Id;
-        }
-        finally { db.Entry(asset).State=EntityState.Detached; }
+        throw new InvalidOperationException("Failed to store artwork after retries.");
     }
     public async Task<string?> GetArtworkReadUrlAsync(Guid assetId,CancellationToken ct)
     {
@@ -35,4 +49,10 @@ internal sealed class SystemAssetService(AssetsDbContext db,IAssetContentStore c
         var asset=await Artwork(assetId,ct); return asset is null ? null : await content.ReadAsync(asset.ObjectKey,15*1024*1024,ct);
     }
     private Task<Asset?> Artwork(Guid id,CancellationToken ct)=>db.Assets.AsNoTracking().SingleOrDefaultAsync(x=>x.Id==id && x.OwnerId==null && x.Purpose=="catalog-artwork" && x.Status=="ready",ct);
+    private static bool IsUniqueViolation(DbUpdateException ex)
+    {
+        // PostgreSQL unique violation SQLSTATE 23505
+        return ex.InnerException?.Message.Contains("23505")==true
+            || ex.InnerException?.Message.Contains("duplicate key")==true;
+    }
 }

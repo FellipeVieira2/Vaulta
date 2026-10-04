@@ -41,8 +41,10 @@ def main():
     import fcntl
     parser=argparse.ArgumentParser()
     parser.add_argument("--root",default="/opt/vaulta")
-    parser.add_argument("--languages",default=",".join(LANGUAGES))
+    parser.add_argument("--languages",default="pt-br,en,ja")
     parser.add_argument("--follow-en",help="Adopt a previously started English import instead of duplicating it.")
+    parser.add_argument("--phase",choices=["metadata","artwork","vision"],
+        help="Run only specific phase: metadata (TCGdex sync), artwork (download/S3), vision (embeddings). Default: all phases.")
     args=parser.parse_args();languages=validate_languages(args.languages.split(","))
     root=Path(args.root).resolve();state_dir=root/".deploy/catalog-bootstrap";state_dir.mkdir(parents=True,exist_ok=True)
     lock=open(state_dir/"run.lock","w");fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -69,27 +71,101 @@ def main():
         refs=preparation.get("references",{});entry["references"]={k:refs[k] for k in ("generated","unchanged","pending","failed","complete") if k in refs}
         entry["index"]={k:refs.get("index",{}).get(k) for k in ("version","referenceCount")}
         save()
+    phase=args.phase
+    # Artwork and vision phases run once globally, not per-language
+    if phase=="artwork":
+        entry=state.get("artwork",{})
+        if entry.get("status") in ("completed","partial"):
+            print(json.dumps({"status":"skipped","phase":"artwork","reason":"already completed"}))
+            return
+        name="vaulta-artwork-all-"+tag[:24]
+        state["artwork"]={"status":"pending","startedAt":now(),"container":name};save()
+        def launch_artwork(job):
+            run(compose+["run","-d","--no-deps","--name",job,
+                "-e","Logging__LogLevel__Microsoft.EntityFrameworkCore=Warning",
+                "-e","Logging__LogLevel__System.Net.Http.HttpClient=Warning",
+                "vaulta-api","--catalog-assets-import","all"])
+            run(["docker","update","--cpus",".5","--memory","768m","--memory-swap","1280m",job])
+        ensure_container(name,exists,launch_artwork)
+        entry=state["artwork"];entry["status"]="running";save()
+        code=int(run(["docker","wait",name]).stdout.strip())
+        entry.update({"status":"completed" if code==0 else "failed","exitCode":code,"finishedAt":now()});save()
+        print(json.dumps({"status":entry["status"],"phase":"artwork","exitCode":code}))
+        return
+    if phase=="vision":
+        entry=state.get("vision",{})
+        if entry.get("status") in ("completed","partial"):
+            print(json.dumps({"status":"skipped","phase":"vision","reason":"already completed"}))
+            return
+        manifest=os.environ.get("VISION_MODEL_MANIFEST_PATH","/models/clip-base/manifest.json")
+        name="vaulta-vision-build-"+tag[:24]
+        state["vision"]={"status":"pending","startedAt":now(),"container":name};save()
+        def launch_vision(job):
+            run(compose+["run","-d","--no-deps","--name",job,
+                "-e","Vision__ModelManifestPath="+manifest,
+                "-e","Logging__LogLevel__Microsoft.EntityFrameworkCore=Warning",
+                "vaulta-api","--vision-index-build",manifest])
+            run(["docker","update","--cpus",".5","--memory","768m","--memory-swap","1280m",job])
+        ensure_container(name,exists,launch_vision)
+        entry=state["vision"];entry["status"]="running";save()
+        code=int(run(["docker","wait",name]).stdout.strip())
+        entry.update({"status":"completed" if code==0 else "failed","exitCode":code,"finishedAt":now()});save()
+        print(json.dumps({"status":entry["status"],"phase":"vision","exitCode":code}))
+        return
+    # Metadata phase (default when --phase is omitted or set to metadata)
     for lang in languages:
         entry=state["languages"].get(lang,{})
         if entry.get("status") in ("completed","partial","failed","no_data"):continue
         if entry.get("container") and exists(entry["container"]):finish(lang,entry["container"]);continue
         if lang=="en" and args.follow_en and exists(args.follow_en):
             state["languages"][lang]={"imageTag":"adopted","startedAt":now()};finish(lang,args.follow_en);continue
-        try:
-            with urllib.request.urlopen("https://api.tcgdex.net/v2/"+lang+"/sets",timeout=60) as response:sets=json.load(response)
-            if not isinstance(sets,list):raise ValueError("Invalid provider set list.")
-        except Exception as error:
-            state["languages"][lang]={"status":"probe_failed","error":type(error).__name__};save();continue
-        if not sets:state["languages"][lang]={"status":"no_data","sets":0};save();continue
-        name="vaulta-catalog-"+lang+"-all-"+tag[:24]
-        state["languages"][lang]={"status":"pending","sets":len(sets),"imageTag":tag,"startedAt":now(),"container":name};save()
-        def launch(job):
-            run(compose+["run","-d","--no-deps","--name",job,
-                "-e","Catalog__Providers__TcgDex__Language="+lang,"-e","Catalog__Providers__TcgDex__MaxConcurrency=2",
-                "-e","Logging__LogLevel__Microsoft.EntityFrameworkCore=Warning","-e","Logging__LogLevel__System.Net.Http.HttpClient=Warning",
-                "vaulta-api","--catalog-sync","tcgdex","all"])
-            run(["docker","update","--cpus",".5","--memory","768m","--memory-swap","1280m",job])
-        ensure_container(name,exists,launch);finish(lang,name)
+        if phase=="metadata" or phase is None:
+            try:
+                with urllib.request.urlopen("https://api.tcgdex.net/v2/"+lang+"/sets",timeout=60) as response:sets=json.load(response)
+                if not isinstance(sets,list):raise ValueError("Invalid provider set list.")
+            except Exception as error:
+                state["languages"][lang]={"status":"probe_failed","error":type(error).__name__};save();continue
+            if not sets:state["languages"][lang]={"status":"no_data","sets":0};save();continue
+            name="vaulta-catalog-"+lang+"-all-"+tag[:24]
+            state["languages"][lang]={"status":"pending","sets":len(sets),"imageTag":tag,"startedAt":now(),"container":name};save()
+            def launch(job):
+                run(compose+["run","-d","--no-deps","--name",job,
+                    "-e","Catalog__Providers__TcgDex__Language="+lang,"-e","Catalog__Providers__TcgDex__MaxConcurrency=2",
+                    "-e","Logging__LogLevel__Microsoft.EntityFrameworkCore=Warning","-e","Logging__LogLevel__System.Net.Http.HttpClient=Warning",
+                    "vaulta-api","--catalog-sync","tcgdex","all"])
+                run(["docker","update","--cpus",".5","--memory","768m","--memory-swap","1280m",job])
+            ensure_container(name,exists,launch);finish(lang,name)
+    # When no phase specified, run artwork and vision after metadata completes
+    if phase is None:
+        artwork_entry=state.get("artwork",{})
+        if artwork_entry.get("status") not in ("completed","partial"):
+            name="vaulta-artwork-all-"+tag[:24]
+            state["artwork"]={"status":"pending","startedAt":now(),"container":name};save()
+            def launch_artwork(job):
+                run(compose+["run","-d","--no-deps","--name",job,
+                    "-e","Logging__LogLevel__Microsoft.EntityFrameworkCore=Warning",
+                    "-e","Logging__LogLevel__System.Net.Http.HttpClient=Warning",
+                    "vaulta-api","--catalog-assets-import","all"])
+                run(["docker","update","--cpus",".5","--memory","768m","--memory-swap","1280m",job])
+            ensure_container(name,exists,launch_artwork)
+            artwork_entry=state["artwork"];artwork_entry["status"]="running";save()
+            code=int(run(["docker","wait",name]).stdout.strip())
+            artwork_entry.update({"status":"completed" if code==0 else "failed","exitCode":code,"finishedAt":now()});save()
+        vision_entry=state.get("vision",{})
+        if vision_entry.get("status") not in ("completed","partial"):
+            manifest=os.environ.get("VISION_MODEL_MANIFEST_PATH","/models/clip-base/manifest.json")
+            name="vaulta-vision-build-"+tag[:24]
+            state["vision"]={"status":"pending","startedAt":now(),"container":name};save()
+            def launch_vision(job):
+                run(compose+["run","-d","--no-deps","--name",job,
+                    "-e","Vision__ModelManifestPath="+manifest,
+                    "-e","Logging__LogLevel__Microsoft.EntityFrameworkCore=Warning",
+                    "vaulta-api","--vision-index-build",manifest])
+                run(["docker","update","--cpus",".5","--memory","768m","--memory-swap","1280m",job])
+            ensure_container(name,exists,launch_vision)
+            vision_entry=state["vision"];vision_entry["status"]="running";save()
+            code=int(run(["docker","wait",name]).stdout.strip())
+            vision_entry.update({"status":"completed" if code==0 else "failed","exitCode":code,"finishedAt":now()});save()
     state["status"]="completed" if all(x.get("status") in ("completed","no_data") for x in state["languages"].values()) else "completed_with_pending"
     save()
     print(json.dumps({"status":state["status"],"languages":{k:v.get("status") for k,v in state["languages"].items()}}))
