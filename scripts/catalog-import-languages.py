@@ -107,7 +107,7 @@ def main():
         state["artwork"]={"status":"pending","startedAt":now(),"container":name};save()
         def launch_artwork(job):
             run(compose+["run","-d","--no-deps","--name",job]+artwork_arguments())
-            run(["docker","update","--cpus",".5","--memory","768m","--memory-swap","1280m",job])
+            run(["docker","update","--cpus",".75","--memory","768m","--memory-swap","1280m",job])
         ensure_container(name,exists,launch_artwork)
         entry=state["artwork"];entry["status"]="running";save()
         code=int(run(["docker","wait",name]).stdout.strip())
@@ -176,7 +176,7 @@ def main():
             state["artwork"]={"status":"pending","startedAt":now(),"container":name};save()
             def launch_artwork(job):
                 run(compose+["run","-d","--no-deps","--name",job]+artwork_arguments())
-                run(["docker","update","--cpus",".5","--memory","768m","--memory-swap","1280m",job])
+                run(["docker","update","--cpus",".75","--memory","768m","--memory-swap","1280m",job])
             ensure_container(name,exists,launch_artwork)
             artwork_entry=state["artwork"];artwork_entry["status"]="running";save()
             code=int(run(["docker","wait",name]).stdout.strip())
