@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import subprocess
 import urllib.request
+import uuid
 
 LANGUAGES=("en","pt","pt-br","es","es-mx","ja","fr","de","it","ko","zh-tw","zh-cn","id","th","nl","pl","ru","pt-pt")
 
@@ -45,6 +46,15 @@ def ensure_container(name,exists,launch):
     launch(name);return "started"
 
 def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
+def retry_plan(entry,max_attempts=3):
+    if entry.get("status") in ("completed","no_data"):return None
+    attempts=int(entry.get("attempts",1 if entry else 0))
+    if attempts>=max_attempts:return None
+    scope="all"
+    if entry.get("status")=="partial":
+        try:scope="resume:"+str(uuid.UUID(entry.get("report",{}).get("id","")))
+        except (ValueError,TypeError,AttributeError):pass
+    return attempts+1,scope
 def run(args,check=True):return subprocess.run(args,check=check,capture_output=True,text=True)
 def exists(name):return run(["docker","inspect",name],False).returncode==0
 
@@ -54,6 +64,8 @@ def main():
     parser.add_argument("--root",default="/opt/vaulta")
     parser.add_argument("--languages",default=",".join(LANGUAGES))
     parser.add_argument("--follow-en",help="Adopt a previously started English import instead of duplicating it.")
+    parser.add_argument("--image-tag",help="Immutable worker image tag; does not change the deployed API tag.")
+    parser.add_argument("--external-vision",action="store_true",help="A separate incremental worker generates embeddings while artwork downloads.")
     parser.add_argument("--phase",choices=["metadata","artwork","vision"],
         help="Run only specific phase: metadata (TCGdex sync), artwork (download/S3), vision (embeddings). Default: all phases.")
     args=parser.parse_args();languages=validate_languages(args.languages.split(","))
@@ -61,7 +73,7 @@ def main():
     lock=open(state_dir/"run.lock","w");fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
     state_file=state_dir/"status.json"
     state=json.loads(state_file.read_text()) if state_file.exists() else {"startedAt":now(),"languages":{}}
-    tag=(root/".deploy/current-tag").read_text().strip()
+    tag=args.image_tag or (root/".deploy/current-tag").read_text().strip()
     if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}",tag) or tag=="latest":raise ValueError("Use a validated immutable deployment tag.")
     envfile=root/".env.production"
     if envfile.stat().st_mode & 0o077:raise ValueError("Production secrets file must remain private.")
@@ -83,6 +95,8 @@ def main():
         entry["index"]={k:refs.get("index",{}).get(k) for k in ("version","referenceCount")}
         save()
     phase=args.phase
+    if args.external_vision:
+        state["vision"]={"status":"running","mode":"incremental","container":"vaulta-vision-follow"};save()
     # Artwork and vision phases run once globally, not per-language
     if phase=="artwork":
         entry=state.get("artwork",{})
@@ -121,33 +135,44 @@ def main():
         print(json.dumps({"status":entry["status"],"phase":"vision","exitCode":code}))
         return
     # Metadata phase (default when --phase is omitted or set to metadata)
+    metadata_retried=False
     for lang in languages:
         entry=state["languages"].get(lang,{})
-        if entry.get("status") in ("completed","partial","failed","no_data"):continue
-        if entry.get("container") and exists(entry["container"]):finish(lang,entry["container"]);continue
-        if lang=="en" and args.follow_en and exists(args.follow_en):
-            state["languages"][lang]={"imageTag":"adopted","startedAt":now()};finish(lang,args.follow_en);continue
-        if phase=="metadata" or phase is None:
+        if entry.get("status") in ("completed","no_data"):continue
+        if entry.get("status") in ("running","pending") and entry.get("container") and exists(entry["container"]):finish(lang,entry["container"])
+        if lang=="en" and args.follow_en and not state["languages"].get(lang) and exists(args.follow_en):
+            state["languages"][lang]={"imageTag":"adopted","startedAt":now()};finish(lang,args.follow_en)
+            if state["languages"][lang].get("status") in ("completed","no_data"):continue
+        while (phase=="metadata" or phase is None) and (plan:=retry_plan(state["languages"].get(lang,{}))) is not None:
+            attempt,scope=plan
+            metadata_retried=metadata_retried or attempt>1
             try:
                 with urllib.request.urlopen("https://api.tcgdex.net/v2/"+lang+"/sets",timeout=60) as response:sets=json.load(response)
                 if not isinstance(sets,list):raise ValueError("Invalid provider set list.")
             except Exception as error:
-                state["languages"][lang]={"status":"probe_failed","error":type(error).__name__};save();continue
+                state["languages"][lang]={"status":"probe_failed","attempts":attempt,"error":type(error).__name__};save();continue
             if not sets:state["languages"][lang]={"status":"no_data","sets":0};save();continue
-            name="vaulta-catalog-"+lang+"-all-"+tag[:24]
-            state["languages"][lang]={"status":"pending","sets":len(sets),"imageTag":tag,"startedAt":now(),"container":name};save()
+            name="vaulta-catalog-"+lang+"-all-"+tag[:24]+"-r"+str(attempt)
+            previous=state["languages"].get(lang,{})
+            history=previous.get("history",[])+([{"status":previous.get("status"),"report":previous.get("report"),"exitCode":previous.get("exitCode")}] if previous else [])
+            state["languages"][lang]={"status":"pending","attempts":attempt,"history":history,"sets":len(sets),"imageTag":tag,"startedAt":now(),"container":name};save()
             def launch(job):
                 run(compose+["run","-d","--no-deps","--name",job,
                     "-e","Catalog__Providers__TcgDex__Language="+lang,"-e","Catalog__Providers__TcgDex__MaxConcurrency=2",
                     "-e","Logging__LogLevel__Microsoft.EntityFrameworkCore=Warning","-e","Logging__LogLevel__System.Net.Http.HttpClient=Warning",
-                    "vaulta-api","--catalog-sync","tcgdex","all"])
+                    "vaulta-api","--catalog-sync","tcgdex",scope])
                 run(["docker","update","--cpus",".5","--memory","768m","--memory-swap","1280m",job])
             ensure_container(name,exists,launch);finish(lang,name)
     # When no phase specified, run artwork and vision after metadata completes
     if phase is None:
         artwork_entry=state.get("artwork",{})
-        if artwork_entry.get("status") not in ("completed","partial"):
-            name="vaulta-artwork-all-"+tag[:24]
+        current_name=artwork_entry.get("container") or "vaulta-artwork-all-"+tag[:24]
+        passes=[] if artwork_entry.get("status")=="completed" else [current_name]
+        # New metadata can fall behind the running import's GUID cursor. Finish
+        # that job first, then do one deduplicated pass with the repaired image.
+        retry_name="vaulta-artwork-all-"+tag[:24]+"-metadata-retry"
+        if metadata_retried and retry_name not in passes:passes.append(retry_name)
+        for name in passes:
             state["artwork"]={"status":"pending","startedAt":now(),"container":name};save()
             def launch_artwork(job):
                 run(compose+["run","-d","--no-deps","--name",job]+artwork_arguments())
@@ -157,7 +182,9 @@ def main():
             code=int(run(["docker","wait",name]).stdout.strip())
             artwork_entry.update({"status":"completed" if code==0 else "failed","exitCode":code,"finishedAt":now()});save()
         vision_entry=state.get("vision",{})
-        if vision_entry.get("status") not in ("completed","partial"):
+        if args.external_vision:
+            state["vision"]={"status":"running","mode":"incremental","container":"vaulta-vision-follow"};save()
+        elif vision_entry.get("status") not in ("completed","partial"):
             manifest=os.environ.get("VISION_MODEL_MANIFEST_PATH","/models/clip-base/manifest.json")
             name="vaulta-vision-build-"+tag[:24]
             state["vision"]={"status":"pending","startedAt":now(),"container":name};save()

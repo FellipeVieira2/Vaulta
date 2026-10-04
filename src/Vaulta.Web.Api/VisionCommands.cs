@@ -17,6 +17,7 @@ internal static class VisionCommands
     public static void Configure(IConfiguration configuration,string[] args)
     {
         var position=Array.IndexOf(args,"--vision-index-build");
+        if(position<0)position=Array.IndexOf(args,"--vision-index-follow");
         if(position<0) return;
         if(args.Length<=position+1) throw new ArgumentException("Usage: --vision-index-build <manifestPath>");
         configuration["Vision:ModelManifestPath"]=Path.GetFullPath(args[position+1]);

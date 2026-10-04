@@ -96,6 +96,41 @@ if 'get-login-password' in sys.argv: print('disposable-token')
             self.assertNotEqual(0, self.run_script('deploy-production.sh', tag).returncode)
         self.assertEqual('', self.log())
 
+    def worker_mock(self):
+        (self.root/'.deploy').mkdir()
+        (self.root/'.deploy/vision-worker-tag').write_text('abc1234')
+        self.command('docker', '''
+import json,os,sys
+args=sys.argv[1:]
+with open(os.environ['CALLS'],'a') as log:log.write('docker '+' '.join(args)+'\\n')
+if 'config' in args:print(os.environ['MOCK_CONFIG'])
+if args[0]=='inspect':
+    if not os.environ.get('STALE_WORKER'):sys.exit(1)
+    if '-f' in args:
+        print('true' if 'State.Running' in args[args.index('-f')+1] else 'stale-image|[]|0|0|0')
+if 'run' in args:
+    assert '--service-ports' not in args
+    from pathlib import Path
+    override=Path(args[[i for i,x in enumerate(args) if x=='-f'][-1]+1]).read_text()
+    assert 'cpus: 0.25' in override and 'mem_limit: 512m' in override and 'memswap_limit: 1024m' in override
+    print('worker')
+if args[0]=='wait':print('0')
+''')
+
+    def test_worker_limits_are_applied_before_launch_and_api_is_not_replaced(self):
+        self.worker_mock();result=self.run_script('vision-index-follow.sh')
+        self.assertEqual(0,result.returncode,result.stderr)
+        self.assertIn('--vision-index-follow',self.log())
+        self.assertNotIn('up -d',self.log())
+        self.assertFalse((self.root/'.deploy/current-tag').exists())
+
+    def test_stale_running_worker_fails_without_stopping_or_reusing_it(self):
+        self.worker_mock();result=self.run_script('vision-index-follow.sh',STALE_WORKER='1')
+        self.assertNotEqual(0,result.returncode)
+        self.assertIn('configuration differs',result.stderr)
+        self.assertNotIn('docker wait',self.log())
+        self.assertNotIn('docker stop',self.log())
+
     def test_failed_dump_never_uploads_partial_backup(self):
         result = self.run_script('backup-postgres.sh', FAIL_DUMP='1')
         self.assertNotEqual(0, result.returncode)

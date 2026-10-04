@@ -16,6 +16,7 @@ internal static class CatalogCommands
         for (var index = 0; index < args.Length; index++)
         {
             if (args[index] is "--vision-index-build" or "--vision-index-probe" or "--vision-model-install") index++;
+            else if(args[index]=="--vision-index-follow") {index++;if(index+1<args.Length && int.TryParse(args[index+1],out _))index++;}
             else if(args[index]=="--vision-rerun-benchmark") index+=3;
             else if(args[index] is "--vision-review" or "--vision-export-manifest") index+=2;
             else if(args[index]=="--vision-purge-expired") { }

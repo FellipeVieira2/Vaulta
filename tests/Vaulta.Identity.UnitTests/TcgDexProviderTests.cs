@@ -11,6 +11,13 @@ namespace Vaulta.Identity.UnitTests;
 public sealed class TcgDexProviderTests
 {
     [Fact]
+    public async Task DuplicateBriefSetIdsDoNotDuplicateCheckpointKeys()
+    {
+        using var handler=new Handler((_,_)=>Task.FromResult(Json("""[{"id":"CSV1C","name":"Same"},{"id":"CSV1C","name":"Alias"},{"id":"CSV2C","name":"Other"}]""")));
+        using var client=Client(handler);var provider=new TcgDexProvider(client,Options.Create(new TcgDexOptions{Language="zh-cn"}));
+        var sets=await provider.GetSets(default);Assert.Equal(2,sets.Count);Assert.Equal(2,sets.ToDictionary(x=>x.ExternalId).Count);
+    }
+    [Fact]
     public async Task ReadsBriefsThenDetailsAndNormalizesFlagsArtworkAndLanguage()
     {
         var paths = new ConcurrentBag<string>();

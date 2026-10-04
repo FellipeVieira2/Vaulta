@@ -87,6 +87,7 @@ if (args.Contains("--migrate") || builder.Configuration.GetValue<bool>("Database
     if (args.Contains("--migrate")) return;
 }
 if (await VisionDatasetCommands.TryExecute(app,args)) return;
+if (await VisionFollowCommand.TryExecute(app,args)) return;
 if (await VisionCommands.TryExecute(app, args)) return;
 if (await CatalogCommands.TryExecute(app, args)) return;
 if (await SeedAdminCommand.TryExecute(app, args)) return;

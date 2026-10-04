@@ -15,12 +15,14 @@ public interface IVisualReferenceIndex
 public interface IVisualReferenceBuilder
 {
     Task<VisualReferenceBuildReport> BuildAsync(Guid? setId,CancellationToken ct);
+    Task<VisualReferenceBatchReport> BuildReadyBatchAsync(int batchSize,TimeSpan retryAfter,CancellationToken ct,Guid? setId=null)=>throw new NotSupportedException();
     Task<VisualIndexStatus> LoadAsync(CancellationToken ct);
     Task<VisualIndexStatus> LoadForEvaluationAsync(IReadOnlyCollection<Guid> excludedAssetIds,CancellationToken ct)=>throw new NotSupportedException("An isolated evaluation index is required.");
     Task<VisualIndexStatus> LoadOfficialForEvaluationAsync(IReadOnlyCollection<Guid> excludedAssetIds,CancellationToken ct)=>throw new NotSupportedException("An official-only evaluation index is required.");
 }
 public sealed record VisualReferenceBuildReport(int Generated,int Unchanged,int Pending,int Failed,VisualIndexStatus Index)
 { public bool Complete=>Pending==0 && Failed==0; }
+public sealed record VisualReferenceBatchReport(int Generated,int Reused,int Failed,int? RemainingReady,bool Busy=false);
 
 public interface IVisionCatalog
 {

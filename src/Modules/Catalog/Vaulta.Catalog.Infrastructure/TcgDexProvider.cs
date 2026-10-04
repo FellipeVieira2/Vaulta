@@ -41,7 +41,9 @@ internal sealed partial class TcgDexProvider(HttpClient httpClient, IOptions<Tcg
             ValidateIdentity(set.Id, set.Name);
         }
         // TCGdex IDs are integration keys, not authoritative canonical set codes.
-        return sets.Select(x => new ProviderSet(x.Id, x.Name, null, null)).ToArray();
+        // Some locales repeat brief IDs (e.g. zh-cn CSV1C). Details are fetched
+        // once by ID and remain authoritative; duplicate briefs are not new sets.
+        return sets.DistinctBy(x=>x.Id,StringComparer.Ordinal).Select(x => new ProviderSet(x.Id, x.Name, null, null)).ToArray();
     }
 
     public async Task<ProviderSetDetails> GetSetDetails(string setId, CancellationToken cancellationToken)

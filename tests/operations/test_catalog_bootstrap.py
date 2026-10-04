@@ -8,6 +8,15 @@ bootstrap=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bootstrap)
 
 class CatalogBootstrapTests(unittest.TestCase):
+    def test_failed_and_partial_languages_have_bounded_new_attempts(self):
+        run_id="c6228c1c-b6d7-479f-8d81-c3ac3913a434"
+        self.assertEqual((2,"resume:"+run_id),bootstrap.retry_plan({"status":"partial","report":{"id":run_id}}))
+        self.assertEqual((2,"all"),bootstrap.retry_plan({"status":"failed"}))
+        self.assertIsNone(bootstrap.retry_plan({"status":"failed","attempts":3}))
+        self.assertIsNone(bootstrap.retry_plan({"status":"completed"}))
+        self.assertEqual((1,"all"),bootstrap.retry_plan({}))
+    def test_retry_report_cannot_inject_container_arguments(self):
+        self.assertEqual((2,"all"),bootstrap.retry_plan({"status":"partial","report":{"id":"bad; command"}}))
     def test_report_ignores_log_objects_and_reads_final_catalog_report(self):
         text='{"EventId":1,"Message":"untrusted data"}\n'+json.dumps({"sync":{"status":"completed"},"preparation":{"complete":True}})
         self.assertEqual("completed",bootstrap.parse_report(text)["sync"]["status"])

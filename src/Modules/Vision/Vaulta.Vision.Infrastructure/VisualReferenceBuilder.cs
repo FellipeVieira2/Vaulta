@@ -9,7 +9,7 @@ using Vaulta.Vision.Application;
 using Vaulta.Vision.Contracts;
 using Vaulta.Vision.Domain;
 namespace Vaulta.Vision.Infrastructure;
-public sealed class VisualReferenceBuilder(VisionDbContext db,CatalogDbContext catalog,ISystemAssetService assets,IImageEncoder encoder,CosineReferenceIndex index,IClock clock,VisionHistoryOptions? history=null) : IVisualReferenceBuilder
+public sealed partial class VisualReferenceBuilder(VisionDbContext db,CatalogDbContext catalog,ISystemAssetService assets,IImageEncoder encoder,CosineReferenceIndex index,IClock clock,VisionHistoryOptions? history=null) : IVisualReferenceBuilder
 {
     public static string ModelVersion(EncoderIdentity identity)=>Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(identity))).ToLowerInvariant();
     public async Task<VisualReferenceBuildReport> BuildAsync(Guid? setId,CancellationToken ct)
