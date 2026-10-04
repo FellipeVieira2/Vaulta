@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><IsTestProject>true</IsTestProject><IsPackable>false</IsPackable></PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/Modules/Vision/Vaulta.Vision.Infrastructure/Vaulta.Vision.Infrastructure.csproj" />
     <ProjectReference Include="../../src/Vaulta.Vision.Encoding/Vaulta.Vision.Encoding.csproj" />
     <ProjectReference Include="../../src/Modules/Vision/Vaulta.Vision.Application/Vaulta.Vision.Application.csproj" />
     <ProjectReference Include="../../src/Modules/Assets/Vaulta.Assets.Infrastructure/Vaulta.Assets.Infrastructure.csproj" />

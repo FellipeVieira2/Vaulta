@@ -12,13 +12,16 @@ public sealed class VisionOptions
 }
 public static class DependencyInjection
 {
-    public static IServiceCollection AddVisionModule(this IServiceCollection services,IConfiguration configuration)
+    public static IServiceCollection AddVisionModule(this IServiceCollection services,IConfiguration configuration,bool isDevelopment=false)
     {
         services.AddDbContext<VisionDbContext>(options=>options.UseNpgsql(configuration.GetConnectionString("Vaulta")));
         var options=configuration.GetSection("Vision").Get<VisionOptions>() ?? new();
         if(options.EncoderConcurrency is <1 or >4 || options.MaxIndexReferences is <1 or >250000) throw new InvalidOperationException("Invalid Vision resource limits.");
         services.AddSingleton(options);
         var history=configuration.GetSection("Vision:History").Get<VisionHistoryOptions>() ?? new();history.Validate();services.AddSingleton(history);services.AddScoped<VisionHistoryService>();
+        var improvement=configuration.GetSection("Vision:Improvement").Get<VisionImprovementOptions>() ?? new();
+        improvement.Validate(isDevelopment,history.Enabled);services.AddSingleton(improvement);
+        services.AddSingleton<VisualIndexRefreshSignal>();
         services.AddSingleton<IImageEncoder>(_=>new OnnxImageEncoder(options.ModelManifestPath ?? throw new InvalidOperationException("Vision encoder is not configured."),options.EncoderConcurrency));
         services.AddSingleton<CosineReferenceIndex>(p=>new(p.GetRequiredService<IImageEncoder>().Identity,options.MaxIndexReferences));
         services.AddSingleton<IVisualReferenceIndex>(p=>p.GetRequiredService<CosineReferenceIndex>());

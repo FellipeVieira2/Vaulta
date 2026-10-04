@@ -20,5 +20,5 @@ public class BenchmarkIndexIsolationTests(ApiFixture fixture)
   await (Task<VisualIndexStatus>)method.Invoke(builder,[new Guid[]{asset},CancellationToken.None])!;Assert.Equal(0,index.Status.ReferenceCount);
  }
  private sealed class Encoder:IImageEncoder
- {public EncoderIdentity Identity=>new("heldout","fixture","fixture","fixture",3,"test","input","output");public Task<ImageEmbedding> EncodeAsync(Stream image,CancellationToken ct)=>Task.FromResult(new ImageEmbedding(Identity,[1,0,0]));}
+ {private readonly EncoderIdentity _identity=new("heldout-"+Guid.NewGuid(),"fixture","fixture","fixture",3,"test","input","output");public EncoderIdentity Identity=>_identity;public Task<ImageEmbedding> EncodeAsync(Stream image,CancellationToken ct)=>Task.FromResult(new ImageEmbedding(Identity,[1,0,0]));}
 }

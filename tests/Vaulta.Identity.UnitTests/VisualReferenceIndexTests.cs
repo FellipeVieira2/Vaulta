@@ -6,6 +6,13 @@ namespace Vaulta.Identity.UnitTests;
 // Artificial 3D vectors exercise math/versioning, never claim visual-model accuracy.
 public sealed class VisualReferenceIndexTests
 {
+    [Fact] public async Task MultiplePhoneReferencesCannotCrowdOutOtherPrintingCandidates()
+    {
+        var a=Guid.NewGuid();var b=Guid.NewGuid();var index=new CosineReferenceIndex(Model);
+        index.Publish(Model,"many-captures",[new(Guid.NewGuid(),a,[1,0,0],"official"),new(Guid.NewGuid(),a,[1,.01f,0],"verified_capture"),new(Guid.NewGuid(),b,[1,.1f,0],"official")]);
+        var matches=await index.SearchAsync(new(Model,[1,0,0]),2,default);
+        Assert.Equal(new[]{a,b},matches.Select(x=>x.PrintingId));Assert.Equal(1,matches[0].Similarity,5);
+    }
     private static readonly EncoderIdentity Model=new("artificial-test-encoder","r1","hash","preprocess-v1",3,"test","input","output");
     [Theory]
     [InlineData(0f,0f,0f)]

@@ -6,6 +6,25 @@ using Xunit;
 namespace Vaulta.Identity.UnitTests;
 public sealed class VisionScannerServiceTests
 {
+    [Fact] public async Task OriginalRetrievalRankSurvivesResolverReordering()
+    {
+        var correct=VisionPrintingResolverTests.Printing("067/086","pt-BR");var wrong=VisionPrintingResolverTests.Printing("026/086","pt-BR");
+        var sequence=new List<string>();var encoder=new Encoder(sequence);
+        var result=await new VisionScannerService(encoder,new RankedIndex(encoder.Identity,wrong,correct),new RankedCatalog(wrong,correct),new Evidence(sequence,VisionPrintingResolverTests.Evidence("067/086")),new Quotes(correct,false),new()).IdentifyAsync(new([new([1])]),default);
+        Assert.Equal(correct.Printing.PrintingId,result.Candidates[0].Printing.PrintingId);
+        Assert.Equal(wrong.Printing.PrintingId,result.Retrieval![0].PrintingId);
+        Assert.Equal(correct.Printing.PrintingId,result.Retrieval[1].PrintingId);
+    }
+    private sealed class RankedIndex(EncoderIdentity identity,VisionCatalogPrinting wrong,VisionCatalogPrinting correct):IVisualReferenceIndex
+    {
+        public VisualIndexStatus Status=>new("rank-fixture",2,identity);
+        public Task<IReadOnlyList<VisualMatch>> SearchAsync(ImageEmbedding e,int k,CancellationToken ct)=>Task.FromResult<IReadOnlyList<VisualMatch>>([new(Guid.NewGuid(),wrong.Printing.PrintingId,.95,"official"),new(Guid.NewGuid(),correct.Printing.PrintingId,.8,"official")]);
+    }
+    private sealed class RankedCatalog(VisionCatalogPrinting wrong,VisionCatalogPrinting correct):IVisionCatalog
+    {
+        public Task<IReadOnlyList<VisionCatalogPrinting>> GetPrintingsAsync(IReadOnlyList<Guid> ids,CancellationToken ct)=>Task.FromResult<IReadOnlyList<VisionCatalogPrinting>>([wrong,correct]);
+        public Task<IReadOnlyList<VisionCatalogPrinting>> FindEvidenceCandidatesAsync(CardEvidence e,CancellationToken ct)=>Task.FromResult<IReadOnlyList<VisionCatalogPrinting>>([wrong,correct]);
+    }
     [Theory] [InlineData(true,"available")] [InlineData(false,"unavailable")]
     public async Task IdentitySurvivesMissingPriceAndQuoteBelongsToResolvedVariant(bool priced,string priceStatus)
     {

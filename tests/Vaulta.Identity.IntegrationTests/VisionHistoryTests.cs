@@ -60,6 +60,15 @@ public class VisionHistoryTests(ApiFixture fixture)
         var db=scope.ServiceProvider.GetRequiredService<VisionDbContext>();Assert.False(await db.ReviewedSamples.AnyAsync(x=>x.AttemptId==a.AttemptId));Assert.Equal("not_a_card",VisionHistoryService.Replay(await db.ScanRuns.SingleAsync(x=>x.Id==run.Id)).Status);
     }
     private static VisionScanResultDto Prediction()=>new(Guid.NewGuid(),"not_a_card",null,null,.9,0,[],null,"unresolved",null,new Dictionary<string,VisionFieldDto>(),new(new("fixture","fixture","fixture","fixture",3,"test","input","output"),"fixture-index","fixture-resolver",null,null,2));
+    [Fact] public async Task RawRetrievalRanksArePersistedIndependentlyOfResolverDisplay()
+    {
+        await using var scope=fixture.Factory.Services.CreateAsyncScope();var service=Service(scope);var owner=Guid.NewGuid();var a=await service.CreateAsync(owner,new("ops-v1"),default);
+        var run=await service.ReserveAsync(owner,a.AttemptId,"raw-rank",Sha,default);
+        var raw=Enumerable.Range(0,10).Select(i=>new VisionRetrievalMatchDto(Guid.NewGuid(),Guid.NewGuid(),1-i*.03,"official")).ToArray();
+        var result=Prediction() with{Retrieval=raw};await service.CompleteAsync(run.Id,result,new(result.Trace.Encoder,[1,0,0]),default);
+        var stored=await scope.ServiceProvider.GetRequiredService<VisionDbContext>().ScanRunCandidates.AsNoTracking().Where(x=>x.RunId==run.Id).OrderBy(x=>x.Rank).ToArrayAsync();
+        Assert.Equal(raw.Select(x=>x.PrintingId),stored.Select(x=>x.PrintingId));Assert.Equal(raw.Select(x=>(double?)x.Similarity),stored.Select(x=>x.RetrievalScore));
+    }
     private static VisionHistoryService Service(AsyncServiceScope scope)=>new(scope.ServiceProvider.GetRequiredService<VisionDbContext>(),scope.ServiceProvider.GetRequiredService<Vaulta.Assets.Application.IPrivateAssetService>(),scope.ServiceProvider.GetRequiredService<Vaulta.Vision.Application.IVisionCatalog>(),scope.ServiceProvider.GetRequiredService<IClock>(),new VisionHistoryOptions {Enabled=true,OperationalPolicyVersion="ops-v1",ImprovementPolicyVersion="improve-v1",RetentionDays=7});
     [Fact] public async Task WithdrawalBeforeCompletionNeverRestoresPrivatePredictionOrVector()
     {

@@ -1,5 +1,6 @@
 using Vaulta.Catalog.Application;
 using Vaulta.Catalog.Contracts;
+using Vaulta.SharedKernel;
 using Xunit;
 
 namespace Vaulta.Identity.UnitTests;
@@ -97,7 +98,8 @@ public sealed class ScannerResearchOrchestrationTests
     }
 
     private static ScannerService Scanner(Vision vision, IScannerMarketResearch research, IScannerCardDetailsReader? details = null, IScannerIdentityResolver? resolver = null)
-        => new([vision], new CatalogSearch(), new ExternalResolver(), research, details, resolver);
+        => new([vision], new CatalogSearch(), new ExternalResolver(), research, details, resolver, new FixedClock());
+    private sealed class FixedClock : IClock { public DateTimeOffset UtcNow => Now; }
     private static CardScanRequest Request() => new(Convert.ToBase64String([1]), "pokemon");
     private static ScannerMarketEstimateDto Estimate(CardVisualIdentificationDto card) => new(25m, "Web", Now, .92, card,
         [new("https://market.example/card", "Sliggoo", 25m, "BRL", "listing", Now)]);

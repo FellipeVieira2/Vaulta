@@ -10,8 +10,13 @@ public sealed partial class ScannerSessionPage
 {
     private bool _cameraReady;
     private bool _soundEnabled = Preferences.Default.Get("scanner-session-sound", true);
-    private readonly SessionRevealDrawable _revealDrawing = new();
-    private GraphicsView? _revealCanvas;
+    private bool _revealInFlight;
+    private long _revealGeneration;
+    private Image? _revealArtwork;
+    private Label? _revealTitle;
+    private Label? _revealPrinting;
+    private Label? _revealSource;
+    private Label? _totalDelta;
     private Border? _revealPanel;
     private Border? _resultPanel;
     private ProgressBar? _costProgress;
@@ -67,6 +72,8 @@ public sealed partial class ScannerSessionPage
         _total.FontSize = 28; _total.LineBreakMode = LineBreakMode.NoWrap;
         _total.HorizontalTextAlignment = TextAlignment.End; _cost.HorizontalTextAlignment = TextAlignment.End; _difference.HorizontalTextAlignment = TextAlignment.End;
         score.Children.Add(caption); score.Children.Add(_total);
+        _totalDelta = Text("", 12, Color.FromArgb("#C8FFDD"), true);
+        _totalDelta.HorizontalTextAlignment = TextAlignment.End; _totalDelta.IsVisible = false; score.Children.Add(_totalDelta);
         if (_session!.CostBrl.HasValue) { score.Children.Add(_cost); score.Children.Add(_difference); }
         _costProgress = new ProgressBar { HeightRequest = 3, BackgroundColor = Color.FromArgb("#40364E") };
         if (_session.CostBrl.HasValue) score.Children.Add(_costProgress);
@@ -88,7 +95,16 @@ public sealed partial class ScannerSessionPage
         SemanticProperties.SetDescription(_identificationPanel, "Identificando esta carta. Aguarde antes de mostrar a próxima.");
         center.Children.Add(_identificationPanel);
         _revealValue.HorizontalTextAlignment = TextAlignment.Center;
-        _revealPanel = Surface(_revealValue, "#EF11101D"); _revealPanel.Margin = 24; _revealPanel.VerticalOptions = LayoutOptions.Center;
+        _revealArtwork = new Image { WidthRequest = 64, HeightRequest = 90, Aspect = Aspect.AspectFit };
+        _revealTitle = Text("", 18, Colors.White, true); _revealTitle.FontFamily = "InterSemiBold";
+        _revealPrinting = Text("", 12, Color.FromArgb("#B4B5C8"));
+        var identity = new VerticalStackLayout { Spacing = 4, VerticalOptions = LayoutOptions.Center, Children = { _revealTitle, _revealPrinting } };
+        var heading = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star) } };
+        heading.Add(_revealArtwork); heading.Add(identity, 1, 0);
+        _revealSource = Text("", 11, Color.FromArgb("#B4B5C8")); _revealSource.HorizontalTextAlignment = TextAlignment.Center;
+        _revealValue.FontFamily = "InterBold";
+        var reveal = new VerticalStackLayout { Spacing = 10, Children = { heading, _revealValue, _revealSource } };
+        _revealPanel = Surface(reveal, "#EF11101D"); _revealPanel.Margin = 24; _revealPanel.VerticalOptions = LayoutOptions.Center;
         _revealPanel.IsVisible = false; _revealPanel.InputTransparent = true;
         _revealPanel.Stroke = Color.FromArgb("#C8B1FF"); _revealPanel.StrokeThickness = 1.5;
         center.Children.Add(_revealPanel); overlay.Add(center, 0, 1);
@@ -120,8 +136,10 @@ public sealed partial class ScannerSessionPage
         options.FontSize = 11; options.MinimumHeightRequest = 40; options.Padding = new Thickness(8, 4); options.BackgroundColor = Colors.Transparent;
         _recordButton = null;
         bottom.Children.Add(options);
+#if DEBUG
+        bottom.Children.Add(Action("Diagnóstico da leitura", ShowVisionDiagnostic));
+#endif
         overlay.Add(bottom, 0, 2); root.Children.Add(overlay);
-        _revealCanvas = new GraphicsView { Drawable = _revealDrawing, InputTransparent = true }; root.Children.Add(_revealCanvas);
         Content = root; UpdateScore();
     }
 
@@ -137,56 +155,6 @@ public sealed partial class ScannerSessionPage
         for (var parent = element.Parent; parent is not null; parent = parent.Parent)
             if (ReferenceEquals(parent, ancestor)) return true;
         return false;
-    }
-
-    private async Task Reveal(ScannerSessionCard card, decimal previousTotal)
-    {
-        RequireOwner(); var highlight = _session!.IsHighlight(card);
-        var session = _session; var token = _lifetime.Token;
-        try { HapticFeedback.Default.Perform(highlight ? HapticFeedbackType.LongPress : HapticFeedbackType.Click); } catch (FeatureNotSupportedException) { }
-#if ANDROID
-        using var tone = _soundEnabled ? new Android.Media.ToneGenerator(Android.Media.Stream.Music, 60) : null;
-        tone?.StartTone(highlight ? Android.Media.Tone.PropAck : Android.Media.Tone.PropBeep, highlight ? 450 : 150);
-#endif
-        _revealValue.Text = card.MarketValue is { } value ? $"+ {Money(value.AmountBrl)}" : "Sem cotação";
-        _revealValue.FontSize = card.MarketValue is null ? 28 : 38;
-        _revealValue.TextColor = highlight ? Color.FromArgb("#FFDA77") : Color.FromArgb("#C8FFDD");
-        var panel = _revealPanel;
-        if (panel is null) return;
-        panel.IsVisible = true; panel.Opacity = 1;
-        _total.TextColor = _revealValue.TextColor;
-        _revealDrawing.Highlight = highlight; _revealDrawing.Visible = !UiMotion.ReducedMotion; _revealDrawing.Progress = 0;
-        try
-        {
-            if (!UiMotion.ReducedMotion)
-            {
-                new Animation(progress =>
-                {
-                    if (!_visible || _session?.Id != session.Id) return;
-                    _total.Text = Money(decimal.Round(previousTotal + (session.EstimatedValueBrl - previousTotal) * (decimal)progress, 2));
-                }).Commit(this, "SessionTotal", 16, 700, Easing.CubicOut);
-                new Animation(progress => { _revealDrawing.Progress = progress; _revealCanvas?.Invalidate(); })
-                    .Commit(this, "SessionConfetti", 16, 900u, Easing.Linear);
-                await panel.ScaleToAsync(highlight ? 1.035 : 1.015, 100, Easing.CubicOut);
-                token.ThrowIfCancellationRequested();
-                await panel.ScaleToAsync(1, 140, Easing.CubicOut);
-            }
-            await Task.Delay(650, token);
-            if (!UiMotion.ReducedMotion) await panel.FadeToAsync(0, 160, Easing.CubicIn);
-        }
-        finally
-        {
-            StopReveal();
-            if (_visible && _session?.Id == session.Id) UpdateScore();
-        }
-    }
-
-    private void StopReveal()
-    {
-        this.AbortAnimation("SessionTotal"); this.AbortAnimation("SessionConfetti");
-        _revealPanel?.CancelAnimations();
-        if (_revealPanel is not null) { _revealPanel.IsVisible = false; _revealPanel.Scale = 1; }
-        _revealDrawing.Visible = false; _revealCanvas?.Invalidate(); _total.TextColor = Colors.White; _total.Scale = 1;
     }
 
     private void SetIdentificationLoading(bool loading, bool captured = false)
@@ -221,28 +189,4 @@ public sealed partial class ScannerSessionPage
         }
     }
 
-    private sealed class SessionRevealDrawable : IDrawable
-    {
-        public bool Visible { get; set; }
-        public bool Highlight { get; set; }
-        public double Progress { get; set; }
-        public void Draw(ICanvas canvas, RectF bounds)
-        {
-            if (!Visible || Progress >= 1) return;
-            var p = (float)Progress; var color = Highlight ? Color.FromArgb("#FFDA77") : Color.FromArgb("#BBA4FF");
-            var centerX = bounds.Width * 0.5f; var centerY = bounds.Height * 0.45f;
-            canvas.StrokeColor = color; canvas.StrokeSize = 2; canvas.Alpha = (1 - p) * 0.5f;
-            canvas.DrawCircle(centerX, centerY, bounds.Width * (0.18f + p * 0.6f));
-            canvas.Alpha = 1 - p; var particles = Highlight ? 36 : 14;
-            for (var i = 0; i < particles; i++)
-            {
-                var angle = i * MathF.PI * 2 / particles;
-                var radius = bounds.Width * (0.08f + p * (0.45f + i % 3 * 0.08f));
-                var x = centerX + MathF.Cos(angle) * radius;
-                var y = centerY + MathF.Sin(angle) * radius * 0.9f + p * p * bounds.Height * 0.17f;
-                canvas.FillColor = i % 3 == 0 ? Colors.White : color;
-                canvas.FillRoundedRectangle(x, y, i % 2 == 0 ? 4 : 7, i % 2 == 0 ? 10 : 4, 2);
-            }
-        }
-    }
 }

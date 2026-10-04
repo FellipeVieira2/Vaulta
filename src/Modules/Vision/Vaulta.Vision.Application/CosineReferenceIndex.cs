@@ -6,7 +6,7 @@ public sealed class CosineReferenceIndex(EncoderIdentity identity,int maxReferen
 {
     private readonly EncoderIdentity _identity=identity;
     public int MaxReferences=>maxReferences;
-    public const string StorageVersion="cosine-half-v1";
+    public const string StorageVersion="cosine-half-printing-v2";
     private sealed record Reference(Guid ReferenceId,Guid PrintingId,Half[] Vector,double InverseNorm,string Origin);
     private sealed record Snapshot(string Version,Reference[] References);
     private Snapshot _snapshot=new("empty",[]);
@@ -64,17 +64,27 @@ public sealed class CosineReferenceIndex(EncoderIdentity identity,int maxReferen
         var vector=EmbeddingMath.Normalize(embedding.Vector,_identity.Dimension);var current=Volatile.Read(ref _snapshot);
         var comparer=Comparer<(double Score,Guid Id)>.Create((a,b)=>a.Score!=b.Score ? a.Score.CompareTo(b.Score) : b.Id.CompareTo(a.Id));
         var ranked=new PriorityQueue<VisualMatch,(double Score,Guid Id)>(comparer);
+        // Bound the working set by topK. Multiple confirmed photos improve a
+        // printing's best score without occupying slots belonging to other cards.
+        var selected=new Dictionary<Guid,VisualMatch>();
         foreach(var reference in current.References)
         {
             ct.ThrowIfCancellationRequested();double score=0;
             for(var i=0;i<vector.Length;i++)score+=(double)vector[i]*(float)reference.Vector[i];
             score=Math.Clamp(score*reference.InverseNorm,-1d,1d);
+            if(selected.TryGetValue(reference.PrintingId,out var prior))
+            {
+                if(score<prior.Similarity || score==prior.Similarity && reference.ReferenceId.CompareTo(prior.ReferenceId)>=0)continue;
+                ranked.Remove(prior,out _,out _);
+                selected.Remove(reference.PrintingId);
+            }
             if(ranked.Count==topK && ranked.TryPeek(out _,out var worst))
             {
                 if(score<worst.Score || score==worst.Score && reference.ReferenceId.CompareTo(worst.Id)>=0)continue;
-                ranked.Dequeue();
+                var removed=ranked.Dequeue();selected.Remove(removed.PrintingId);
             }
-            ranked.Enqueue(new(reference.ReferenceId,reference.PrintingId,score,reference.Origin),(score,reference.ReferenceId));
+            var match=new VisualMatch(reference.ReferenceId,reference.PrintingId,score,reference.Origin);
+            selected.Add(reference.PrintingId,match);ranked.Enqueue(match,(score,reference.ReferenceId));
         }
         return Task.FromResult(new VisualSearchSnapshot(new(current.Version,current.References.Length,_identity),
             ranked.UnorderedItems.Select(x=>x.Element).OrderByDescending(x=>x.Similarity).ThenBy(x=>x.ReferenceId).ToArray()));

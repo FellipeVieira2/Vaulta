@@ -18,9 +18,9 @@ public sealed class OnnxImageEncoder : Vaulta.Vision.Application.IImageEncoder,I
     private readonly float[] _mean;
     private readonly float[] _std;
     public EncoderIdentity Identity=>_manifest.Identity;
-    public OnnxImageEncoder(string manifestPath,int concurrency=2)
+    public OnnxImageEncoder(string manifestPath,int concurrency=2,bool offlineExperiment=false)
     {
-        _manifest=EncoderManifest.Load(manifestPath); _manifest.Validate();
+        _manifest=EncoderManifest.Load(manifestPath);if(offlineExperiment)_manifest.ValidateOffline();else _manifest.Validate();
         if(concurrency is <1 or >4) throw new ArgumentOutOfRangeException(nameof(concurrency));
         var weights=Path.Combine(Path.GetDirectoryName(Path.GetFullPath(manifestPath))!,_manifest.ModelFile);
         using(var stream=File.OpenRead(weights))
@@ -53,10 +53,7 @@ public sealed class OnnxImageEncoder : Vaulta.Vision.Application.IImageEncoder,I
         var info=Image.Identify(bytes);
         if(info.Width<1 || info.Height<1 || info.Width>8000 || info.Height>8000 || (long)info.Width*info.Height>20_000_000 || Math.Max(info.Width,info.Height)/(double)Math.Min(info.Width,info.Height)>8) throw new InvalidDataException("Capture exceeds the pixel limit.");
         using var image=Image.Load<Rgb24>(new DecoderOptions { MaxFrames=1 },bytes);
-        image.Mutate(context=>context.AutoOrient());
-        var scale=224d/Math.Min(image.Width,image.Height);
-        var width=Math.Max(224,(int)(image.Width*scale)); var height=Math.Max(224,(int)(image.Height*scale));
-        image.Mutate(context=>context.Resize(width,height,KnownResamplers.Bicubic).Crop(new Rectangle((width-224)/2,(height-224)/2,224,224)));
+        EncoderPreprocessing.Apply(image,_manifest);
         const int plane=224*224; var pixels=new float[3*plane];
         image.ProcessPixelRows(accessor=>
         {
@@ -76,7 +73,9 @@ public sealed class OnnxImageEncoder : Vaulta.Vision.Application.IImageEncoder,I
         var tensor=new DenseTensor<float>(pixels,[1,3,224,224]);
         using var results=_session.Run([NamedOnnxValue.CreateFromTensor(_manifest.InputTensor,tensor)],[_manifest.OutputTensor],run);
         ct.ThrowIfCancellationRequested();
-        return new(Identity,EmbeddingMath.Normalize(results.Single().AsTensor<float>().ToArray(),_manifest.Dimension));
+        var output=results.Single().AsTensor<float>();
+        var vector=_manifest.Pooling=="cls"?output.ToArray().AsSpan(0,_manifest.Dimension).ToArray():output.ToArray();
+        return new(Identity,EmbeddingMath.Normalize(vector,_manifest.Dimension));
     }
     public void Dispose() { _session.Dispose(); _slots.Dispose(); }
 }

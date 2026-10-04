@@ -160,7 +160,10 @@ public sealed partial class ScannerSessionPage : ContentPage
             var attempt=await ReserveHistory(operation.Context.Token);RequireScannerOperation(operation);
             var result=await _scanner.ScanCardAsync(photo,null,attempt?.AttemptId,attempt is null?null:Guid.NewGuid().ToString("N"),retrievalCrop,operation.Context.Token);RequireScannerOperation(operation);
             if(attempt is not null && result.History?.PersistenceStatus=="saved" && (_archiveTask is null || _archiveTask.IsCompleted))
-                _archiveTask=_captureArchive.ArchiveAsync(retrievalCrop??photo,attempt.AttemptId,operation.Context.Token);
+                _archiveTask=_captureArchive.ArchiveAsync(retrievalCrop??photo,retrievalCrop is null?null:photo,attempt.AttemptId,operation.Context.Token);
+#if DEBUG
+            _lastVisionDiagnostic=Vaulta.App.Core.Vision.VisionDebugSnapshot.Create(result);
+#endif
             await HandleContinuousResult(result,operation);
         }
         finally { SetIdentificationLoading(false); }

@@ -57,7 +57,8 @@ public sealed class VisionScannerService(IImageEncoder encoder,IVisualReferenceI
             var result=new VisionScanResultDto(Guid.NewGuid(),resolution.Status,resolution.PrintingId,resolution.VariantId,resolution.PrintingConfidence,resolution.VariantConfidence,displayed,quote,
                 quote is not null?"available":graded?"graded_unavailable":resolution.PrintingId is null?"unresolved":resolution.VariantId is null?"variant_pending":"unavailable",resolution.ReviewReason,fields,
                 new(encoded.Identity,retrieval.Index.Version,VisionPrintingResolver.Version,observed?.ModelVersion,observed?.PromptVersion,timer.ElapsedMilliseconds,Convert.ToHexString(SHA256.HashData(image)).ToLowerInvariant(),Convert.ToHexString(SHA256.HashData(evidenceCapture.Image)).ToLowerInvariant(),retrievalCapture.Role??"full-frame"),reading.Issue);
-            return new(result,encoded);
+            result=result with {Retrieval=retrieval.Matches.Select(x=>new VisionRetrievalMatchDto(x.PrintingId,x.ReferenceId,x.Similarity,x.Origin)).ToArray()};
+            return new(result,encoded);
         }
         finally { slots.Release(); }
     }

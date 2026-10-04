@@ -10,6 +10,12 @@ public static class VisionEndpoints
  {
   var v=app.MapGroup("/api/v1/vision").RequireAuthorization().WithTags("Vision");
   v.MapGet("/policies",(VisionHistoryService s)=>Results.Ok(s.Policies));
+  v.MapGet("/improvement/status",async(ClaimsPrincipal p,VisionHistoryService s,IServiceProvider services,CancellationToken ct)=>
+  {
+   if(!s.IsDeveloper(Owner(p)))return Results.NotFound();
+   var index=services.GetRequiredService<Vaulta.Vision.Application.IVisualReferenceIndex>();
+   return Results.Ok(await s.ImprovementStatusAsync(index,ct));
+  });
   v.MapPost("/attempts",async(CreateScanAttemptRequest r,ClaimsPrincipal p,VisionHistoryService s,CancellationToken ct)=>Results.Ok(await s.CreateAsync(Owner(p),r,ct)));
   v.MapGet("/attempts/{id:guid}",async(Guid id,ClaimsPrincipal p,VisionHistoryService s,CancellationToken ct)=>Results.Ok(await s.GetAsync(Owner(p),id,ct)));
   v.MapDelete("/attempts/{id:guid}",async(Guid id,ClaimsPrincipal p,VisionHistoryService s,CancellationToken ct)=>{await s.DeleteAsync(Owner(p),id,ct);return Results.NoContent();});

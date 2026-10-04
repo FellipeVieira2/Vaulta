@@ -75,6 +75,7 @@
     <Project Path="tests/Vaulta.ArchitectureTests/Vaulta.ArchitectureTests.csproj" />
     <Project Path="tests/Vaulta.Identity.IntegrationTests/Vaulta.Identity.IntegrationTests.csproj" />
     <Project Path="tests/Vaulta.Identity.UnitTests/Vaulta.Identity.UnitTests.csproj" />
+    <Project Path="tests/Vaulta.Vision.Encoding.UnitTests/Vaulta.Vision.Encoding.UnitTests.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Vision/">
     <Project Path="src/Modules/Vision/Vaulta.Vision.Contracts/Vaulta.Vision.Contracts.csproj" />

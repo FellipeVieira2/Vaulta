@@ -32,7 +32,7 @@ public sealed partial class ScannerSessionPage
         var captureStarted=false; var analysisStarted=false; var camera=_camera; var generation=_viewGeneration;
         try
         {
-            var blocked=_busy || _continuousInFlight || _previewAnalysisInFlight || _resultPanel?.IsVisible==true;
+            var blocked=_busy || _revealInFlight || _continuousInFlight || _previewAnalysisInFlight || _resultPanel?.IsVisible==true;
             var observation=CameraSceneSampler.ReadObservation(camera,!blocked);
             if(observation is null) return;
             if(blocked || !observation.CardPresent)
@@ -100,9 +100,16 @@ public sealed partial class ScannerSessionPage
                     var accepted=VisionAcceptance.CreateCard(result,true,printing.PrintingId,variant.Id)!;
                     if(quote is not null) accepted=accepted with {MarketValue=new(decimal.Round(quote.MarketValueBrl,2),quote.Source,quote.UpdatedAt,quote.OriginalValue,quote.OriginalCurrency,quote.ExchangeRate,quote.ExchangeRateAt)};
                     await SaveReading(accepted,operation);
+                    if(_session!.Cards.Any(x=>x.ScanId==accepted.ScanId))
+                        _=RecordHumanReview(result,accepted,operation,_archiveTask);
                 }));
             if(printing.Variants.Count==0)
-                _result.Children.Add(Action("Confirmar sem cotação",()=>SaveReading(VisionAcceptance.CreateCard(result,true,printing.PrintingId)!,operation)));
+                _result.Children.Add(Action("Confirmar sem cotação",async()=>
+                {
+                    var accepted=VisionAcceptance.CreateCard(result,true,printing.PrintingId)!;
+                    await SaveReading(accepted,operation);
+                    if(_session!.Cards.Any(x=>x.ScanId==accepted.ScanId))_=RecordHumanReview(result,accepted,operation,_archiveTask);
+                }));
         }
         _result.Children.Add(Action("Pular carta",()=> { ClearResults(); _status.Text="Mostre a próxima carta."; return Task.CompletedTask; }));
         if(_resultPanel is not null) _resultPanel.IsVisible=true;
@@ -159,12 +166,14 @@ public sealed partial class ScannerSessionPage
             RequireScannerOperation(operation);
             if(!again){ClearResults();_status.Text="Carta não adicionada. Mostre a próxima carta.";return;}
         }
+        // A missing/uncertain finish or graded card cannot borrow a raw quote.
+        if(ScannerRevealPresentation.Create(card,0,0).Kind!=ScannerRevealKind.Price)card=card with{MarketValue=null};
         var previousTotal = operation.Session.EstimatedValueBrl;
         var added = operation.Session.Add(card); await _store.Save(added, operation.Context.Token); RequireScannerOperation(operation); _session = added;
         ClearResults(); _status.Text = card.MarketValue is null ? "Pode retirar a carta · adicionada sem cotação." : "Pode retirar a carta.";
         UpdateScore();
         SetIdentificationLoading(false);
-        await Reveal(card, previousTotal); RequireScannerOperation(operation);
+        await Reveal(card, previousTotal, operation); RequireScannerOperation(operation);
         _status.Text = "Mostre a próxima carta · captura automática.";
     }
 }

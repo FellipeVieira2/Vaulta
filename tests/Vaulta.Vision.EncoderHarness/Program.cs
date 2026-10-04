@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using Vaulta.Vision.Encoding;
 using Vaulta.Vision.Domain;
+if(args.FirstOrDefault()=="--offline-smoke") {await Vaulta.Vision.EncoderHarness.OfflineSmokeHarness.RunAsync(args.Skip(1).ToArray());return;}
 if(args.Length<2) throw new ArgumentException("Usage: <manifest> <image-directory>");
 using var encoder=new OnnxImageEncoder(args[0]);
 // Real runtime also rejects extreme aspect ratios before allocating an enormous resize.

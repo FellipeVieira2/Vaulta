@@ -22,6 +22,7 @@ using Vaulta.Vision.Infrastructure;
 using Vaulta.Web.Api;
 
 if (await VisionCommands.TryInstallModelAsync(args)) return;
+if (await VisionOfflineEncoderCommands.TryExecuteAsync(args)) return;
 var builder = WebApplication.CreateBuilder(CatalogCommands.HostArguments(args));
 VisionCommands.Configure(builder.Configuration,args);
 builder.Logging.ClearProviders();
@@ -30,7 +31,7 @@ builder.Services.AddTrustedReverseProxy(builder.Configuration);
 builder.Services.AddIdentityModule(builder.Configuration);
 builder.Services.AddCatalogModule(builder.Configuration);
 builder.Services.AddAssetsModule(builder.Configuration);
-builder.Services.AddVisionModule(builder.Configuration);
+builder.Services.AddVisionModule(builder.Configuration,builder.Environment.IsDevelopment());
 builder.Services.AddCollectionModule(builder.Configuration);
 builder.Services.AddMarketplaceModule(builder.Configuration);
 builder.Services.AddOrdersModule(builder.Configuration);

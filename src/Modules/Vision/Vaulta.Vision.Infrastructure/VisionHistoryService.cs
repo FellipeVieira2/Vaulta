@@ -7,7 +7,7 @@ using Vaulta.Vision.Application;
 using Vaulta.Vision.Contracts;
 using Vaulta.Vision.Domain;
 namespace Vaulta.Vision.Infrastructure;
-public sealed class VisionHistoryService(VisionDbContext db,IPrivateAssetService assets,IVisionCatalog catalog,IClock clock,VisionHistoryOptions options)
+public sealed partial class VisionHistoryService(VisionDbContext db,IPrivateAssetService assets,IVisionCatalog catalog,IClock clock,VisionHistoryOptions options,VisionImprovementOptions? improvement=null,VisualIndexRefreshSignal? refresh=null,Microsoft.Extensions.Logging.ILogger<VisionHistoryService>? logger=null)
 {
  private static readonly JsonSerializerOptions Json=new(JsonSerializerDefaults.Web);
  public VisionPoliciesDto Policies=>new(options.Enabled,options.OperationalPolicyVersion,options.ImprovementPolicyVersion,options.RetentionDays);
@@ -43,7 +43,8 @@ public sealed class VisionHistoryService(VisionDbContext db,IPrivateAssetService
   if(embedding.Identity!=result.Trace.Encoder || embedding.Vector.Length!=embedding.Identity.Dimension) throw new DomainException("Run embedding does not match its executed manifest.");
   run.PredictionJson=JsonSerializer.Serialize(result with {Price=null,PriceStatus=result.PriceStatus=="available"?"unavailable":result.PriceStatus,History=null},Json);
   run.ManifestJson=JsonSerializer.Serialize(result.Trace,Json);run.Embedding=EmbeddingMath.Normalize(embedding.Vector,embedding.Identity.Dimension);run.Status="completed";run.CompletedAt=clock.UtcNow;
-  db.ScanRunCandidates.AddRange(result.Candidates.Take(10).Select((c,i)=>new ScanRunCandidate {RunId=runId,Rank=i+1,PrintingId=c.Printing.PrintingId,RetrievalScore=c.RetrievalScore}));await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);
+  var original=result.Retrieval?.Select(c=>(c.PrintingId,Score:(double?)c.Similarity)).ToArray()??result.Candidates.Select(c=>(c.Printing.PrintingId,Score:c.RetrievalScore)).ToArray();
+  db.ScanRunCandidates.AddRange(original.Take(10).Select((c,i)=>new ScanRunCandidate {RunId=runId,Rank=i+1,PrintingId=c.PrintingId,RetrievalScore=c.Score}));await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);
  }
  public async Task<VisionAttemptDetailsDto> GetAsync(Guid owner,Guid attempt,CancellationToken ct)
  {
@@ -68,7 +69,9 @@ public sealed class VisionHistoryService(VisionDbContext db,IPrivateAssetService
   var details=await assets.GetOwnedAsync(owner,row.AssetId,ct);if(details is null || details.Purpose!="vision-scan" || details.Sha256!=row.Sha256) throw new DomainException("Capture asset mismatch.");
   await uploads.ConfirmUpload(owner,row.AssetId,ct);await assets.FinalizeOwnedAsync(owner,row.AssetId,ct);details=await assets.GetOwnedAsync(owner,row.AssetId,ct);
   if(details?.Status!="ready" || details.Sha256!=row.Sha256) throw new DomainException("Capture is not verified in storage.");
-  row.Status="ready";row.ConfirmedAt??=clock.UtcNow;await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);return new(row.Id,row.AssetId,row.Sequence,row.Role,row.Sha256,row.Status);
+  row.Status="ready";row.ConfirmedAt??=clock.UtcNow;await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);await tx.DisposeAsync();
+  await RetryDeveloperFeedbackAsync(owner,attempt,ct);
+  return new(row.Id,row.AssetId,row.Sequence,row.Role,row.Sha256,row.Status);
  }
  public async Task<VisionFeedbackDto> FeedbackAsync(Guid owner,Guid attempt,string key,VisionFeedbackRequest request,CancellationToken ct)
  {
@@ -79,13 +82,15 @@ public sealed class VisionHistoryService(VisionDbContext db,IPrivateAssetService
   { var canonical=(await catalog.GetPrintingsAsync([p],ct)).SingleOrDefault();if(canonical is null || request.ConfirmedVariantId is { } v && !canonical.Printing.Variants.Any(x=>x.Id==v)) throw new DomainException("Printing/variant does not exist or does not match."); }
   var prior=await db.Feedback.SingleOrDefaultAsync(x=>x.AttemptId==attempt && x.IdempotencyKey==key,ct);
   if(prior is not null)
-  { var previous=new VisionFeedbackRequest(prior.RunId,prior.Source,prior.PrintingId,prior.VariantId,prior.Orientation,prior.Presence,prior.Notes);if(previous!=request) throw new ConflictException("Feedback key already has different content.");await tx.CommitAsync(ct);return new(prior.Id,previous,prior.CreatedAt); }
+  { var previous=new VisionFeedbackRequest(prior.RunId,prior.Source,prior.PrintingId,prior.VariantId,prior.Orientation,prior.Presence,prior.Notes);if(previous!=request) throw new ConflictException("Feedback key already has different content.");await tx.CommitAsync(ct);await tx.DisposeAsync();return new(prior.Id,previous,prior.CreatedAt,await TryDeveloperPromotionAsync(owner,attempt,prior,ct)); }
   if(await db.Feedback.CountAsync(x=>x.AttemptId==attempt,ct)>=100) throw new DomainException("Feedback limit reached.");
   var latestAt=await db.Feedback.Where(x=>x.RunId==request.RunId).MaxAsync(x=>(DateTimeOffset?)x.CreatedAt,ct);
   var createdAt=latestAt is { } last && last.AddTicks(10)>clock.UtcNow?last.AddTicks(10):clock.UtcNow;
   var captureAssets=await db.ScanCaptures.Where(x=>x.AttemptId==attempt).Select(x=>x.AssetId).ToArrayAsync(ct);
-  await db.VisualReferences.Where(x=>x.Origin=="verified_capture" && x.SourceAssetId!=null && captureAssets.Contains(x.SourceAssetId.Value)).ExecuteDeleteAsync(ct);
-  var row=new VisionFeedback {Id=Guid.NewGuid(),AttemptId=attempt,RunId=request.RunId,IdempotencyKey=key,Source=request.Source,PrintingId=request.ConfirmedPrintingId,VariantId=request.ConfirmedVariantId,Orientation=request.Orientation,Presence=request.Presence,Notes=request.Notes,CreatedAt=createdAt};db.Feedback.Add(row);await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);return new(row.Id,request,row.CreatedAt);
+  var invalidated=await db.VisualReferences.Where(x=>x.Origin=="verified_capture" && x.SourceAssetId!=null && captureAssets.Contains(x.SourceAssetId.Value)).ExecuteDeleteAsync(ct);
+  var row=new VisionFeedback {Id=Guid.NewGuid(),AttemptId=attempt,RunId=request.RunId,IdempotencyKey=key,Source=request.Source,PrintingId=request.ConfirmedPrintingId,VariantId=request.ConfirmedVariantId,Orientation=request.Orientation,Presence=request.Presence,Notes=request.Notes,CreatedAt=createdAt};db.Feedback.Add(row);await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);await tx.DisposeAsync();
+  if(invalidated>0)refresh?.Request();
+  return new(row.Id,request,row.CreatedAt,await TryDeveloperPromotionAsync(owner,attempt,row,ct));
  }
  public async Task DeleteAsync(Guid owner,Guid attempt,CancellationToken ct)
  {
@@ -97,11 +102,11 @@ public sealed class VisionHistoryService(VisionDbContext db,IPrivateAssetService
   foreach(var run in await db.ScanRuns.Where(x=>x.AttemptId==attempt).ToArrayAsync(ct)) { run.Embedding=null;run.PredictionJson=null;run.ManifestJson=null; }
   await db.ReviewedSamples.Where(x=>x.AttemptId==attempt).ExecuteDeleteAsync(ct);await db.Feedback.Where(x=>x.AttemptId==attempt).ExecuteDeleteAsync(ct);
   // A signed PUT can outlive logical withdrawal. Repeat physical deletion until every issued URL has expired.
-  a.Status=captures.Any(x=>x.CreatedAt.AddMinutes(11)>clock.UtcNow)?"deletion_pending":"deleted";await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);
+  a.Status=captures.Any(x=>x.CreatedAt.AddMinutes(11)>clock.UtcNow)?"deletion_pending":"deleted";await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);refresh?.Request();
  }
  public async Task<int> PurgeExpiredAsync(CancellationToken ct)
  { var expired=await db.ScanAttempts.AsNoTracking().Where(x=>x.RetentionUntil<=clock.UtcNow && x.Status!="deleted" || x.Status=="deletion_pending").OrderBy(x=>x.RetentionUntil).Take(100).Select(x=>new{x.Id,x.OwnerId}).ToArrayAsync(ct);foreach(var row in expired) await DeleteAsync(row.OwnerId,row.Id,ct);return expired.Length; }
- public async Task<Guid> PromoteAsync(Guid attempt,Guid feedback,CancellationToken ct)
+ public async Task<Guid> PromoteAsync(Guid attempt,Guid feedback,CancellationToken ct,string reviewSource="operator-cli")
  {
   await using var tx=await db.Database.BeginTransactionAsync(ct);await Lock(attempt,ct);
   var owner=await db.ScanAttempts.AsNoTracking().Where(x=>x.Id==attempt).Select(x=>(Guid?)x.OwnerId).SingleOrDefaultAsync(ct)??throw new NotFoundException("Attempt not found.");
@@ -116,18 +121,23 @@ public sealed class VisionHistoryService(VisionDbContext db,IPrivateAssetService
   var verified=await assets.ReadOwnedAsync(a.OwnerId,capture.AssetId,ct);
   if(verified is null || !Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(verified)).Equals(imageSha,StringComparison.OrdinalIgnoreCase))throw new DomainException("Capture content does not match its executed input.");
   var prior=await db.ReviewedSamples.SingleOrDefaultAsync(x=>x.FeedbackId==feedback && x.CaptureId==capture.Id,ct);if(prior is not null) {await tx.CommitAsync(ct);return prior.Id;}
-  var sample=new VisionReviewedSample {Id=Guid.NewGuid(),AttemptId=attempt,FeedbackId=feedback,CaptureId=capture.Id,ReviewedAt=clock.UtcNow};db.ReviewedSamples.Add(sample);
+  var sample=new VisionReviewedSample {Id=Guid.NewGuid(),AttemptId=attempt,FeedbackId=feedback,CaptureId=capture.Id,ReviewedAt=clock.UtcNow,ReviewSource=reviewSource};db.ReviewedSamples.Add(sample);
   await db.VisualReferences.Where(x=>x.Origin=="verified_capture" && x.SourceAssetId==capture.AssetId).ExecuteDeleteAsync(ct);
   if(f.PrintingId is { } printing && f.Orientation=="front" && f.Presence=="card-present" && run.Embedding is not null)
   {
    var canonical=(await catalog.GetPrintingsAsync([printing],ct)).SingleOrDefault();if(canonical is null || f.VariantId is { } v && !canonical.Printing.Variants.Any(x=>x.Id==v)) throw new DomainException("Reviewed identity is no longer active.");
    if(trace is null)throw new DomainException("Executed manifest is unavailable.");var vector=EmbeddingMath.Normalize(run.Embedding,trace.Encoder.Dimension);
    var version=VisualReferenceBuilder.ModelVersion(trace.Encoder);
+   await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({"vision:sha:"+imageSha+":"+version}))",ct);
+   var identical=await db.VisualReferences.AsNoTracking().Where(x=>x.Origin=="verified_capture" && x.ModelVersion==version && x.ImageSha256==imageSha && x.Status=="ready").ToArrayAsync(ct);
+   if(identical.Any(x=>x.PrintingId!=printing))throw new ConflictException("Identical capture has a conflicting verified identity; operator review is required.");
    // Each asset has at most one live identity per model. A later correction replaces its reference, never the run/feedback.
    await db.VisualReferences.Where(x=>x.Origin=="verified_capture" && x.SourceAssetId==capture.AssetId && x.ModelVersion==version).ExecuteDeleteAsync(ct);
-   db.VisualReferences.Add(new VisualReference {Id=Guid.NewGuid(),PrintingId=printing,SourceAssetId=capture.AssetId,Origin="verified_capture",Status="ready",ModelVersion=version,ModelManifestJson=JsonSerializer.Serialize(trace.Encoder),Dimension=trace.Encoder.Dimension,Vector=vector,ImageSha256=imageSha,VectorSha256=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Runtime.InteropServices.MemoryMarshal.AsBytes(vector.AsSpan()))).ToLowerInvariant(),CreatedAt=clock.UtcNow,UpdatedAt=clock.UtcNow});
+   if(identical.Length==0)db.VisualReferences.Add(new VisualReference {Id=Guid.NewGuid(),PrintingId=printing,SourceAssetId=capture.AssetId,Origin="verified_capture",Status="ready",ModelVersion=version,ModelManifestJson=JsonSerializer.Serialize(trace.Encoder),Dimension=trace.Encoder.Dimension,Vector=vector,ImageSha256=imageSha,VectorSha256=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Runtime.InteropServices.MemoryMarshal.AsBytes(vector.AsSpan()))).ToLowerInvariant(),CreatedAt=clock.UtcNow,UpdatedAt=clock.UtcNow});
   }
-  await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);return sample.Id;
+  await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);refresh?.Request();
+  Microsoft.Extensions.Logging.LoggerExtensions.LogInformation(logger??Microsoft.Extensions.Logging.Abstractions.NullLogger<VisionHistoryService>.Instance,"Vision improvement promoted sample: origin={Origin}, printingId={PrintingId}, modelVersion={ModelVersion}, reviewSource={ReviewSource}","verified_capture",f.PrintingId,trace is null?null:VisualReferenceBuilder.ModelVersion(trace.Encoder),reviewSource);
+  return sample.Id;
  }
  public async Task<VisionBenchmarkManifestDto> ExportAsync(string version,CancellationToken ct)
  {
