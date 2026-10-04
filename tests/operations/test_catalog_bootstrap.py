@@ -11,6 +11,17 @@ class CatalogBootstrapTests(unittest.TestCase):
     def test_report_ignores_log_objects_and_reads_final_catalog_report(self):
         text='{"EventId":1,"Message":"untrusted data"}\n'+json.dumps({"sync":{"status":"completed"},"preparation":{"complete":True}})
         self.assertEqual("completed",bootstrap.parse_report(text)["sync"]["status"])
+    def test_metadata_only_report_is_accepted(self):
+        report=bootstrap.parse_report('{"id":"run","status":"completed","recordsRead":200}')
+        self.assertEqual("completed",bootstrap.classify(0,report))
+    def test_failed_artwork_prevents_complete_pipeline(self):
+        state={"languages":{"en":{"status":"completed"}},"artwork":{"status":"failed"},"vision":{"status":"completed"}}
+        self.assertEqual("completed_with_pending",bootstrap.pipeline_status(state,["en"]))
+    def test_absent_requested_language_prevents_complete_pipeline(self):
+        state={"languages":{"en":{"status":"completed"}},"artwork":{"status":"completed"},"vision":{"status":"completed"}}
+        self.assertEqual("completed_with_pending",bootstrap.pipeline_status(state,["en","ja"]))
+    def test_artwork_command_does_not_build_embeddings(self):
+        self.assertIn("Vision__ModelManifestPath=",bootstrap.artwork_arguments())
     def test_incomplete_assets_are_partial_even_when_metadata_completed(self):
         self.assertEqual("partial",bootstrap.classify(1,{"sync":{"status":"completed"},"preparation":{"complete":False}}))
     def test_oom_never_becomes_completed_from_a_report(self):

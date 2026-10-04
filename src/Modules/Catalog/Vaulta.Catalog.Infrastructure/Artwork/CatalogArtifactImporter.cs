@@ -16,7 +16,6 @@ namespace Vaulta.Catalog.Infrastructure.Artwork;
 public sealed class CatalogArtifactImporter(
     IServiceScopeFactory scopeFactory,
     CatalogArtworkDownloader download,
-    ICatalogSearch catalog,
     IBrlExchangeRateProvider exchange,
     IClock clock,
     IOptions<ArtworkImportOptions> options,
@@ -154,6 +153,7 @@ public sealed class CatalogArtifactImporter(
             await using var scope = scopeFactory.CreateAsyncScope();
             var workerDb = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
             var workerAssets = scope.ServiceProvider.GetRequiredService<ISystemAssetService>();
+            var workerCatalog = scope.ServiceProvider.GetRequiredService<ICatalogSearch>();
             var workerClock = scope.ServiceProvider.GetRequiredService<IClock>();
 
             try
@@ -231,7 +231,7 @@ public sealed class CatalogArtifactImporter(
                 {
                     try
                     {
-                        var details = await catalog.GetPrinting(printing.Id, ct);
+                        var details = await workerCatalog.GetPrinting(printing.Id, ct);
                         var quotes = CatalogPriceParser.Read(
                             printing.SourcePricingJson, printing.Variants.ToArray(), rates);
                         if (quotes.Count > 0)
@@ -263,7 +263,7 @@ public sealed class CatalogArtifactImporter(
                 if (!recent) printing.ArtworkCheckedAt = workerClock.UtcNow;
                 await workerDb.SaveChangesAsync(ct);
             }
-            catch (Exception error) when (error is not OperationCanceledException)
+            catch (Exception error) when (error is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 Interlocked.Increment(ref counters.Failed);
                 logger.LogWarning("Catalog artifact failed for {PrintingId}: {ErrorType}",

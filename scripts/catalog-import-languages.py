@@ -20,14 +20,25 @@ def parse_report(output):
     for match in re.finditer(r"(?m)^\{",output):
         try:
             value,_=decoder.raw_decode(output[match.start():])
-            if isinstance(value,dict) and isinstance(value.get("sync"),dict):result=value
+            if isinstance(value,dict):
+                if isinstance(value.get("sync"),dict):result=value
+                elif "id" in value and value.get("status") in ("completed","partial","failed"):result={"sync":value}
         except (ValueError,TypeError):pass
     return result
 
 def classify(exit_code,report):
     if exit_code not in (0,1):return "failed"
     if report.get("sync",{}).get("status") not in ("completed","partial"):return "failed"
-    return "completed" if exit_code==0 and report.get("preparation",{}).get("complete") is True else "partial"
+    return "completed" if exit_code==0 and report["sync"]["status"]=="completed" and ("preparation" not in report or report["preparation"].get("complete") is True) else "partial"
+
+def pipeline_status(state,languages):
+    metadata=all(state.get("languages",{}).get(lang,{}).get("status") in ("completed","no_data") for lang in languages)
+    ready=metadata and all(state.get(phase,{}).get("status")=="completed" for phase in ("artwork","vision"))
+    return "completed" if ready else "completed_with_pending"
+
+def artwork_arguments():
+    return ["-e","Vision__ModelManifestPath=","-e","Logging__LogLevel__Microsoft.EntityFrameworkCore=Warning",
+        "-e","Logging__LogLevel__System.Net.Http.HttpClient=Warning","vaulta-api","--catalog-assets-import","all"]
 
 def ensure_container(name,exists,launch):
     if exists(name):return "existing"
@@ -41,7 +52,7 @@ def main():
     import fcntl
     parser=argparse.ArgumentParser()
     parser.add_argument("--root",default="/opt/vaulta")
-    parser.add_argument("--languages",default="pt-br,en,ja")
+    parser.add_argument("--languages",default=",".join(LANGUAGES))
     parser.add_argument("--follow-en",help="Adopt a previously started English import instead of duplicating it.")
     parser.add_argument("--phase",choices=["metadata","artwork","vision"],
         help="Run only specific phase: metadata (TCGdex sync), artwork (download/S3), vision (embeddings). Default: all phases.")
@@ -81,10 +92,7 @@ def main():
         name="vaulta-artwork-all-"+tag[:24]
         state["artwork"]={"status":"pending","startedAt":now(),"container":name};save()
         def launch_artwork(job):
-            run(compose+["run","-d","--no-deps","--name",job,
-                "-e","Logging__LogLevel__Microsoft.EntityFrameworkCore=Warning",
-                "-e","Logging__LogLevel__System.Net.Http.HttpClient=Warning",
-                "vaulta-api","--catalog-assets-import","all"])
+            run(compose+["run","-d","--no-deps","--name",job]+artwork_arguments())
             run(["docker","update","--cpus",".5","--memory","768m","--memory-swap","1280m",job])
         ensure_container(name,exists,launch_artwork)
         entry=state["artwork"];entry["status"]="running";save()
@@ -142,10 +150,7 @@ def main():
             name="vaulta-artwork-all-"+tag[:24]
             state["artwork"]={"status":"pending","startedAt":now(),"container":name};save()
             def launch_artwork(job):
-                run(compose+["run","-d","--no-deps","--name",job,
-                    "-e","Logging__LogLevel__Microsoft.EntityFrameworkCore=Warning",
-                    "-e","Logging__LogLevel__System.Net.Http.HttpClient=Warning",
-                    "vaulta-api","--catalog-assets-import","all"])
+                run(compose+["run","-d","--no-deps","--name",job]+artwork_arguments())
                 run(["docker","update","--cpus",".5","--memory","768m","--memory-swap","1280m",job])
             ensure_container(name,exists,launch_artwork)
             artwork_entry=state["artwork"];artwork_entry["status"]="running";save()
@@ -166,7 +171,7 @@ def main():
             vision_entry=state["vision"];vision_entry["status"]="running";save()
             code=int(run(["docker","wait",name]).stdout.strip())
             vision_entry.update({"status":"completed" if code==0 else "failed","exitCode":code,"finishedAt":now()});save()
-    state["status"]="completed" if all(x.get("status") in ("completed","no_data") for x in state["languages"].values()) else "completed_with_pending"
+    state["status"]=pipeline_status(state,languages) if phase is None else ("metadata_completed" if all(state["languages"].get(lang,{}).get("status") in ("completed","no_data") for lang in languages) else "completed_with_pending")
     save()
     print(json.dumps({"status":state["status"],"languages":{k:v.get("status") for k,v in state["languages"].items()}}))
 if __name__=="__main__":main()

@@ -101,7 +101,8 @@
 - [x] Remover gate rígido de 1 segundo. Disparar pelo frame utilizável, persistir foto e liberar posição física enquanto resolve; não esperar usuário manter celular apontado.
 - [x] Mostrar “Vire a carta” para verso sustentado, sem identificar Printing pelo verso comum. Desconhecido não vira bloqueio permanente.
 - [x] Integrar novo cliente e política de confirmação; manter animação discreta, valor breve, total parcial e próxima carta. Não deixar última carta ocupando a tela.
-- [ ] Compilar Android e executar harness/emulador; medir custo do preview/inferência e testar em dispositivo disponível sem inventar validação física.
+- [x] Compilar Android ARM64, verificar assinatura e inclusão dos pesos ONNX.
+- [ ] Executar harness/emulador; medir custo do preview/inferência e testar em dispositivo disponível sem inventar validação física.
 
 ## Task 7: Histórico real, feedback e memória incremental
 
