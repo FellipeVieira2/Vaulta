@@ -5,11 +5,11 @@ using Vaulta.App.Core.Marketplace;
 
 namespace Vaulta.App.ViewModels;
 
-public partial class MarketplaceHomeViewModel(MarketplaceHomeController controller) : ObservableObject
+public partial class MarketplaceHomeViewModel(MarketplaceProductBrowseController controller) : ObservableObject
 {
     private CancellationTokenSource? _debounce;
     private bool _active;
-    public ObservableCollection<MarketplaceListingPresentation> Listings { get; } = [];
+    public ObservableCollection<MarketplaceProductPresentation> Products { get; } = [];
     [ObservableProperty] private string searchText = "";
     [ObservableProperty] private string? selectedGameCode = "pokemon";
     [ObservableProperty] private string selectedSort = "newest";
@@ -85,12 +85,15 @@ public partial class MarketplaceHomeViewModel(MarketplaceHomeController controll
         // One refresh after updating all controls; intermediate combinations must not issue calls.
         var active = _active;
         _active = false;
-        SearchText = ""; SelectedGameCode = null; SelectedSort = "newest";
+        _advanced = new(); SearchText = ""; SelectedGameCode = "pokemon"; SelectedSort = "newest";
         _active = active;
         await RefreshAsync();
     }
 
-    private MarketplaceHomeFilters Filters() => new(SearchText, SelectedGameCode, SelectedSort);
+    private MarketplaceProductFilters _advanced = new();
+    public MarketplaceProductFilters CurrentFilters => _advanced with { Query = SearchText, GameCode = SelectedGameCode, Sort = SelectedSort };
+    public Task ApplyFiltersAsync(MarketplaceProductFilters filters) { _advanced = filters; return _active ? RefreshAsync() : Task.CompletedTask; }
+    private MarketplaceProductFilters Filters() => CurrentFilters;
     private void CancelDebounce()
     {
         var cancellation = _debounce;
@@ -107,17 +110,17 @@ public partial class MarketplaceHomeViewModel(MarketplaceHomeController controll
         ShowInitialProblem = HasProblem && state.Items.Count == 0;
         ShowFooterProblem = HasProblem && state.Items.Count > 0;
         StatusTitle = state.Problem == MarketplaceHomeProblem.Offline ? "Você está offline" : "Não foi possível carregar";
-        StatusMessage = ShowFooterProblem ? $"{state.Message} Os anúncios já carregados continuam disponíveis." : state.Message;
+        StatusMessage = ShowFooterProblem ? $"{state.Message} As cartas já carregadas continuam disponíveis." : state.Message;
         HasMore = state.HasMore && !state.IsBusy && !HasProblem;
-        SectionTitle = string.IsNullOrWhiteSpace(state.Filters.Query) && state.Filters.Sort == "newest" ? "Recém anunciadas" : "Anúncios";
-        ResultSummary = state.HasLoaded ? $"{state.TotalCount} anúncio{(state.TotalCount == 1 ? "" : "s")}" : "";
-        var now = DateTimeOffset.UtcNow;
+        SectionTitle = string.IsNullOrWhiteSpace(state.Filters.Query) && state.Filters.Sort == "newest" ? "Cartas à venda" : "Cartas encontradas";
+        ResultSummary = state.HasLoaded ? $"{state.TotalCount} carta{(state.TotalCount == 1 ? "" : "s")}" : "";
+
         for (var index = 0; index < state.Items.Count; index++)
         {
-            var item = MarketplaceListingPresentation.From(state.Items[index], now);
-            if (index >= Listings.Count) Listings.Add(item);
-            else if (Listings[index] != item) Listings[index] = item;
+            var item = MarketplaceProductPresentation.From(state.Items[index]);
+            if (index >= Products.Count) Products.Add(item);
+            else if (Products[index] != item) Products[index] = item;
         }
-        while (Listings.Count > state.Items.Count) Listings.RemoveAt(Listings.Count - 1);
+        while (Products.Count > state.Items.Count) Products.RemoveAt(Products.Count - 1);
     });
 }

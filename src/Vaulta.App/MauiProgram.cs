@@ -98,6 +98,9 @@ public static class MauiProgram
         builder.Services.AddHttpClient<IMarketplaceClient, MarketplaceClient>((serviceProvider, client) =>
                 client.BaseAddress = ResolveBaseAddress(serviceProvider))
             .AddHttpMessageHandler<AuthorizingHttpMessageHandler>();
+        builder.Services.AddHttpClient<IMarketplaceProductClient, MarketplaceProductClient>((serviceProvider, client) =>
+                client.BaseAddress = ResolveBaseAddress(serviceProvider))
+            .AddHttpMessageHandler<AuthorizingHttpMessageHandler>();
         builder.Services.AddHttpClient<IOrdersClient, OrdersClient>((serviceProvider, client) =>
                 client.BaseAddress = ResolveBaseAddress(serviceProvider))
             .AddHttpMessageHandler<AuthorizingHttpMessageHandler>();
@@ -138,10 +141,16 @@ public static class MauiProgram
         builder.Services.AddTransient<ScannerSaleViewModel>();
         builder.Services.AddTransient<ScannerSalePage>();
         builder.Services.AddTransient<MarketplaceHomeController>(sp => new(sp.GetRequiredService<IMarketplaceClient>(),
-            () => Connectivity.Current.NetworkAccess == NetworkAccess.Internet));
+            () => { try { return Connectivity.Current.NetworkAccess == NetworkAccess.Internet; } catch { return false; } }));
         builder.Services.AddTransient<MarketplaceHomeViewModel>();
+        builder.Services.AddTransient<MarketplaceProductBrowseController>(sp => new(sp.GetRequiredService<IMarketplaceProductClient>(),
+            () => { try { return Connectivity.Current.NetworkAccess == NetworkAccess.Internet; } catch { return false; } }));
+        builder.Services.AddTransient<MarketplaceProductDetailController>();
+        builder.Services.AddTransient<MarketplaceProductDetailViewModel>();
+        builder.Services.AddTransient<MarketplaceProductDetailPage>();
         builder.Services.AddTransient<MarketplaceHomePage>();
-        builder.Services.AddTransient<MarketplaceListingDetailController>();
+        builder.Services.AddTransient<MarketplaceListingDetailController>(sp => new(
+            sp.GetRequiredService<IMarketplaceClient>(),sp.GetRequiredService<ICatalogClient>(),loadComparisons:false));
         builder.Services.AddTransient<MarketplaceListingDetailViewModel>();
         builder.Services.AddTransient<MarketplaceListingDetailPage>();
         builder.Services.AddTransient<MarketplaceSellerViewModel>();

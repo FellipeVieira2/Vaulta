@@ -249,6 +249,21 @@ public sealed partial class ScannerSessionPage : ContentPage
         }
         if (variants.Length == 0) _result.Children.Add(Action("Adicionar sem cotação",
             () => AddIdentifiedCard(details, null, condition, null, scanId, scannedAt, operation, visual)));
+        var marketplace = Action("Ver ofertas desta carta", async () =>
+        {
+            Guid? variantId = null;
+            if (variants.Length == 1) variantId = variants[0].Id;
+            else if (variants.Length > 1)
+            {
+                var chosen = await DisplayActionSheetAsync("Qual acabamento deseja consultar?", "Cancelar", null, variants.Select(x=>x.Name).ToArray());
+                var selected = variants.FirstOrDefault(x=>x.Name==chosen);
+                if (selected is null) return;
+                variantId = selected.Id;
+            }
+            await Shell.Current.GoToAsync($"marketplace-product?printingId={details.Printing.PrintingId}&variantKey={variantId?.ToString() ?? "none"}");
+        });
+        marketplace.IsEnabled = _videoClip is null;
+        _result.Children.Add(marketplace);
         _result.Children.Add(Action("Pular carta", () => { ClearResults(); _status.Text = "Mostre a próxima carta."; return Task.CompletedTask; }));
         if (_resultPanel is not null) _resultPanel.IsVisible = true;
     }

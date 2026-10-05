@@ -14,7 +14,7 @@ public sealed record MarketplaceListingDetailState(Guid? ListingId = null, Listi
 }
 
 /// <summary>Public detail and compatible offers, without checkout or private seller profile access.</summary>
-public sealed class MarketplaceListingDetailController(IMarketplaceClient marketplace, ICatalogClient catalog) : IDisposable
+public sealed class MarketplaceListingDetailController(IMarketplaceClient marketplace, ICatalogClient catalog, bool loadComparisons = true) : IDisposable
 {
     private enum LoadMode { Detail, Comparisons, MoreComparisons }
     private readonly object _gate = new();
@@ -87,7 +87,8 @@ public sealed class MarketplaceListingDetailController(IMarketplaceClient market
                 }
                 source.Token.ThrowIfCancellationRequested();
                 var loaded = listing;
-                if (!Complete(generation, state => state with { Listing = loaded, IsLoading = false, IsComparing = true, MetadataMessage = metadataMessage })) return;
+                if (!Complete(generation, state => state with { Listing = loaded, IsLoading = false, IsComparing = loadComparisons, MetadataMessage = metadataMessage })) return;
+                if (!loadComparisons) return;
             }
             try
             {

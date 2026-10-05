@@ -35,7 +35,7 @@ public sealed class MarketplaceSellerPage : ContentPage, IQueryAttributable
     private View BuildHeader()
     {
         var header = new VerticalStackLayout { Spacing = 8, Padding = new Thickness(0, 12, 0, 16) };
-        var back = new ImageButton { Source = "icon_arrow_left.png", WidthRequest = 48, HeightRequest = 48, Padding = 12, BackgroundColor = Colors.Transparent };
+        var back = new ImageButton { Source = "icon_arrow_left.svg", WidthRequest = 48, HeightRequest = 48, Padding = 12, BackgroundColor = Colors.Transparent };
         SemanticProperties.SetDescription(back, "Voltar ao anúncio"); back.Clicked += async (_, _) => await Shell.Current.GoToAsync("..");
         var top = new Grid { ColumnDefinitions = { new ColumnDefinition { Width = 48 }, new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = 48 } } };
         var title = MarketplaceTheme.Text("Vendedor", 13, bold: true); title.HorizontalTextAlignment = TextAlignment.Center; title.VerticalOptions = LayoutOptions.Center;

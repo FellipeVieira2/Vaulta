@@ -19,12 +19,16 @@ public sealed class CatalogClient(HttpClient httpClient) : ICatalogClient
         if (!string.IsNullOrWhiteSpace(game))
             url += $"&game={Uri.EscapeDataString(game)}";
         using var response = await httpClient.GetAsync(url, cancellationToken);
-        return await response.ReadApiJsonAsync<CatalogSearchPage>(cancellationToken);
+        var result = await response.ReadApiJsonAsync<CatalogSearchPage>(cancellationToken);
+        return result with { Items = result.Items.Select(x=>x with {ArtworkUrl=Artwork(x.ArtworkUrl)}).ToArray() };
     }
 
     public async Task<CatalogPrintingDetails> GetPrintingAsync(Guid printingId, CancellationToken cancellationToken = default)
     {
         using var response = await httpClient.GetAsync($"api/v1/catalog/printings/{printingId}", cancellationToken);
-        return await response.ReadApiJsonAsync<CatalogPrintingDetails>(cancellationToken);
+        var result = await response.ReadApiJsonAsync<CatalogPrintingDetails>(cancellationToken);
+        return result with {ArtworkUrl=Artwork(result.ArtworkUrl)};
     }
+    private string? Artwork(string? value) => value is not null && value.StartsWith("/api/v1/catalog/printings/",StringComparison.Ordinal) && httpClient.BaseAddress is not null
+        ? new Uri(httpClient.BaseAddress,value).AbsoluteUri : value;
 }

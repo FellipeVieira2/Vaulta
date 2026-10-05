@@ -12,6 +12,31 @@ public static class MarketplaceEndpoints
     public static void MapMarketplaceEndpoints(this WebApplication app)
     {
         var marketplace = app.MapGroup("/api/v1/marketplace").WithTags("Marketplace");
+        marketplace.MapGet("/product-filters", async (string? game, string? setQuery, int? page, int? pageSize,
+            Vaulta.Catalog.Application.ICatalogMarketplaceReader catalog, CancellationToken ct) =>
+        {
+            var options = await catalog.GetFilterOptions(game,setQuery,page ?? 1,pageSize ?? 20,ct);
+            return Results.Ok(new MarketplaceProductFilterOptionsDto(options.Sets.Select(x=>new MarketplaceSetOptionDto(x.Id,x.Name)).ToArray(),
+                options.Page,options.PageSize,options.TotalCount,options.Languages,options.VariantCodes));
+        }).WithName("GetMarketplaceProductFilters").Produces<MarketplaceProductFilterOptionsDto>().ProducesProblem(400);
+        marketplace.MapGet("/products", async (string? query, string? game, Guid? setId, string? language,
+            string? variantCode, string? condition, decimal? minPriceBrl, decimal? maxPriceBrl, bool? photosOnly,
+            int? page, int? pageSize, string? sort, IMarketplaceProductQueries products, CancellationToken ct) =>
+            Results.Ok(await products.BrowseProducts(new(query, game, page ?? 1, pageSize ?? 20, sort ?? "newest",
+                setId, language, variantCode, condition, minPriceBrl, maxPriceBrl, photosOnly ?? false), ct)))
+            .WithName("BrowseMarketplaceProducts").Produces<MarketplaceProductPageDto>().ProducesProblem(400);
+        marketplace.MapGet("/products/{printingId:guid}/variants/{variantKey}", async (Guid printingId,
+            string variantKey, IMarketplaceProductQueries products, CancellationToken ct) =>
+        {
+            var product = await products.GetProduct(printingId, VariantIdentity(variantKey), ct);
+            return product is null ? Results.NotFound() : Results.Ok(product);
+        }).WithName("GetMarketplaceProduct").Produces<MarketplaceProductDto>().ProducesProblem(400).ProducesProblem(404);
+        marketplace.MapGet("/products/{printingId:guid}/variants/{variantKey}/offers", async (Guid printingId,
+            string variantKey, int? page, int? pageSize, string? sort, IMarketplaceProductQueries products, CancellationToken ct) =>
+        {
+            var offers = await products.GetOffers(printingId, VariantIdentity(variantKey), page ?? 1, pageSize ?? 20, sort ?? "price_asc", ct);
+            return offers is null ? Results.NotFound() : Results.Ok(offers);
+        }).WithName("GetMarketplaceProductOffers").Produces<ListingPageDto>().ProducesProblem(400).ProducesProblem(404);
         var mySeller = app.MapGroup("/api/v1/me/seller").WithTags("Marketplace").RequireAuthorization();
         var drafts = mySeller.MapGroup("/listing-drafts");
 
@@ -118,5 +143,8 @@ public static class MarketplaceEndpoints
         }).WithName("RemoveListingPhoto").Produces(204).ProducesProblem(401).ProducesProblem(404);
     }
 
+    private static Guid? VariantIdentity(string key) => key == "none" ? null
+        : Guid.TryParse(key, out var id) && id != Guid.Empty ? id
+        : throw new Vaulta.SharedKernel.DomainException("Use a variant ID or the explicit none identity.");
     private static Guid UserId(ClaimsPrincipal principal) => Guid.Parse(principal.FindFirstValue("sub")!);
 }

@@ -23,10 +23,10 @@ public sealed class MarketplaceListingDetailPage : ContentPage, IQueryAttributab
             BackgroundColor = MarketplaceTheme.Background, Margin = new Thickness(16, 0),
             SelectionMode = SelectionMode.Single, ItemSizingStrategy = ItemSizingStrategy.MeasureAllItems,
             ItemTemplate = new DataTemplate(() => new MarketplaceComparisonRowView()),
-            Header = BuildHeader(), Footer = BuildFooter()
+            Header = BuildHeader()
         };
-        _comparisons.SetBinding(ItemsView.ItemsSourceProperty, nameof(MarketplaceListingDetailViewModel.Comparisons));
-        _comparisons.SelectionChanged += OpenComparison;
+
+
         var buy = MarketplaceTheme.Action("Comprar agora");
         buy.BackgroundColor = MarketplaceTheme.Brand; buy.TextColor = MarketplaceTheme.Background;
         buy.SetBinding(Button.TextProperty, nameof(MarketplaceListingDetailViewModel.BuyLabel));
@@ -107,7 +107,7 @@ public sealed class MarketplaceListingDetailPage : ContentPage, IQueryAttributab
         var metadata = MarketplaceTheme.Text(null, 11, secondary: true);
         metadata.SetBinding(Label.TextProperty, nameof(MarketplaceListingDetailViewModel.MetadataMessage));
         metadata.SetBinding(IsVisibleProperty, nameof(MarketplaceListingDetailViewModel.HasMetadataMessage)); info.Children.Add(metadata);
-        info.Children.Add(MarketplaceTheme.Text("Referência de mercado indisponível", 11, secondary: true));
+        info.Children.Add(MarketplaceTheme.Text("Consulte a referência de mercado em “Ver outras ofertas desta carta”.", 11, secondary: true));
         var seller = MarketplaceTheme.Action(""); seller.HorizontalOptions = LayoutOptions.Start; seller.Padding = 0;
         seller.TextColor = MarketplaceTheme.Primary; seller.SetBinding(Button.TextProperty, nameof(MarketplaceListingDetailViewModel.Seller));
         seller.Clicked += OpenSeller; SemanticProperties.SetHint(seller, "Abrir anúncios e avaliações do vendedor"); info.Children.Add(seller);
@@ -117,53 +117,30 @@ public sealed class MarketplaceListingDetailPage : ContentPage, IQueryAttributab
         info.Children.Add(MarketplaceTheme.Text("Descrição do vendedor", 13, bold: true));
         var description = MarketplaceTheme.Text(null, 13, secondary: true);
         description.SetBinding(Label.TextProperty, nameof(MarketplaceListingDetailViewModel.Description)); info.Children.Add(description);
-        var comparisonTitle = MarketplaceTheme.Text("Compare vendedores", 16, bold: true);
-        comparisonTitle.Margin = new Thickness(0, 8, 0, 0); SemanticProperties.SetHeadingLevel(comparisonTitle, SemanticHeadingLevel.Level2); info.Children.Add(comparisonTitle);
-        info.Children.Add(MarketplaceTheme.Text("Mesma impressão, variante e idioma", 11, secondary: true));
-        var comparing = new ActivityIndicator { Color = MarketplaceTheme.Brand, HeightRequest = 36 };
-        comparing.SetBinding(ActivityIndicator.IsRunningProperty, nameof(MarketplaceListingDetailViewModel.IsComparing));
-        comparing.SetBinding(IsVisibleProperty, nameof(MarketplaceListingDetailViewModel.IsComparing)); info.Children.Add(comparing);
-        var empty = MarketplaceTheme.Text("Não há anúncios compatíveis disponíveis para comparar.", 11, secondary: true);
-        empty.SetBinding(IsVisibleProperty, nameof(MarketplaceListingDetailViewModel.ComparisonEmpty)); info.Children.Add(empty);
+        var market = MarketplaceTheme.Action("Ver outras ofertas desta carta");
+        market.Clicked += OpenProduct;
+        info.Children.Add(market);
         header.Children.Add(info);
         return header;
     }
 
-    private View BuildFooter()
-    {
-        var footer = new VerticalStackLayout { Spacing = 8, Padding = new Thickness(0, 8, 0, 24) };
-        var problem = new VerticalStackLayout { Spacing = 8 };
-        var message = MarketplaceTheme.Text(null, 11, secondary: true);
-        message.SetBinding(Label.TextProperty, nameof(MarketplaceListingDetailViewModel.ComparisonMessage));
-        var retry = MarketplaceTheme.Action("Tentar comparação novamente");
-        retry.SetBinding(Button.CommandProperty, nameof(MarketplaceListingDetailViewModel.RetryComparisonsCommand));
-        problem.Children.Add(message); problem.Children.Add(retry);
-        problem.SetBinding(IsVisibleProperty, nameof(MarketplaceListingDetailViewModel.HasComparisonProblem)); footer.Children.Add(problem);
-        var more = MarketplaceTheme.Action("Comparar mais anúncios");
-        more.SetBinding(Button.CommandProperty, nameof(MarketplaceListingDetailViewModel.LoadMoreComparisonsCommand));
-        more.SetBinding(IsVisibleProperty, nameof(MarketplaceListingDetailViewModel.HasMoreComparisons)); footer.Children.Add(more);
-        var history = MarketplaceTheme.Text("Histórico de preços indisponível", 11, secondary: true);
-        history.SetBinding(IsVisibleProperty, nameof(MarketplaceListingDetailViewModel.HasListing)); footer.Children.Add(history);
-        return footer;
-    }
-
     private static View BuildTopBar()
     {
-        var back = new ImageButton { Source = "icon_arrow_left.png", WidthRequest = 48, HeightRequest = 48, Padding = 12, BackgroundColor = Colors.Transparent };
+        var back = new ImageButton { Source = "icon_arrow_left.svg", WidthRequest = 48, HeightRequest = 48, Padding = 12, BackgroundColor = Colors.Transparent };
         SemanticProperties.SetDescription(back, "Voltar"); back.Clicked += async (_, _) => await Shell.Current.GoToAsync("..");
         var title = MarketplaceTheme.Text("Anúncio", 13, bold: true); title.HorizontalTextAlignment = TextAlignment.Center; title.VerticalOptions = LayoutOptions.Center;
-        var favorite = new ImageButton { Source = "icon_heart.png", WidthRequest = 48, HeightRequest = 48, Padding = 12, BackgroundColor = Colors.Transparent, IsEnabled = false };
+        var favorite = new ImageButton { Source = "icon_heart.svg", WidthRequest = 48, HeightRequest = 48, Padding = 12, BackgroundColor = Colors.Transparent, IsEnabled = false };
         SemanticProperties.SetDescription(favorite, "Favoritar anúncio: ainda indisponível");
         var header = new Grid { ColumnDefinitions = { new ColumnDefinition { Width = 48 }, new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = 48 } } };
         header.Add(back); header.Add(title, 1); header.Add(favorite, 2); return header;
     }
 
-    private async void OpenComparison(object? sender, SelectionChangedEventArgs args)
+    private async void OpenProduct(object? sender, EventArgs args)
     {
-        var listing = args.CurrentSelection.OfType<MarketplaceListingPresentation>().FirstOrDefault(); _comparisons.SelectedItem = null;
-        if (listing is null || listing.Id == _viewModel.Listing?.Id || _navigating) return;
+        if (_viewModel.Listing is not { } listing || _navigating) return;
         _navigating = true;
-        try { await Shell.Current.GoToAsync($"marketplace-listing?listingId={listing.Id}"); } finally { _navigating = false; }
+        try { await Shell.Current.GoToAsync($"marketplace-product?printingId={listing.PrintingId}&variantKey={listing.VariantId?.ToString() ?? "none"}"); }
+        finally { _navigating = false; }
     }
     private async void OpenSeller(object? sender, EventArgs args)
     {

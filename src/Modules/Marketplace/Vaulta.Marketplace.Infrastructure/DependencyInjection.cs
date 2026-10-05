@@ -12,6 +12,7 @@ public static class DependencyInjection
         services.AddDbContext<MarketplaceDbContext>(options => options.UseNpgsql(configuration.GetConnectionString("Vaulta")));
         services.AddScoped<IMarketplaceStore, MarketplaceStore>();
         services.AddScoped<IMarketplaceQueries, MarketplaceQueries>();
+        services.AddScoped<IMarketplaceProductQueries, MarketplaceProductQueries>();
         services.AddScoped<IMarketplaceCatalog, MarketplaceCatalogAdapter>();
         services.AddScoped<IMarketplaceCollection, MarketplaceCollectionAdapter>();
         services.AddScoped<IMarketplaceAssets, MarketplaceAssetsAdapter>();

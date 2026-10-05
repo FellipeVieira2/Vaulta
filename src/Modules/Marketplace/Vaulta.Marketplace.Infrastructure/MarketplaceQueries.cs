@@ -26,7 +26,7 @@ public sealed class MarketplaceQueries(MarketplaceDbContext db, IMarketplaceAsse
             && db.SellerProfiles.Any(s => s.UserId == x.SellerUserId && s.Status == MarketplaceRules.ActiveStatus));
         if (request.SellerUserId.HasValue) query = query.Where(x => x.SellerUserId == request.SellerUserId.Value);
         if (request.PrintingId.HasValue) query = query.Where(x => x.PrintingId == request.PrintingId.Value);
-        if (request.VariantId.HasValue) query = query.Where(x => x.VariantId == request.VariantId.Value);
+        if (request.ExactVariant || request.VariantId.HasValue) query = query.Where(x => x.VariantId == request.VariantId);
         if (!string.IsNullOrWhiteSpace(request.Query) || !string.IsNullOrWhiteSpace(request.GameCode))
         {
             var matchingPrintings = await catalog.SearchPrintingIds(request.Query?.Trim(), request.GameCode?.Trim(), cancellationToken);

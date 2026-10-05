@@ -20,7 +20,8 @@ public sealed record MarketplaceListingPresentation(Guid Id, string Name, string
             "es" => "Espanhol", "fr" => "Francês", "de" => "Alemão", null or "" => null,
             _ => printing.Language
         };
-        var metadata = language is null ? listing.Condition : $"{listing.Condition} · {language}";
+        var condition = listing.Condition switch { "MINT"=>"M", "NEAR_MINT"=>"NM", "LIGHTLY_PLAYED"=>"LP", "MODERATELY_PLAYED"=>"MP", "HEAVILY_PLAYED"=>"HP", "DAMAGED"=>"DMG", "UNKNOWN"=>"Condição não informada", _=>listing.Condition };
+        var metadata = language is null ? condition : $"{condition} · {language}";
         var reputation = listing.SellerTotalReviews > 0
             ? $"{listing.SellerAverageRating.ToString("N1", Br)} ({listing.SellerTotalReviews})" : "Sem avaliações";
         var seller = $"Vendedor {listing.SellerUserId.ToString("N")[..8]} · {reputation}";

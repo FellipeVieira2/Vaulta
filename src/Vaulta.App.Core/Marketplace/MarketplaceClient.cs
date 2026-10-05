@@ -32,14 +32,15 @@ public sealed class MarketplaceClient(HttpClient httpClient) : IMarketplaceClien
         if (!string.IsNullOrWhiteSpace(query.Query)) url += $"&query={Uri.EscapeDataString(query.Query.Trim())}";
         if (!string.IsNullOrWhiteSpace(query.GameCode)) url += $"&game={Uri.EscapeDataString(query.GameCode.Trim())}";
         using var response = await httpClient.GetAsync(url, cancellationToken);
-        return await response.ReadApiJsonAsync<ListingPageDto>(cancellationToken);
+        var page = await response.ReadApiJsonAsync<ListingPageDto>(cancellationToken);
+        return page with { Items = page.Items.Select(NormalizeArtwork).ToArray() };
     }
 
     public async Task<ListingDto?> GetListingAsync(Guid listingId, CancellationToken cancellationToken = default)
     {
         using var response = await httpClient.GetAsync($"api/v1/marketplace/listings/{listingId}", cancellationToken);
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
-        return await response.ReadApiJsonAsync<ListingDto>(cancellationToken);
+        return NormalizeArtwork(await response.ReadApiJsonAsync<ListingDto>(cancellationToken));
     }
 
     public async Task<SellerProfileDto?> GetMySellerProfileAsync(CancellationToken cancellationToken = default)
@@ -58,7 +59,7 @@ public sealed class MarketplaceClient(HttpClient httpClient) : IMarketplaceClien
     public async Task<ListingDto> CreateListingAsync(CreateListingRequest request, CancellationToken cancellationToken = default)
     {
         using var response = await httpClient.PostAsJsonAsync("api/v1/me/seller/listings", request, cancellationToken);
-        return await response.ReadApiJsonAsync<ListingDto>(cancellationToken);
+        return NormalizeArtwork(await response.ReadApiJsonAsync<ListingDto>(cancellationToken));
     }
 
     public async Task UpdateListingAsync(Guid listingId, UpdateListingRequest request, CancellationToken cancellationToken = default)
@@ -77,5 +78,19 @@ public sealed class MarketplaceClient(HttpClient httpClient) : IMarketplaceClien
     {
         using var response = await httpClient.PostAsJsonAsync($"api/v1/me/seller/listings/{listingId}/photos", request, cancellationToken);
         await response.EnsureApiSuccessAsync(cancellationToken);
+    }
+
+    private ListingDto NormalizeArtwork(ListingDto listing)
+    {
+        if (listing.Printing is not { } printing) return listing;
+        var value = printing.ArtworkUrl;
+        string? artwork = null;
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            if (Uri.TryCreate(value, UriKind.Absolute, out var absolute) && absolute.Scheme is "https" or "http") artwork = absolute.AbsoluteUri;
+            else if (value.StartsWith("/api/v1/catalog/printings/", StringComparison.Ordinal) && httpClient.BaseAddress is not null)
+                artwork = new Uri(httpClient.BaseAddress, value).AbsoluteUri;
+        }
+        return listing with { Printing = printing with { ArtworkUrl = artwork } };
     }
 }

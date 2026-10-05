@@ -40,8 +40,8 @@ public partial class AppShell : Shell
         var mainTabs = new TabBar { Route = "main" };
         foreach (var (screenId, title, icon) in new[]
         {
-            ("home", "Início", "tab_home.png"), ("search", "Buscar", "icon_search.png"),
-            ("sell", "Vender", "icon_plus.png"), ("collection", "Coleção", "tab_collection.png"), ("profile", "Perfil", "tab_profile.png")
+            ("home", "Início", "tab_home.svg"), ("search", "Buscar", "icon_search.svg"),
+            ("sell", "Vender", "icon_plus.svg"), ("collection", "Coleção", "tab_collection.svg"), ("profile", "Perfil", "tab_profile.svg")
         })
         {
             var section = new ShellSection { Title = title, Route = screenId, Icon = icon };
@@ -61,6 +61,7 @@ public partial class AppShell : Shell
         Routing.RegisterRoute("experience", typeof(ExperiencePage));
         Routing.RegisterRoute("scanner-session", typeof(ScannerSessionPage));
         Routing.RegisterRoute("marketplace-listing", typeof(MarketplaceListingDetailPage));
+        Routing.RegisterRoute("marketplace-product", typeof(MarketplaceProductDetailPage));
         Routing.RegisterRoute("marketplace-seller", typeof(MarketplaceSellerPage));
         Navigating += SellNavigationRequested;
 

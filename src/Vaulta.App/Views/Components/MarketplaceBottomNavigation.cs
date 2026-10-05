@@ -7,8 +7,8 @@ public sealed class MarketplaceBottomNavigation : ContentView
         var buttons = new Grid { ColumnSpacing = 0, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Star } } };
         var actions = new[]
         {
-            ("Início", "home", "tab_home.png"), ("Buscar", "search", "icon_search.png"),
-            ("Vender", "sell", "icon_plus.png"), ("Coleção", "collection", "tab_collection.png"), ("Perfil", "profile", "tab_profile.png")
+            ("Início", "home", "tab_home.svg"), ("Buscar", "search", "icon_search.svg"),
+            ("Vender", "sell", "icon_plus.svg"), ("Coleção", "collection", "tab_collection.svg"), ("Perfil", "profile", "tab_profile.svg")
         };
         for (var index = 0; index < actions.Length; index++)
         {

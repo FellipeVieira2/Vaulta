@@ -14,11 +14,12 @@ public sealed class MarketplaceHomePage : ContentPage
     private readonly ContentView _navigation = new();
     private readonly List<(Button Button, string? Code)> _gameButtons = [];
     private bool _searchActive;
+    private readonly IMarketplaceProductClient _productClient;
     private bool _openingListing;
 
-    public MarketplaceHomePage(MarketplaceHomeViewModel viewModel)
+    public MarketplaceHomePage(MarketplaceHomeViewModel viewModel, IMarketplaceProductClient productClient)
     {
-        _viewModel = viewModel;
+        _viewModel = viewModel; _productClient = productClient;
         BindingContext = viewModel;
         Title = "Início";
         BackgroundColor = MarketplaceTheme.Background;
@@ -35,7 +36,7 @@ public sealed class MarketplaceHomePage : ContentPage
         };
         _search.SetBinding(Entry.TextProperty, nameof(MarketplaceHomeViewModel.SearchText), BindingMode.TwoWay);
         _search.SetBinding(Entry.ReturnCommandProperty, nameof(MarketplaceHomeViewModel.SearchCommand));
-        SemanticProperties.SetDescription(_search, "Buscar anúncios por carta, set ou número da carta");
+        SemanticProperties.SetDescription(_search, "Buscar cartas por nome, set ou número da carta");
 
         _list = new CollectionView
         {
@@ -44,13 +45,13 @@ public sealed class MarketplaceHomePage : ContentPage
             ItemSizingStrategy = ItemSizingStrategy.MeasureAllItems,
             SelectionMode = SelectionMode.Single, RemainingItemsThreshold = 4,
             Margin = new Thickness(16, 0),
-            ItemTemplate = new DataTemplate(() => new MarketplaceListingCardView()),
+            ItemTemplate = new DataTemplate(() => new MarketplaceProductCardView()),
             Header = BuildHeader(), Footer = BuildFooter()
         };
-        _list.SetBinding(ItemsView.ItemsSourceProperty, nameof(MarketplaceHomeViewModel.Listings));
+        _list.SetBinding(ItemsView.ItemsSourceProperty, nameof(MarketplaceHomeViewModel.Products));
         _list.SetBinding(ItemsView.RemainingItemsThresholdReachedCommandProperty, nameof(MarketplaceHomeViewModel.LoadMoreCommand));
         _list.SelectionChanged += OpenListing;
-        SemanticProperties.SetDescription(_list, "Anúncios ativos. Duas colunas. Selecione uma carta para abrir o anúncio");
+        SemanticProperties.SetDescription(_list, "Cartas à venda. Selecione uma carta para ver as ofertas desta impressão e acabamento");
 
         var layout = new Grid { RowDefinitions = { new RowDefinition { Height = GridLength.Star }, new RowDefinition { Height = GridLength.Auto } } };
         layout.Add(_list);
@@ -91,7 +92,7 @@ public sealed class MarketplaceHomePage : ContentPage
         SemanticProperties.SetHeadingLevel(brand, SemanticHeadingLevel.Level1);
         var profile = new ImageButton
         {
-            Source = "tab_profile.png", BackgroundColor = Colors.Transparent, Padding = 12,
+            Source = "tab_profile.svg", BackgroundColor = Colors.Transparent, Padding = 12,
             WidthRequest = 48, HeightRequest = 48, HorizontalOptions = LayoutOptions.End
         };
         SemanticProperties.SetDescription(profile, "Abrir meu perfil");
@@ -99,9 +100,9 @@ public sealed class MarketplaceHomePage : ContentPage
         var top = new Grid { ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Auto } } };
         top.Add(brand); top.Add(profile, 1);
         header.Children.Add(top);
-        header.Children.Add(MarketplaceTheme.Text("Anúncios ativos de colecionadores", 11, secondary: true));
+        header.Children.Add(MarketplaceTheme.Text("Seu próximo card começa aqui.", 11, secondary: true));
         var searchRow = new Grid { ColumnSpacing = 8, ColumnDefinitions = { new ColumnDefinition { Width = 24 }, new ColumnDefinition { Width = GridLength.Star } } };
-        searchRow.Add(new Image { Source = "icon_search.png", WidthRequest = 24, HeightRequest = 24, VerticalOptions = LayoutOptions.Center });
+        searchRow.Add(new Image { Source = "icon_search.svg", WidthRequest = 24, HeightRequest = 24, VerticalOptions = LayoutOptions.Center });
         searchRow.Add(_search, 1);
         header.Children.Add(new Border
         {
@@ -114,20 +115,30 @@ public sealed class MarketplaceHomePage : ContentPage
         AddGame(games, "Yu-Gi-Oh!", "yugioh", available: false);
         AddGame(games, "One Piece", "onepiece", available: false);
         AddGame(games, "Magic", "magic", available: false);
-        AddGame(games, "Todos", null);
+
         header.Children.Add(new ScrollView { Orientation = ScrollOrientation.Horizontal, HorizontalScrollBarVisibility = ScrollBarVisibility.Never, Content = games });
 
+        var filters = new HorizontalStackLayout { Spacing = 8 };
+        foreach (var title in new[] { "Set", "Variante", "Condição", "Filtros" })
+        {
+            var filter = MarketplaceTheme.Action(title); filter.BackgroundColor = MarketplaceTheme.Surface;
+            filter.TextColor = MarketplaceTheme.Primary;
+            filter.Clicked += async (_,_) => await Navigation.PushModalAsync(new MarketplaceFiltersPage(_productClient,
+                _viewModel.CurrentFilters, _viewModel.ApplyFiltersAsync));
+            filters.Children.Add(filter);
+        }
+        header.Children.Add(new ScrollView { Orientation = ScrollOrientation.Horizontal, Content = filters, HorizontalScrollBarVisibility = ScrollBarVisibility.Never });
         var section = MarketplaceTheme.Text(null, 16, bold: true);
         section.SetBinding(Label.TextProperty, nameof(MarketplaceHomeViewModel.SectionTitle));
         section.VerticalOptions = LayoutOptions.Center;
         SemanticProperties.SetHeadingLevel(section, SemanticHeadingLevel.Level2);
         var sort = new Picker
         {
-            Title = "Ordenar anúncios", ItemsSource = new[] { "Mais recentes", "Menor preço", "Maior preço" },
+            Title = "Ordenar cartas", ItemsSource = new[] { "Mais recentes", "Menor preço", "Maior preço" },
             SelectedIndex = 0, FontSize = 11, TextColor = MarketplaceTheme.Secondary,
             BackgroundColor = Colors.Transparent, WidthRequest = 144, MinimumHeightRequest = 48
         };
-        SemanticProperties.SetDescription(sort, "Ordenação dos anúncios");
+        SemanticProperties.SetDescription(sort, "Ordenação das cartas");
         sort.SelectedIndexChanged += (_, _) => _viewModel.SelectedSort = sort.SelectedIndex switch { 1 => "price_asc", 2 => "price_desc", _ => "newest" };
         _viewModel.PropertyChanged += (_, args) =>
         {
@@ -143,12 +154,12 @@ public sealed class MarketplaceHomePage : ContentPage
         var loading = new HorizontalStackLayout { Spacing = 8, Padding = new Thickness(0, 12) };
         var activity = new ActivityIndicator { Color = MarketplaceTheme.Brand, WidthRequest = 24, HeightRequest = 24 };
         activity.SetBinding(ActivityIndicator.IsRunningProperty, nameof(MarketplaceHomeViewModel.IsLoading));
-        loading.Children.Add(activity); loading.Children.Add(MarketplaceTheme.Text("Carregando anúncios…", secondary: true));
+        loading.Children.Add(activity); loading.Children.Add(MarketplaceTheme.Text("Carregando cartas…", secondary: true));
         loading.SetBinding(IsVisibleProperty, nameof(MarketplaceHomeViewModel.IsLoading));
         header.Children.Add(loading);
         header.Children.Add(BuildProblem());
         var empty = new VerticalStackLayout { Spacing = 8, Padding = new Thickness(0, 24) };
-        empty.Children.Add(MarketplaceTheme.Text("Nenhum anúncio encontrado", 16, bold: true));
+        empty.Children.Add(MarketplaceTheme.Text("Nenhuma carta encontrada", 16, bold: true));
         empty.Children.Add(MarketplaceTheme.Text("Tente outra busca ou limpe os filtros.", secondary: true));
         var clear = MarketplaceTheme.Action("Limpar filtros");
         clear.SetBinding(Button.CommandProperty, nameof(MarketplaceHomeViewModel.ClearFiltersCommand));
@@ -180,17 +191,17 @@ public sealed class MarketplaceHomePage : ContentPage
         loading.SetBinding(ActivityIndicator.IsRunningProperty, nameof(MarketplaceHomeViewModel.IsLoadingMore));
         loading.SetBinding(IsVisibleProperty, nameof(MarketplaceHomeViewModel.IsLoadingMore));
         footer.Children.Add(loading);
-        var more = MarketplaceTheme.Action("Carregar mais anúncios");
+        var more = MarketplaceTheme.Action("Carregar mais cartas");
         more.SetBinding(Button.CommandProperty, nameof(MarketplaceHomeViewModel.LoadMoreCommand));
         more.SetBinding(IsVisibleProperty, nameof(MarketplaceHomeViewModel.HasMore));
         footer.Children.Add(more);
         var all = new Grid { MinimumHeightRequest = 48, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = 24 } } };
-        var label = MarketplaceTheme.Text("Ver todos os anúncios", 13, bold: true);
+        var label = MarketplaceTheme.Text("Ver todas as cartas", 13, bold: true);
         label.TextColor = MarketplaceTheme.Brand; label.VerticalOptions = LayoutOptions.Center;
         all.Add(label);
-        all.Add(new Image { Source = "icon_chevron_right.png", WidthRequest = 24, HeightRequest = 24, VerticalOptions = LayoutOptions.Center }, 1);
+        all.Add(new Image { Source = "icon_chevron_right.svg", WidthRequest = 24, HeightRequest = 24, VerticalOptions = LayoutOptions.Center }, 1);
         var allAction = MarketplaceTheme.Action("");
-        SemanticProperties.SetDescription(allAction, "Ver todos os anúncios. Limpar busca e filtros");
+        SemanticProperties.SetDescription(allAction, "Ver todas as cartas. Limpar busca e filtros");
         allAction.SetBinding(Button.CommandProperty, nameof(MarketplaceHomeViewModel.ClearFiltersCommand));
         all.Add(allAction); Grid.SetColumnSpan(allAction, 2);
         footer.Children.Add(all);
@@ -198,7 +209,7 @@ public sealed class MarketplaceHomePage : ContentPage
         SemanticProperties.SetDescription(catalog, "Buscar cartas no catálogo para adicionar à coleção");
         catalog.Clicked += async (_, _) => await Shell.Current.GoToAsync("experience?screen=catalog");
         footer.Children.Add(catalog);
-        var refresh = MarketplaceTheme.Action("Atualizar anúncios");
+        var refresh = MarketplaceTheme.Action("Atualizar cartas");
         refresh.SetBinding(Button.CommandProperty, nameof(MarketplaceHomeViewModel.RefreshCommand));
         footer.Children.Add(refresh);
         return footer;
@@ -241,11 +252,11 @@ public sealed class MarketplaceHomePage : ContentPage
 
     private async void OpenListing(object? sender, SelectionChangedEventArgs args)
     {
-        var listing = args.CurrentSelection.OfType<MarketplaceListingPresentation>().FirstOrDefault();
+        var listing = args.CurrentSelection.OfType<MarketplaceProductPresentation>().FirstOrDefault();
         _list.SelectedItem = null;
         if (listing is null || _openingListing) return;
         _openingListing = true;
-        try { await Shell.Current.GoToAsync($"marketplace-listing?listingId={listing.Id}"); }
+        try { await Shell.Current.GoToAsync($"marketplace-product?printingId={listing.PrintingId}&variantKey={listing.VariantId?.ToString() ?? "none"}"); }
         finally { _openingListing = false; }
     }
 }
