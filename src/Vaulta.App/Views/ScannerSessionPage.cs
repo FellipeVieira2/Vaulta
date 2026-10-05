@@ -458,5 +458,9 @@ public sealed partial class ScannerSessionPage : ContentPage
         border.SetDynamicResource(VisualElement.BackgroundColorProperty, bgToken);
         return border;
     }
-    private static Color TokenColor(string key) => (Color)Application.Current!.Resources[key];
+    private static Color TokenColor(string key)
+    {
+        if (Application.Current?.Resources.TryGetValue(key, out var value) == true && value is Color color) return color;
+        return Colors.White;
+    }
 }
