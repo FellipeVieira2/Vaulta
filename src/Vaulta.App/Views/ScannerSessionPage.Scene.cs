@@ -217,7 +217,7 @@ public sealed partial class ScannerSessionPage
             if (height < 60 || width < 40) return;
             var left = (float)guide.Left; var top = (float)guide.Top;
             // Outer guide: subtle BrandPrimary tint
-            canvas.StrokeColor = TokenColor("BrandPrimary"); canvas.StrokeSize = 1.2f;
+            canvas.StrokeColor = ScannerSessionPage.TokenColor("BrandPrimary"); canvas.StrokeSize = 1.2f;
             canvas.Alpha = 0.2f; canvas.DrawRoundedRectangle(left, top, width, height, 18);
             // Corner accents: brighter BrandPrimary
             canvas.Alpha = 0.6f; canvas.StrokeSize = 3;
