@@ -1155,7 +1155,7 @@ public sealed partial class ExperiencePage : ContentPage, IQueryAttributable
     {
         var button = new Button
         {
-            ImageSource = "google_g.png",
+            ImageSource = "google_g.svg",
             WidthRequest = 52,
             HeightRequest = 52,
             Padding = new Thickness(14),

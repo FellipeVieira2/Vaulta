@@ -90,9 +90,23 @@ public sealed partial class ScannerSessionPage
         foreach(var candidate in result.Candidates.Take(5))
         {
             var printing=candidate.Printing;
-            _result.Children.Add(Text($"{printing.CardName} · {printing.SetName} · {printing.CollectorNumber}",16,Colors.White,true));
+            var card = new Grid { ColumnSpacing = 12, Padding = new Thickness(0, 4),
+                ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star) } };
+            var artwork = new Image { WidthRequest = 48, HeightRequest = 67, Aspect = Aspect.AspectFill };
+            if (Uri.TryCreate(printing.ArtworkUrl, UriKind.Absolute, out var artUri) && artUri.Scheme == Uri.UriSchemeHttps)
+                artwork.Source = ImageSource.FromUri(artUri);
+            card.Add(artwork);
+            var info = new VerticalStackLayout { Spacing = 4, VerticalOptions = LayoutOptions.Center };
+            var name = Text(printing.CardName, 15, TokenColor("TextPrimary"), true);
+            name.LineBreakMode = LineBreakMode.TailTruncation;
+            var meta = Text($"{printing.SetName} · #{printing.CollectorNumber}", 12, TokenColor("TextSecondary"));
+            meta.LineBreakMode = LineBreakMode.TailTruncation;
+            info.Children.Add(name); info.Children.Add(meta);
+            card.Add(info, 1, 0);
+            _result.Children.Add(card);
             foreach(var variant in printing.Variants.Take(20))
-                _result.Children.Add(Action(variant.Name,async () =>
+            {
+                var btn = Action(variant.Name, async () =>
                 {
                     RequireScannerOperation(operation);
                     var details=await _scanner.GetCardDetailsAsync(printing.PrintingId,operation.Context.Token); RequireScannerOperation(operation);
@@ -102,16 +116,30 @@ public sealed partial class ScannerSessionPage
                     await SaveReading(accepted,operation);
                     if(_session!.Cards.Any(x=>x.ScanId==accepted.ScanId))
                         _=RecordHumanReview(result,accepted,operation,_archiveTask);
-                }));
+                });
+                btn.FontSize = 13; btn.Padding = new Thickness(12, 8); btn.MinimumHeightRequest = 36;
+                btn.CornerRadius = 12;
+                _result.Children.Add(btn);
+            }
             if(printing.Variants.Count==0)
-                _result.Children.Add(Action("Confirmar sem cotação",async()=>
+            {
+                var confirmBtn = Action("Confirmar sem cotação", async () =>
                 {
                     var accepted=VisionAcceptance.CreateCard(result,true,printing.PrintingId)!;
                     await SaveReading(accepted,operation);
                     if(_session!.Cards.Any(x=>x.ScanId==accepted.ScanId))_=RecordHumanReview(result,accepted,operation,_archiveTask);
-                }));
+                });
+                confirmBtn.FontSize = 13; confirmBtn.Padding = new Thickness(12, 8); confirmBtn.MinimumHeightRequest = 36;
+                _result.Children.Add(confirmBtn);
+            }
+            _result.Children.Add(new BoxView { HeightRequest = 1, Margin = new Thickness(0, 6) });
         }
-        _result.Children.Add(Action("Pular carta",()=> { ClearResults(); _status.Text="Mostre a próxima carta."; return Task.CompletedTask; }));
+        var skip = Action("Pular carta", () => { ClearResults(); _status.Text="Mostre a próxima carta."; return Task.CompletedTask; });
+        skip.SetDynamicResource(Button.BackgroundColorProperty, "BackgroundPrimary");
+        skip.SetDynamicResource(Button.TextColorProperty, "TextSecondary");
+        skip.FontSize = 13; skip.MinimumHeightRequest = 36;
+        skip.HorizontalOptions = LayoutOptions.End;
+        _result.Children.Add(skip);
         if(_resultPanel is not null) _resultPanel.IsVisible=true;
     }
 

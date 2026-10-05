@@ -23,7 +23,7 @@ public sealed partial class ScannerSessionPage
     private Border? _identificationPanel;
     private ActivityIndicator? _identificationSpinner;
     private Label? _identificationText;
-    private readonly Label _revealValue = Text("", 44, Colors.White, true);
+    private readonly Label _revealValue = Text("", 48, Colors.White, true);
 
     private void ShowLive()
     {
@@ -61,32 +61,52 @@ public sealed partial class ScannerSessionPage
         var root = new Grid(); root.Children.Add(camera);
         root.Children.Add(new GraphicsView { Drawable = new SessionFrameDrawable(), InputTransparent = true });
         var overlay = new Grid { RowDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) } };
+
+        // Top bar: brand left, score right
         var top = new Grid { Padding = new Thickness(16, 12, 16, 8), ColumnSpacing = 12,
-            ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star) } };
-        var brand = new VerticalStackLayout { Spacing = 3, Children = { Text("VAULTA", 20, Colors.White, true), Text("SCANNER TCG", 9, Color.FromArgb("#BBA4FF"), true), _count } };
-        var exit = Action("×", () => Shell.Current.GoToAsync("..")); exit.FontSize = 24; exit.Padding = new Thickness(10, 2);
-        exit.MinimumHeightRequest = 44; exit.HorizontalOptions = LayoutOptions.Start;
-        SemanticProperties.SetDescription(exit, "Fechar scanner"); brand.Children.Add(exit);
-        var score = new VerticalStackLayout { Spacing = 5 };
-        var caption = Text("TOTAL DA SESSÃO", 9, Color.FromArgb("#BBA4FF"), true); caption.HorizontalTextAlignment = TextAlignment.End;
-        _total.FontSize = 28; _total.LineBreakMode = LineBreakMode.NoWrap;
-        _total.HorizontalTextAlignment = TextAlignment.End; _cost.HorizontalTextAlignment = TextAlignment.End; _difference.HorizontalTextAlignment = TextAlignment.End;
-        score.Children.Add(caption); score.Children.Add(_total);
-        _totalDelta = Text("", 12, Color.FromArgb("#C8FFDD"), true);
-        _totalDelta.HorizontalTextAlignment = TextAlignment.End; _totalDelta.IsVisible = false; score.Children.Add(_totalDelta);
+            ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) } };
+        var brand = new VerticalStackLayout { Spacing = 2 };
+        var brandLabel = Text("VAULTA", 18, TokenColor("TextPrimary"), true);
+        brandLabel.FontFamily = "InterBold";
+        brand.Children.Add(brandLabel);
+        var exit = Action("×", () => Shell.Current.GoToAsync(".."));
+        exit.FontSize = 20; exit.Padding = new Thickness(12, 6);
+        exit.MinimumHeightRequest = 40; exit.MinimumWidthRequest = 40;
+        exit.CornerRadius = 20; exit.HorizontalOptions = LayoutOptions.Start;
+        exit.SetDynamicResource(Button.BackgroundColorProperty, "SurfaceElevated");
+        SemanticProperties.SetDescription(exit, "Fechar scanner");
+        brand.Children.Add(exit);
+
+        var score = new VerticalStackLayout { Spacing = 4 };
+        _total.FontSize = 32; _total.LineBreakMode = LineBreakMode.NoWrap;
+        _total.FontFamily = "InterBold";
+        _total.HorizontalTextAlignment = TextAlignment.End;
+        _total.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
+        _cost.HorizontalTextAlignment = TextAlignment.End;
+        _difference.HorizontalTextAlignment = TextAlignment.End;
+        score.Children.Add(_total);
+        _totalDelta = Text("", 13, TokenColor("StatusSuccess"), true);
+        _totalDelta.FontFamily = "InterBold";
+        _totalDelta.HorizontalTextAlignment = TextAlignment.End;
+        _totalDelta.IsVisible = false;
+        score.Children.Add(_totalDelta);
         if (_session!.CostBrl.HasValue) { score.Children.Add(_cost); score.Children.Add(_difference); }
-        _costProgress = new ProgressBar { HeightRequest = 3, BackgroundColor = Color.FromArgb("#40364E") };
+        _costProgress = new ProgressBar { HeightRequest = 3 };
+        _costProgress.SetDynamicResource(ProgressBar.ProgressColorProperty, "BrandPrimary");
+        _costProgress.SetDynamicResource(VisualElement.BackgroundColorProperty, "SurfaceElevated");
         if (_session.CostBrl.HasValue) score.Children.Add(_costProgress);
-        var scorePanel = Surface(score, "#E0080911");
-        scorePanel.Stroke = Color.FromArgb("#594476"); scorePanel.StrokeThickness = 1;
+        var scorePanel = TokenSurface(score, "SurfaceDefault", 16, 14);
+        scorePanel.Stroke = TokenColor("BorderSubtle"); scorePanel.StrokeThickness = 1;
         top.Add(brand); top.Add(scorePanel, 1, 0); overlay.Add(top, 0, 0);
 
+        // Center: identification loading + reveal panel
         var center = new Grid { InputTransparent = true };
-        _identificationSpinner = new ActivityIndicator { Color = Color.FromArgb("#C8FFDD"), WidthRequest = 22, HeightRequest = 22 };
-        _identificationText = Text("Tirando a foto…", 13, Colors.White, true);
+        _identificationSpinner = new ActivityIndicator { Color = TokenColor("BrandPrimary"), WidthRequest = 24, HeightRequest = 24 };
+        _identificationText = Text("Tirando a foto…", 14, TokenColor("TextPrimary"), true);
         var identifying = new HorizontalStackLayout { Spacing = 10, VerticalOptions = LayoutOptions.Center,
             Children = { _identificationSpinner, _identificationText } };
-        _identificationPanel = Surface(identifying, "#E8111520");
+        _identificationPanel = TokenSurface(identifying, "SurfaceDefault", 20, 14);
+        _identificationPanel.Opacity = 0.92;
         _identificationPanel.IsVisible = false;
         _identificationPanel.HorizontalOptions = LayoutOptions.Center;
         _identificationPanel.VerticalOptions = LayoutOptions.End;
@@ -94,34 +114,53 @@ public sealed partial class ScannerSessionPage
         _identificationPanel.InputTransparent = true;
         SemanticProperties.SetDescription(_identificationPanel, "Identificando esta carta. Aguarde antes de mostrar a próxima.");
         center.Children.Add(_identificationPanel);
+
+        // Reveal panel: artwork left, identity + price right
         _revealValue.HorizontalTextAlignment = TextAlignment.Center;
-        _revealArtwork = new Image { WidthRequest = 64, HeightRequest = 90, Aspect = Aspect.AspectFit };
-        _revealTitle = Text("", 18, Colors.White, true); _revealTitle.FontFamily = "InterSemiBold";
-        _revealPrinting = Text("", 12, Color.FromArgb("#B4B5C8"));
-        var identity = new VerticalStackLayout { Spacing = 4, VerticalOptions = LayoutOptions.Center, Children = { _revealTitle, _revealPrinting } };
-        var heading = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star) } };
-        heading.Add(_revealArtwork); heading.Add(identity, 1, 0);
-        _revealSource = Text("", 11, Color.FromArgb("#B4B5C8")); _revealSource.HorizontalTextAlignment = TextAlignment.Center;
         _revealValue.FontFamily = "InterBold";
-        var reveal = new VerticalStackLayout { Spacing = 10, Children = { heading, _revealValue, _revealSource } };
-        _revealPanel = Surface(reveal, "#EF11101D"); _revealPanel.Margin = 24; _revealPanel.VerticalOptions = LayoutOptions.Center;
+        _revealValue.SetDynamicResource(Label.TextColorProperty, "BrandPrimary");
+        _revealArtwork = new Image { WidthRequest = 120, HeightRequest = 168, Aspect = Aspect.AspectFit };
+        _revealArtwork.Shadow = new Shadow { Brush = new SolidColorBrush(TokenColor("BrandPrimary")), Opacity = 0.25f, Radius = 20, Offset = new Point(0, 6) };
+        _revealTitle = Text("", 24, TokenColor("TextPrimary"), true);
+        _revealTitle.FontFamily = "InterBold";
+        _revealTitle.LineBreakMode = LineBreakMode.TailTruncation;
+        _revealPrinting = Text("", 14, TokenColor("TextSecondary"));
+        _revealPrinting.LineBreakMode = LineBreakMode.TailTruncation;
+        var identity = new VerticalStackLayout { Spacing = 6, VerticalOptions = LayoutOptions.Center, Children = { _revealTitle, _revealPrinting } };
+        var heading = new Grid { ColumnSpacing = 16, ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star) } };
+        heading.Add(_revealArtwork); heading.Add(identity, 1, 0);
+        _revealSource = Text("", 12, TokenColor("TextSecondary"));
+        _revealSource.HorizontalTextAlignment = TextAlignment.Center;
+        _total.HorizontalTextAlignment = TextAlignment.Center;
+        var divider = new BoxView { HeightRequest = 1, Margin = new Thickness(0, 8) };
+        divider.SetDynamicResource(BoxView.ColorProperty, "BorderSubtle");
+        var reveal = new VerticalStackLayout { Spacing = 12, Children = { heading, _revealValue, _revealSource, divider, _total } };
+        _revealPanel = TokenSurface(reveal, "SurfaceDefault", 24, 20);
+        _revealPanel.Margin = 24; _revealPanel.VerticalOptions = LayoutOptions.Center;
         _revealPanel.IsVisible = false; _revealPanel.InputTransparent = true;
-        _revealPanel.Stroke = Color.FromArgb("#C8B1FF"); _revealPanel.StrokeThickness = 1.5;
+        _revealPanel.Stroke = TokenColor("BorderSubtle"); _revealPanel.StrokeThickness = 1;
         center.Children.Add(_revealPanel); overlay.Add(center, 0, 1);
 
-        var bottom = new VerticalStackLayout { Padding = new Thickness(16, 6, 16, 12), Spacing = 7 };
-        var scroll = new ScrollView { Content = _result, MaximumHeightRequest = 300 };
-        _resultPanel = Surface(scroll, "#F0080911"); _resultPanel.IsVisible = false;
+        // Bottom bar: status, actions, options
+        var bottom = new VerticalStackLayout { Padding = new Thickness(16, 6, 16, 12), Spacing = 8 };
+        var scroll = new ScrollView { Content = _result, MaximumHeightRequest = 280 };
+        _resultPanel = TokenSurface(scroll, "SurfaceDefault", 20, 16);
+        _resultPanel.Opacity = 0.95;
+        _resultPanel.IsVisible = false;
+        _resultPanel.Stroke = TokenColor("BrandPrimary"); _resultPanel.StrokeThickness = 2;
         // Results float over the camera area; opening them must not collapse
         // the guide into the tiny frame observed on a physical phone.
         _resultPanel.VerticalOptions = LayoutOptions.End; _resultPanel.Margin = new Thickness(16, 0, 16, 8);
         overlay.Add(_resultPanel, 0, 1);
-        _status.FontSize = 12; bottom.Children.Add(Surface(_status, "#CE080911"));
+        _status.FontSize = 13;
+        var statusPanel = TokenSurface(_status, "SurfaceDefault", 14, 10);
+        statusPanel.Opacity = 0.85;
+        bottom.Children.Add(statusPanel);
         var actions = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star) }, ColumnSpacing = 14 };
-        var search = Action("Buscar", Search); search.BackgroundColor = Colors.Transparent;
-        var finish = Action("Finalizar", Finish); finish.BackgroundColor = Colors.Transparent;
+        var search = Action("Buscar", Search);
+        var finish = Action("Finalizar", Finish);
         actions.Add(search); actions.Add(finish, 1, 0); bottom.Children.Add(actions);
-        var options = Action("Opções da sessão", async () =>
+        var options = Action("⚙️  Opções", async () =>
         {
             var choice = await DisplayActionSheetAsync("Sessão", "Voltar", null,
                 _soundEnabled ? "Desligar som" : "Ligar som", "Pacotes e custo", "Capturar novamente", "Histórico e melhoria", "Nova sessão");
@@ -133,7 +172,9 @@ public sealed partial class ScannerSessionPage
             else if (choice == "Capturar novamente") await CaptureCard();
             else if (choice == "Nova sessão") { await StopRecording(); RequireOwner(); _session = null; ShowSetup(); }
         });
-        options.FontSize = 11; options.MinimumHeightRequest = 40; options.Padding = new Thickness(8, 4); options.BackgroundColor = Colors.Transparent;
+        options.FontSize = 12; options.MinimumHeightRequest = 40; options.Padding = new Thickness(8, 4);
+        options.SetDynamicResource(Button.BackgroundColorProperty, "BackgroundPrimary");
+        options.SetDynamicResource(Button.TextColorProperty, "TextSecondary");
         _recordButton = null;
         bottom.Children.Add(options);
 #if DEBUG
@@ -169,16 +210,17 @@ public sealed partial class ScannerSessionPage
 
     private sealed class SessionFrameDrawable : IDrawable
     {
-        // Draw over the full camera view, the same coordinates the detector samples.
         public void Draw(ICanvas canvas, RectF bounds)
         {
             var guide = ScannerCaptureGuide.ForPreview(bounds.Width, bounds.Height);
             var height = (float)guide.Height; var width = (float)guide.Width;
             if (height < 60 || width < 40) return;
             var left = (float)guide.Left; var top = (float)guide.Top;
-            canvas.StrokeColor = Color.FromArgb("#D2BFFF"); canvas.StrokeSize = 1.2f;
-            canvas.Alpha = 0.45f; canvas.DrawRoundedRectangle(left, top, width, height, 18);
-            canvas.Alpha = 1; canvas.StrokeSize = 3;
+            // Outer guide: subtle BrandPrimary tint
+            canvas.StrokeColor = TokenColor("BrandPrimary"); canvas.StrokeSize = 1.2f;
+            canvas.Alpha = 0.2f; canvas.DrawRoundedRectangle(left, top, width, height, 18);
+            // Corner accents: brighter BrandPrimary
+            canvas.Alpha = 0.6f; canvas.StrokeSize = 3;
             var corner = Math.Min(28, width * 0.18f);
             foreach (var x in new[] { left, left + width })
                 foreach (var y in new[] { top, top + height })

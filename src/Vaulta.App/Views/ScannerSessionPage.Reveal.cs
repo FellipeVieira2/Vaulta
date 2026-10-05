@@ -28,16 +28,16 @@ public sealed partial class ScannerSessionPage
             ScannerRevealKind.GradedUnavailable => "Cotação da certificação indisponível",
             _ => "Sem cotação disponível"
         };
-        _revealValue.FontSize = presentation.Value.HasValue ? 38 : 20;
-        _revealValue.TextColor = Colors.White;
+        _revealValue.FontSize = presentation.Value.HasValue ? 48 : 20;
+        _revealValue.SetDynamicResource(Label.TextColorProperty, presentation.Value.HasValue ? "BrandPrimary" : "TextSecondary");
         _revealValue.Opacity = UiMotion.ReducedMotion ? 1 : 0;
         _revealSource!.Text = presentation.Value.HasValue && card.MarketValue is {} quote
             ? $"{quote.Source}{(card.Condition != "UNKNOWN" ? " · " + card.Condition : "")} · atualizado {quote.QuotedAt.ToLocalTime():dd/MM HH:mm}"
             : "Adicionada à sessão · não entra no valor estimado";
         _revealSource.Opacity = _revealValue.Opacity;
         _total.Text = Money(UiMotion.ReducedMotion ? presentation.FinalTotal : previousTotal);
-        panel.IsVisible = true; panel.Opacity = 0; panel.Scale = UiMotion.ReducedMotion ? 1 : .97;
-        panel.TranslationY = UiMotion.ReducedMotion ? 0 : 8;
+        panel.IsVisible = true; panel.Opacity = 0; panel.Scale = UiMotion.ReducedMotion ? 1 : .9;
+        panel.TranslationY = UiMotion.ReducedMotion ? 0 : 12;
         try
         {
             try { HapticFeedback.Default.Perform(HapticFeedbackType.Click); }
@@ -53,27 +53,36 @@ public sealed partial class ScannerSessionPage
             else
             {
                 await AnimateReveal("Card", generation, ScannerRevealMotion.CardMs, p =>
-                { panel.Opacity = p; panel.TranslationY = 8 * (1 - p); panel.Scale = .97 + .03 * p; }, Current, operation.Context.Token);
+                { panel.Opacity = p; panel.TranslationY = 12 * (1 - p); panel.Scale = .9 + .1 * p; }, Current, operation.Context.Token);
                 Check();
                 await AnimateReveal("Value", generation, ScannerRevealMotion.ValueMs, p =>
                 {
-                    _revealValue.Opacity = Math.Min(1, p * 4); _revealSource.Opacity = _revealValue.Opacity;
+                    _revealValue.Opacity = Math.Min(1, p * 3); _revealSource.Opacity = _revealValue.Opacity;
                     if (presentation.ValueAt(p) is {} amount) _revealValue.Text = Money(amount);
                 }, Current, operation.Context.Token);
                 Check();
                 if (presentation.Value.HasValue)
                 {
                     _revealValue.Text = Money(presentation.Value.Value);
+                    try { HapticFeedback.Default.Perform(HapticFeedbackType.Click); }
+                    catch (Exception ex) when (ex is FeatureNotSupportedException or PermissionException) { }
                     await AnimateReveal("Pop", generation, ScannerRevealMotion.PopMs,
-                        p => _revealValue.Scale = 1 + .05 * Math.Sin(Math.PI * p), Current, operation.Context.Token, Easing.Linear);
+                        p => _revealValue.Scale = 1 + .08 * Math.Sin(Math.PI * p), Current, operation.Context.Token, Easing.Linear);
                     Check();
-                    if (_totalDelta is {} delta) { delta.Text = "+ " + Money(presentation.Value.Value); delta.IsVisible = true; }
+                    if (_totalDelta is {} delta) { delta.Text = "+ " + Money(presentation.Value.Value); delta.IsVisible = true; delta.Opacity = 1; delta.TranslationY = 0; }
                 }
                 await AnimateReveal("Total", generation, ScannerRevealMotion.TotalMs,
                     p => _total.Text = Money(presentation.TotalAt(p)), Current, operation.Context.Token);
             }
             Check(); _total.Text = Money(presentation.FinalTotal);
             SemanticProperties.SetDescription(panel, $"{card.Name}. {_revealValue.Text}. Total {Money(presentation.FinalTotal)}.");
+            // Fade out the delta after the reveal settles
+            if (_totalDelta is {} d && d.IsVisible)
+            {
+                await AnimateReveal("DeltaFade", generation, ScannerRevealMotion.ExitMs * 2, p =>
+                { d.Opacity = 1 - p; d.TranslationY = -8 * p; }, Current, operation.Context.Token);
+                d.IsVisible = false;
+            }
             await AnimateReveal("Exit", generation, ScannerRevealMotion.ExitMs, p => panel.Opacity = 1 - p, Current, operation.Context.Token);
         }
         finally
@@ -101,11 +110,11 @@ public sealed partial class ScannerSessionPage
     private void StopReveal()
     {
         var generation = _revealGeneration++;
-        foreach (var stage in new[] { "Card", "Value", "Pop", "Total", "Exit" }) this.AbortAnimation($"ScannerReveal{stage}{generation}");
+        foreach (var stage in new[] { "Card", "Value", "Pop", "Total", "DeltaFade", "Exit" }) this.AbortAnimation($"ScannerReveal{stage}{generation}");
         _revealPanel?.CancelAnimations(); _revealValue.CancelAnimations();
         if (_revealPanel is {} panel) { panel.IsVisible = false; panel.Scale = 1; panel.TranslationY = 0; }
         _revealValue.Scale = 1;
-        if (_totalDelta is {} delta) delta.IsVisible = false;
-        _total.TextColor = Colors.White; _total.Scale = 1; _revealInFlight = false;
+        if (_totalDelta is {} delta) { delta.IsVisible = false; delta.Opacity = 1; delta.TranslationY = 0; }
+        _total.TextColor = TokenColor("TextPrimary"); _total.Scale = 1; _revealInFlight = false;
     }
 }

@@ -434,8 +434,10 @@ public sealed partial class ScannerSessionPage : ContentPage
     private void ShowError(Exception ex) { _status.Text = ex is ArgumentException or InvalidOperationException ? ex.Message : ApiErrorTranslator.FromException(ex).Message; }
     private Button Action(string title, Func<Task> action)
     {
-        var button = new Button { Text = title, CornerRadius = 14, MinimumHeightRequest = 48, Padding = new Thickness(16, 12), BackgroundColor = Color.FromArgb("#282137"), TextColor = Colors.White, FontSize = 14,
+        var button = new Button { Text = title, CornerRadius = 16, MinimumHeightRequest = 48, Padding = new Thickness(16, 12), FontSize = 14,
             IsEnabled = !_busy };
+        button.SetDynamicResource(Button.BackgroundColorProperty, "SurfaceElevated");
+        button.SetDynamicResource(Button.TextColorProperty, "TextPrimary");
         _actions.Add(button); SemanticProperties.SetDescription(button, title); UiMotion.AttachPress(button);
         button.Clicked += async (_, _) =>
         {
@@ -450,4 +452,11 @@ public sealed partial class ScannerSessionPage : ContentPage
     private static Label Text(string value, double size, Color color, bool bold = false) => new() { Text = value, FontSize = size, TextColor = color, FontAttributes = bold ? FontAttributes.Bold : FontAttributes.None };
     private static string Money(decimal value) => value.ToString("C2", Br);
     private static Border Surface(View child, string color) => new() { Content = child, Padding = 14, BackgroundColor = Color.FromArgb(color), StrokeThickness = 0, StrokeShape = new RoundRectangle { CornerRadius = 18 } };
+    private static Border TokenSurface(View child, string bgToken, int cornerRadius = 20, double padding = 16)
+    {
+        var border = new Border { Content = child, Padding = padding, StrokeThickness = 0, StrokeShape = new RoundRectangle { CornerRadius = cornerRadius } };
+        border.SetDynamicResource(VisualElement.BackgroundColorProperty, bgToken);
+        return border;
+    }
+    private static Color TokenColor(string key) => (Color)Application.Current!.Resources[key];
 }
